@@ -16,6 +16,7 @@ pub fn add_two(a: i32) -> i32 {
     a + 2
 }
 
+#[allow(dead_code)]
 pub struct Guess {
     value: i32,
 }
@@ -75,7 +76,6 @@ mod tests {
     fn it_adds_two() {
         assert_eq!(4, add_two(2))
     }
-
 
     #[test]
     #[should_panic]
