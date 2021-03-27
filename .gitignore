@@ -1,0 +1,44 @@
+# JAVA #
+*.class
+*.jar
+
+# IDEA #
+.idea
+*.iml
+.metadata
+.settings/
+.loadpath
+.externalToolBuilders/
+*.launch
+.cache*
+
+# Eclipse #
+.settings
+.classpath
+.project
+.externalToolBuilders
+
+# SVN #
+.svn
+
+# image #
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Maven #
+target/
+
+# html #
+*.eot
+*.ttf
+*.woff
+
+# js #
+*.min.js
+
+# css #
+*.min.css
+
+# custom #
