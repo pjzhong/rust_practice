@@ -3,6 +3,7 @@ mod number_of_good_pairs;
 mod remove_all_adjacent_duplicates_in_string;
 mod running_sum_of_1d_array;
 
+#[allow(dead_code)]
 pub struct Solution;
 
 #[test]

@@ -1,6 +1,7 @@
 use crate::algorithms::Solution;
 
 /// @link https://leetcode.com/problems/remove-all-adjacent-duplicates-in-string
+#[allow(dead_code)]
 impl Solution {
     pub fn remove_duplicates(s: String) -> String {
         let mut result = String::new();

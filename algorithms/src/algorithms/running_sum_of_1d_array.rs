@@ -1,6 +1,7 @@
 use crate::algorithms::Solution;
 
 /// @link https://leetcode.com/problems/running-sum-of-1d-array/
+#[allow(dead_code)]
 impl Solution {
     pub fn running_sum(nums: Vec<i32>) -> Vec<i32> {
         let mut prev = 0;

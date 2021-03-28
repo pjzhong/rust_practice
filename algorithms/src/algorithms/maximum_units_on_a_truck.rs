@@ -1,6 +1,7 @@
 use crate::algorithms::Solution;
 
 /// @link https://leetcode.com/problems/maximum-units-on-a-truck/
+#[allow(dead_code)]
 impl Solution {
     pub fn maximum_units(box_types: Vec<Vec<i32>>, truck_size: i32) -> i32 {
         let mut box_types = box_types;

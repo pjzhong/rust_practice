@@ -1,6 +1,7 @@
 use crate::algorithms::Solution;
 
 /// @link https://leetcode.com/problems/number-of-good-pairs/
+#[allow(dead_code)]
 impl Solution {
     pub fn num_identical_pairs(nums: Vec<i32>) -> i32 {
         let mut result = 0;
