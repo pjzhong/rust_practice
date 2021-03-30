@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use vulkano::command_buffer::AutoCommandBuffer;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{AutoCommandBufferBuilder, CommandBuffer},
@@ -17,6 +16,7 @@ fn main() {
     let physical = PhysicalDevice::enumerate(&instance)
         .next()
         .expect("no device available");
+    println!("selected device:{:?}", physical.name());
 
     for family in physical.queue_families() {
         println!(
@@ -35,7 +35,10 @@ fn main() {
         Device::new(
             physical,
             &Features::none(),
-            &DeviceExtensions::none(),
+            &DeviceExtensions {
+                khr_storage_buffer_storage_class: true,
+                ..DeviceExtensions::none()
+            },
             [(queue_family, 0.5)].iter().cloned(),
         )
         .expect("failed to create device")
@@ -51,13 +54,10 @@ fn main() {
             .expect("failed to create buffer");
 
     let shader = cs::Shader::load(device.clone()).expect("failed to create shader module");
-    let compute_pipeline = Arc::new(ComputePipeline::new(
-        device.clone(),
-        &shader.main_entry_point(),
-        &(),
-        Option::None,
-    ))
-    .expect("failed to create compute pipline");
+    let compute_pipeline = Arc::new(
+        ComputePipeline::new(device.clone(), &shader.main_entry_point(), &(), None)
+            .expect("failed to create pipeline"),
+    );
 
     let layout = compute_pipeline.layout().descriptor_set_layout(0).unwrap();
     let set = Arc::new(
@@ -70,7 +70,13 @@ fn main() {
 
     let mut builder = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
     builder
-        .dispatch([1024, 1, 1], compute_pipeline.clone(), set.clone(), (), 0)
+        .dispatch(
+            [1024, 1, 1],
+            compute_pipeline.clone(),
+            set.clone(),
+            (),
+            0..0,
+        )
         .unwrap();
     let command_buffer = builder.build().unwrap();
     let finished = command_buffer.execute(queue.clone()).unwrap();
@@ -82,7 +88,7 @@ fn main() {
 
     let content = data_buffer.read().unwrap();
     for (n, val) in content.iter().enumerate() {
-        assert_eq!(val, n as u32 * 12)
+        assert_eq!(*val, n as u32 * 12)
     }
 }
 
