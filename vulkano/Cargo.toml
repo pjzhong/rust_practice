@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 vulkano = "0.21.0"
 vulkano-shaders = "0.18"
+image = "0.23"

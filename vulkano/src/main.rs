@@ -46,7 +46,7 @@ fn main() {
     };
     let queue = queues.next().unwrap();
 
-    compute_operations::run(device, queue);
+    image_creation::run(device, queue);
     //buffer_create_example(device)
     //copy_operation(device, queue);
 }
