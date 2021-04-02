@@ -24,12 +24,6 @@ pub fn run(device: Arc<Device>, queue: Arc<Queue>) {
     )
     .unwrap();
 
-    let mut builder = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
-    builder
-        .clear_color_image(image.clone(), ClearValue::Float([0.0, 0.0, 1.0, 1.0]))
-        .unwrap();
-    let command_buffer = builder.build().unwrap();
-
     let buf = CpuAccessibleBuffer::from_iter(
         device.clone(),
         BufferUsage::all(),
