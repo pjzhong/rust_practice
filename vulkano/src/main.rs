@@ -11,6 +11,7 @@ use vulkano::{
 mod compute_operations;
 mod image_creation;
 mod fractal;
+mod graphics_pipeline;
 
 fn main() {
     let instance =
@@ -47,7 +48,7 @@ fn main() {
     };
     let queue = queues.next().unwrap();
 
-    fractal::run(device, queue);
+    graphics_pipeline::run(device, queue);
     //buffer_create_example(device)
     //copy_operation(device, queue);
 }
