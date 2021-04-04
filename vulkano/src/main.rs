@@ -4,18 +4,21 @@ use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{AutoCommandBufferBuilder, CommandBuffer},
     device::{Device, DeviceExtensions, Features, Queue},
-    instance::{Instance, InstanceExtensions, PhysicalDevice},
+    instance::{Instance, PhysicalDevice},
     sync::GpuFuture,
 };
 
 mod compute_operations;
-mod image_creation;
 mod fractal;
 mod graphics_pipeline;
+mod image_creation;
+mod windowing;
 
 fn main() {
-    let instance =
-        Instance::new(None, &InstanceExtensions::none(), None).expect("failed to create instance");
+    let instance = {
+        let extensions = vulkano_win::required_extensions();
+        Instance::new(None, &extensions, None).expect("failed to create vulkan instance")
+    };
     let physical = PhysicalDevice::enumerate(&instance)
         .next()
         .expect("no device available");
@@ -39,6 +42,7 @@ fn main() {
             physical,
             &Features::none(),
             &DeviceExtensions {
+                khr_swapchain: true,
                 khr_storage_buffer_storage_class: true,
                 ..DeviceExtensions::none()
             },
@@ -48,9 +52,10 @@ fn main() {
     };
     let queue = queues.next().unwrap();
 
-    graphics_pipeline::run(device, queue);
+    //graphics_pipeline::run(device, queue);
     //buffer_create_example(device)
     //copy_operation(device, queue);
+    windowing::run(instance.clone(), physical, device, queue);
 }
 
 #[allow(dead_code)]

@@ -576,9 +576,9 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd96ffd135b2fd7b973ac026d28085defbe8983df057ced3eb4f2130b0831312"
+checksum = "5a3c91c24eae6777794bb1997ad98bbb87daf92890acab859f7eaa4320333176"
 dependencies = [
  "scopeguard",
 ]
@@ -1241,22 +1241,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vulkano"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b34b537d0050076f22526f6aab0ee53b1aae135d9d13ac5acd9cf3d916940c7"
-dependencies = [
- "crossbeam-queue",
- "fnv",
- "half",
- "lazy_static",
- "parking_lot",
- "shared_library",
- "smallvec",
- "vk-sys",
-]
-
-[[package]]
 name = "vulkano-shaders"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1270,15 +1254,15 @@ dependencies = [
 
 [[package]]
 name = "vulkano-win"
-version = "0.22.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7a193b77f1c4127f64042ac5d77f2a8b8e236fb9e42a32ece8b33b22eb4715e"
+checksum = "8acdaa3c8b810ad1140e853874c677c9c478e2ee101f8a5162d0cc9e40786ad5"
 dependencies = [
  "cocoa 0.20.2",
  "metal",
  "objc",
  "raw-window-handle",
- "vulkano 0.22.0",
+ "vulkano 0.21.0",
  "winit",
 ]
 
