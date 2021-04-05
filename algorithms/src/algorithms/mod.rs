@@ -4,6 +4,7 @@ mod remove_all_adjacent_duplicates_in_string;
 mod running_sum_of_1d_array;
 mod backspace_string_compare;
 mod last_stone_weight;
+mod reorganize_string;
 
 #[allow(dead_code)]
 pub struct Solution;
