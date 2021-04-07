@@ -5,6 +5,7 @@ mod running_sum_of_1d_array;
 mod backspace_string_compare;
 mod last_stone_weight;
 mod reorganize_string;
+mod sort_characters_by_frequency;
 
 #[allow(dead_code)]
 pub struct Solution;
