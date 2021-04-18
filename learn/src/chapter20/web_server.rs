@@ -51,7 +51,9 @@ fn handle_connection(mut stream: TcpStream) {
         }
         Err(e) => {
             println!("{:?} read wrong {:?}, closing", stream, e);
-            stream.shutdown(Shutdown::Both);
+            if let Err(e) = stream.shutdown(Shutdown::Both) {
+                println!("shutdown error {:?}", e)
+            }
             return;
         }
     }
@@ -61,7 +63,9 @@ fn write(stream: &mut TcpStream, response: String) {
     match stream.write(response.as_bytes()) {
         Ok(size) => {
             println!("write {} bytes", size);
-            stream.flush();
+            if let Err(e) = stream.flush() {
+                println!("flush error {:?}", e);
+            }
         }
         Err(e) => {
             println!("{:?} write wrong {:?}, do nothing", stream, e);
