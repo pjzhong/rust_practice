@@ -1538,6 +1538,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e5d7cd7ab3e47dda6e56542f4bbf3824c15234958c6e1bd6aaa347e93499fdc"
 
 [[package]]
+name = "tutorial3-pipeline"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "env_logger",
+ "fs_extra",
+ "futures",
+ "glob",
+ "shaderc",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
+name = "tutorial4-buffers"
+version = "0.1.0"
+
+[[package]]
 name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1707,20 +1725,6 @@ checksum = "222b1ef9334f92a21d3fb53dc3fd80f30836959a90f9274a626d7e06315ba3c3"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "wgpu"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "env_logger",
- "fs_extra",
- "futures",
- "glob",
- "shaderc",
- "wgpu 0.7.1",
- "winit",
 ]
 
 [[package]]
