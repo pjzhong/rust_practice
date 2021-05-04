@@ -42,3 +42,4 @@ target/
 *.min.css
 
 # custom #
+*.spv

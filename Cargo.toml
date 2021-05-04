@@ -11,5 +11,5 @@ members = [
    "algorithms",
    "learn",
    #"vulkano", vulkano and wgpu has depedencies conflicts, activity only one of the two
-   "wgpu",
+   "wgpu/*",
 ]
