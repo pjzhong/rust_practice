@@ -1889,6 +1889,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "tutorial7-instancing"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "cgmath",
+ "env_logger",
+ "fs_extra",
+ "futures",
+ "glob",
+ "image",
+ "shaderc",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
+name = "tutorial8-depthbuffer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "cgmath",
+ "env_logger",
+ "fs_extra",
+ "futures",
+ "glob",
+ "image",
+ "shaderc",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
