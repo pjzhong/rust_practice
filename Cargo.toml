@@ -10,6 +10,7 @@ edition = "2018"
 members = [
    "algorithms",
    "learn",
-   #"vulkano", vulkano and wgpu has depedencies conflicts, activity only one of the two
-   "wgpu/*",
+   #"vulkano", vulkano, wgpu, wgpu8.0 has depedencies conflicts, activity only one of three
+   #"wgpu/*",
+   "wgpu8.0/*",
 ]
