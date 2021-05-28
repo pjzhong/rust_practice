@@ -93,7 +93,7 @@ impl Texture {
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
-            &*rgba,
+            &rgba,
             wgpu::ImageDataLayout  {
                 offset: 0,
                 bytes_per_row:  NonZeroU32::new(4 * dimensions.0),
