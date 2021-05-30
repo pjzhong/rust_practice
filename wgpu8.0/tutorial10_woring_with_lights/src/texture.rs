@@ -1,8 +1,6 @@
-use std::path::Path;
-
 use anyhow::*;
 use image::GenericImageView;
-use std::num::NonZeroU32;
+use std::{num::NonZeroU32, path::Path};
 
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -11,8 +9,20 @@ pub struct Texture {
 }
 
 impl Texture {
-    //1.
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+    pub fn load<P: AsRef<Path>>(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        path: P,
+    ) -> Result<Self> {
+        // Needed to appease the borrow checker
+        let path_copy = path.as_ref().to_path_buf();
+        let label = path_copy.to_str();
+
+        let img = image::open(path)?;
+        Self::from_image(device, queue, &img, label)
+    }
 
     pub fn create_depth_texture(
         device: &wgpu::Device,
@@ -20,12 +30,10 @@ impl Texture {
         label: &str,
     ) -> Self {
         let size = wgpu::Extent3d {
-            //2.
             width: sc_desc.width,
             height: sc_desc.height,
             depth_or_array_layers: 1,
         };
-
         let desc = wgpu::TextureDescriptor {
             label: Some(label),
             size,
@@ -33,11 +41,9 @@ impl Texture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT // 3.
-            | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         };
         let texture = device.create_texture(&desc);
-
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -59,26 +65,34 @@ impl Texture {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn from_bytes(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bytes: &[u8],
+        label: &str,
+    ) -> Result<Self> {
+        let img = image::load_from_memory(bytes)?;
+        Self::from_image(device, queue, &img, Some(label))
+    }
+
     pub fn from_image(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         img: &image::DynamicImage,
         label: Option<&str>,
     ) -> Result<Self> {
-        let rgba = img.to_rgba8();
-
         let dimensions = img.dimensions();
+        let rgba = img.to_rgba8();
 
         let size = wgpu::Extent3d {
             width: dimensions.0,
             height: dimensions.1,
             depth_or_array_layers: 1,
         };
-
-        //This texture struct has no method to interact with the data directly
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size,
             label,
+            size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -86,24 +100,21 @@ impl Texture {
             usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
         });
 
-        //write the data to texture struct
         queue.write_texture(
-            wgpu::ImageCopyTexture  {
+            wgpu::ImageCopyTexture {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
             &rgba,
-            wgpu::ImageDataLayout  {
+            wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row:  NonZeroU32::new(4 * dimensions.0),
+                bytes_per_row: NonZeroU32::new(4 * dimensions.0),
                 rows_per_image: NonZeroU32::new(dimensions.1),
             },
             size,
         );
 
-        //Why need viewer to view the texture?
-        //And also a sampler to extract data the from viewer?
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -120,17 +131,5 @@ impl Texture {
             view,
             sampler,
         })
-    }
-
-    pub fn load<P: AsRef<Path>>(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        path: P,
-    ) -> Result<Self> {
-        let path_copy = path.as_ref().to_path_buf();
-        let label = path_copy.to_str();
-
-        let img = image::open(path)?;
-        Self::from_image(device, queue, &img, label)
     }
 }
