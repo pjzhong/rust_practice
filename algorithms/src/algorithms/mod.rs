@@ -6,6 +6,7 @@ mod backspace_string_compare;
 mod last_stone_weight;
 mod reorganize_string;
 mod sort_characters_by_frequency;
+mod sum_of_subarray_minimums;
 
 #[allow(dead_code)]
 pub struct Solution;

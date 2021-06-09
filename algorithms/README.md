@@ -1,6 +1,6 @@
 [LeetCode:pj_zhong](https://leetcode.com/pj_zhong/)
 
-# Questions-8
+# Questions-9
 
 - [backspace_string_compare](src/algorithms/backspace_string_compare.rs)
 - [last_stone_weight](src/algorithms/last_stone_weight.rs)
@@ -10,3 +10,4 @@
 - [reorganize_string](src/algorithms/reorganize_string.rs)
 - [running_sum_of_1d_array](src/algorithms/running_sum_of_1d_array.rs)
 - [sort_characters_by_frequency](src/algorithms/sort_characters_by_frequency.rs)
+- [sum_of_subarray_minimums](src/algorithms/sum_of_subarray_minimums.rs)
