@@ -1,10 +1,11 @@
-use crate::algorithms::Solution;
 use std::collections::HashMap;
 
-/// click [`here`] to leetcode
-/// [here]: https://leetcode.com/problems/sort-characters-by-frequency/
+use crate::algorithms::Solution;
+
 #[allow(dead_code)]
 impl Solution {
+    /// click [`here`] to leetcode
+    /// [here]: https://leetcode.com/problems/sort-characters-by-frequency/
     pub fn frequency_sort(s: String) -> String {
         let mut map = HashMap::new();
         for c in s.chars() {
