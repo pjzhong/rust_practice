@@ -1,4 +1,4 @@
-use std::collections::LinkedList;
+use std::collections::VecDeque;
 
 use crate::algorithms::Solution;
 
@@ -8,7 +8,7 @@ impl Solution {
     /// [here]: https://leetcode.com/problems/sum-of-subarray-minimums/
     pub fn sum_subarray_mins(arr: Vec<i32>) -> i32 {
         let mut res: usize = 0;
-        let mut stack = LinkedList::new();
+        let mut stack = VecDeque::new();
 
         stack.push_front((arr[0], 0usize));
         for i in 1..arr.len() {
@@ -25,7 +25,7 @@ impl Solution {
         (res % 1_000_000_007) as i32
     }
 
-    fn pop_out(val: i32, idx: usize, stack: &mut LinkedList<(i32, usize)>) -> usize {
+    fn pop_out(val: i32, idx: usize, stack: &mut VecDeque<(i32, usize)>) -> usize {
         let mut res = 0;
         while let Some((num, i)) = stack.pop_front() {
             if val <= num {
