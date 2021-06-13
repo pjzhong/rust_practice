@@ -5,7 +5,8 @@ use crate::algorithms::Solution;
 #[allow(dead_code)]
 impl Solution {
     /// click [`here`] to leetcode
-    /// [here]: https://leetcode.com/problems/sum-of-subarray-minimums/
+    ///
+    /// [`here`]: https://leetcode.com/problems/sum-of-subarray-minimums/
     pub fn sum_subarray_mins(arr: Vec<i32>) -> i32 {
         let mut res: usize = 0;
         let mut stack = VecDeque::new();
