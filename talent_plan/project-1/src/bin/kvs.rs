@@ -55,16 +55,6 @@ fn main() {
         ])
         .get_matches();
 
-    if let Some(matches) = matches.subcommand_matches("get") {
-        eprintln!("unimplemented");
-        process::exit(0x0100);
-    }
-
-    if let Some(matches) = matches.subcommand_matches("set") {
-        eprintln!("unimplemented");
-        process::exit(0x0100);
-    }
-
     match matches.subcommand() {
         ("get", _) | ("set", _) | ("rm", _) => {
             eprintln!("unimplemented");

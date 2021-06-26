@@ -28,6 +28,16 @@ where
     }
 
     pub fn remove(&mut self, key: K) -> Option<V> {
-       self.map.remove(&key)
+        self.map.remove(&key)
+    }
+}
+
+impl<K, V> Default for KvStore<K, V>
+where
+    K: Eq + Hash,
+    V: Clone,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
