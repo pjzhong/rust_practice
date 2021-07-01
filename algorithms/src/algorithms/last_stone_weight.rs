@@ -20,7 +20,7 @@ impl Solution {
 
     pub fn last_stone_weight_none_heap(stones: Vec<i32>) -> i32 {
         let mut stones = stones;
-        stones.sort();
+        stones.sort_unstable();
 
         while 1 < stones.len() {
             let left = stones.pop().unwrap() - stones.pop().unwrap();

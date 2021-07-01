@@ -8,13 +8,11 @@ use std::{
 pub fn main() {
     let current_dir = env::current_dir().unwrap();
     let algorithms_dir = current_dir
-        .clone()
         .join("algorithms")
         .join("src")
         .join("algorithms");
 
     let path_prefix = current_dir
-        .clone()
         .join("algorithms/")
         .into_os_string()
         .into_string()
@@ -22,8 +20,7 @@ pub fn main() {
     let suffix = String::from(".rs");
 
     let mut questions = Vec::new();
-    let mut dirs = Vec::new();
-    dirs.push(fs::read_dir(algorithms_dir.clone()));
+    let mut dirs = vec![fs::read_dir(algorithms_dir)];
 
     while !dirs.is_empty() {
         let item = dirs.pop().unwrap();
@@ -38,7 +35,7 @@ pub fn main() {
                         .collect::<String>()
                         .replace(MAIN_SEPARATOR, "/");
 
-                    let index = match path_string.rfind("/") {
+                    let index = match path_string.rfind('/') {
                         Some(idx) => idx + 1,
                         _ => 0,
                     };
@@ -63,12 +60,12 @@ pub fn main() {
         questions.len()
     );
     read_me_file
-        .write(all.as_bytes())
+        .write_all(all.as_bytes())
         .expect("Something wrong, check out");
     questions.sort();
     for q in questions {
         read_me_file
-            .write(q.as_bytes())
+            .write_all(q.as_bytes())
             .expect("Something wrong, check out");
     }
 }

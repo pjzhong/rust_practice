@@ -8,7 +8,7 @@ impl Solution {
 
         let mut result = Vec::with_capacity(nums.len());
         for value in nums {
-            prev = prev + value;
+            prev += value;
             result.push(prev);
         }
 

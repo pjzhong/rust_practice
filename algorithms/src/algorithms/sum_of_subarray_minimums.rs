@@ -12,13 +12,12 @@ impl Solution {
         let mut stack = VecDeque::new();
 
         stack.push_front((arr[0], 0usize));
-        for i in 1..arr.len() {
-            let num = arr[i];
+        for (i, num) in arr.iter().enumerate().skip(1) {
             if let Some((val, _)) = stack.front() {
-                if num <= *val {
-                    res += Solution::pop_out(num, i, &mut stack);
+                if num <= val {
+                    res += Solution::pop_out(*num, i, &mut stack);
                 }
-                stack.push_front((num, i));
+                stack.push_front((*num, i));
             }
         }
         res += Solution::pop_out(0, arr.len(), &mut stack);
@@ -53,13 +52,14 @@ impl Solution {
 
 /// click [`here`] to leetcode
 /// [here]: https://leetcode.com/problems/sum-of-subarray-minimums/
+#[allow(dead_code)]
 fn brute_force(arr: Vec<i32>) -> i32 {
     let mut res: usize = 0;
 
     for i in 0..arr.len() {
         let mut min = arr[i];
-        for j in i..arr.len() {
-            min = min.min(arr[j]);
+        for j in arr.iter().skip(i) {
+            min = min.min(*j);
             res += min as usize;
         }
     }
