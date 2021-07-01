@@ -56,11 +56,10 @@ impl Solution {
 fn brute_force(arr: Vec<i32>) -> i32 {
     let mut res: usize = 0;
 
-    for i in 0..arr.len() {
-        let mut min = arr[i];
+    for (i, mut min) in arr.iter().enumerate() {
         for j in arr.iter().skip(i) {
-            min = min.min(*j);
-            res += min as usize;
+            min = min.min(j);
+            res += *min as usize;
         }
     }
     (res % 1_000_000_007) as i32
