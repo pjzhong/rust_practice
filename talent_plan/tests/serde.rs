@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufWriter, Read, Write};
-use serde::{Deserialize, Serialize};
+
 use bson::Document;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Move {
@@ -20,10 +21,14 @@ fn bson_serde() -> io::Result<()> {
     }
 
     {
-        let mut f = File::open("serde_bson")?;
+        let f = File::open("serde_bson")?;
+        let mut reader = BufReader::new(f);
         loop {
-            match Document::from_reader(&mut f) {
-                Ok(d) => println!("{:?}", d),
+            match Document::from_reader(&mut reader) {
+                Ok(d) => {
+                   let m = bson::from_document::<Move>(d);
+                    println!("{:?}", m);
+                }
                 Err(_) => break,
             }
         }

@@ -9,7 +9,10 @@ use std::process;
 
 use clap::{App, Arg, SubCommand};
 
-fn main() {
+use kvs::kvs::error::CliErr;
+use kvs::KvStore;
+
+fn main() -> Result<(), CliErr> {
     let matches = App::new("My kvs program")
         .version(env!("CARGO_PKG_VERSION"))
         .author("ping <ping@gmail.com>")
@@ -36,7 +39,7 @@ fn main() {
                         .help("the key")
                         .required(true)
                         .index(1),
-                    Arg::with_name("VALUE")
+                    Arg::with_name("VAL")
                         .help("the value")
                         .required(true)
                         .index(2),
@@ -55,13 +58,35 @@ fn main() {
         ])
         .get_matches();
 
+    let mut kv_store = KvStore::new()?;
     match matches.subcommand() {
-        ("get", _) | ("set", _) | ("rm", _) => {
+        ("set", Some(set_args)) => {
+            let key = set_args.value_of("KEY").expect("Key is not Exists");
+            let val = set_args.value_of("VAL").expect("Val is not Exists");
+            if let Err(err) = kv_store.set(key.to_owned(), val.to_owned()) {
+                println!("{}", err)
+            }
+        }
+        ("get", Some(get_args)) => {
+            let key = get_args.value_of("KEY").expect("Key is not Exists");
+            match kv_store.get(key.to_owned()) {
+                Ok(val) => println!("{}", val.unwrap_or(String::from("Key not found"))),
+                Err(err) => println!("{}", err),
+            }
+        }
+        ("rm", Some(rm_args)) => {
+            let key = rm_args.value_of("KEY").expect("Key is not Exists");
+            if let Err(err) = kv_store.remove(key.to_owned()) {
+                println!("{}", err);
+                process::exit(0x0100);
+            }
+        }
+        _ => {
             eprintln!("unimplemented");
             process::exit(0x0100);
         }
-        _ => unreachable!(),
     }
 
     // more program logic goes here...
+    Ok(())
 }
