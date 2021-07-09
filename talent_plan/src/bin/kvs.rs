@@ -70,7 +70,7 @@ fn main() -> Result<(), CliErr> {
         ("get", Some(get_args)) => {
             let key = get_args.value_of("KEY").expect("Key is not Exists");
             match kv_store.get(key.to_owned()) {
-                Ok(val) => println!("{}", val.unwrap_or(String::from("Key not found"))),
+                Ok(val) => println!("{}", val.unwrap_or_else( || String::from("Key not found"))),
                 Err(err) => println!("{}", err),
             }
         }
