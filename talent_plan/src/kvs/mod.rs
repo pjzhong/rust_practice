@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Seek, SeekFrom, Write};
+use std::io::{BufReader, Cursor, Seek, SeekFrom, Write};
 use std::path;
 
 use bson::Document;
@@ -11,6 +11,7 @@ use error::{CliErr, Result};
 pub mod error;
 
 const NAME: &str = "kvs";
+const COMPACT_THRESHOLD: u64 = (1024 * 1024) * 10;
 
 /// A in-memory Key-value store
 pub struct KvStore {
@@ -19,16 +20,9 @@ pub struct KvStore {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Record {
-    opt: Opt,
-    key: String,
-    val: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 enum Opt {
-    Set,
-    Rm,
+    Set { key: String, val: String },
+    Rm { key: String },
 }
 
 impl KvStore {
@@ -45,20 +39,20 @@ impl KvStore {
             .read(true)
             .create(true)
             .append(true)
-            .open(kvs_path.clone())?;
+            .open(kvs_path)?;
 
         let mut read = BufReader::new(file);
         loop {
             let pos = read.stream_position()?;
             match Document::from_reader(&mut read) {
                 Ok(d) => {
-                    let record = bson::from_document::<Record>(d)?;
-                    match record.opt {
-                        Opt::Set => {
-                            map.insert(record.key, pos);
+                    let record = bson::from_document::<Opt>(d)?;
+                    match record {
+                        Opt::Set { key, .. } => {
+                            map.insert(key, pos);
                         }
-                        Opt::Rm => {
-                            map.remove(&record.key);
+                        Opt::Rm { key } => {
+                            map.remove(&key);
                         }
                     }
                 }
@@ -78,8 +72,11 @@ impl KvStore {
             Some(s) => {
                 self.file.seek(SeekFrom::Start(*s))?;
                 let doc = Document::from_reader(&mut self.file)?;
-                let record = bson::from_document::<Record>(doc)?;
-                Ok(Some(record.val))
+                let record = bson::from_document::<Opt>(doc)?;
+                match record {
+                    Opt::Set { key: _, val } => Ok(Some(val)),
+                    _ => Ok(None),
+                }
             }
             _ => Ok(None),
         }
@@ -88,36 +85,53 @@ impl KvStore {
     /// Inserts a key-value pair into the store.
     pub fn set(&mut self, key: String, val: String) -> Result<()> {
         let pos = self.file.seek(SeekFrom::End(0))?;
-        let doc = bson::to_document(&Record {
-            opt: Opt::Set,
+        let doc = bson::to_document(&Opt::Set {
             key: key.to_owned(),
             val,
         })?;
         doc.to_writer(&mut self.file)?;
         self.map.insert(key, pos);
 
+        self.compact()?;
+        Ok(())
+    }
+
+    fn compact(&mut self) -> Result<()> {
+        let len = self.file.metadata().map_or(0, |meta| meta.len());
+        if len <= COMPACT_THRESHOLD {
+            return Ok(());
+        }
+
+        let mut buff = Cursor::new(Vec::new());
+        let mut new_map = HashMap::new();
+        for (key, pos) in self.map.to_owned() {
+            self.file.seek(SeekFrom::Start(pos))?;
+            let doc = Document::from_reader(&mut self.file)?;
+
+            let pos = buff.stream_position()?;
+            doc.to_writer(&mut buff)?;
+            new_map.insert(key, pos);
+        }
+
+        self.file.set_len(0)?;
+        self.file.write_all(&buff.get_ref().as_slice())?;
+        self.map = new_map;
         Ok(())
     }
 
     /// Removes a key from the store, returning the value at the key if the key
     /// was previously in the store.
     pub fn remove(&mut self, key: String) -> Result<String> {
-        let value = self.get(key.to_owned())?;
-        if value.is_none() {
-            return Err(CliErr::KeyNotFound);
-        }
+        let value = self.get(key.to_owned())?.ok_or(CliErr::KeyNotFound)?;
 
         self.file.seek(SeekFrom::End(0))?;
-        let doc = bson::to_document(&Record {
-            opt: Opt::Rm,
+        let doc = bson::to_document(&Opt::Rm {
             key: key.to_owned(),
-            val: String::new(),
         })?;
         doc.to_writer(&mut self.file)?;
-        self.file.flush()?;
         self.map.remove(&key);
 
-        Ok(value.unwrap())
+        Ok(value)
     }
 }
 

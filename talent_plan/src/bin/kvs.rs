@@ -78,12 +78,12 @@ fn main() -> Result<(), CliErr> {
             let key = rm_args.value_of("KEY").expect("Key is not Exists");
             if let Err(err) = kv_store.remove(key.to_owned()) {
                 println!("{}", err);
-                process::exit(0x0100);
+                process::exit(1);
             }
         }
         _ => {
             eprintln!("unimplemented");
-            process::exit(0x0100);
+            process::exit(1);
         }
     }
 
