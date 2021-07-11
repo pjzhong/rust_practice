@@ -273,7 +273,6 @@ fn compaction() -> Result<()> {
     };
 
     let mut current_size = dir_size();
-    println!("cur_size:{}", current_size);
     for iter in 0..1000 {
         for key_id in 0..1000 {
             let key = format!("key{}", key_id);
@@ -282,7 +281,6 @@ fn compaction() -> Result<()> {
         }
 
         let new_size = dir_size();
-        println!("new_size:{}", new_size);
         if new_size > current_size {
             current_size = new_size;
             continue;
