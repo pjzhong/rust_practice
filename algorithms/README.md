@@ -1,9 +1,10 @@
 [LeetCode:pj_zhong](https://leetcode.com/pj_zhong/)
 
-# Questions-9
+# Questions-10
 
 - [backspace_string_compare](src/algorithms/backspace_string_compare.rs)
 - [last_stone_weight](src/algorithms/last_stone_weight.rs)
+- [majority_element](src/algorithms/majority_element.rs)
 - [maximum_units_on_a_truck](src/algorithms/maximum_units_on_a_truck.rs)
 - [number_of_good_pairs](src/algorithms/number_of_good_pairs.rs)
 - [remove_all_adjacent_duplicates_in_string](src/algorithms/remove_all_adjacent_duplicates_in_string.rs)

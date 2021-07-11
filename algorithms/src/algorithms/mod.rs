@@ -7,6 +7,7 @@ mod last_stone_weight;
 mod reorganize_string;
 mod sort_characters_by_frequency;
 mod sum_of_subarray_minimums;
+mod majority_element;
 
 #[allow(dead_code)]
 pub struct Solution;
