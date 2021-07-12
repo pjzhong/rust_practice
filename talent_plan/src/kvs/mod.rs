@@ -50,27 +50,23 @@ impl KvStore {
         let mut read = BufReader::new(file);
         let mut uncompact = 0u64;
         let mut pos = read.stream_position()?;
-        loop {
-            match Document::from_reader(&mut read) {
-                Ok(d) => {
-                    let new_pos = read.stream_position()?;
-                    let len = new_pos - pos;
-                    let record = bson::from_document::<Opt>(d)?;
-                    match record {
-                        Opt::Set { key, .. } => {
-                            if let Some(old) = map.insert(key, CommandPos { pos, len }) {
-                                uncompact += old.len;
-                            }
-                        }
-                        Opt::Rm { key } => {
-                            map.remove(&key);
-                            uncompact += len;
-                        }
+
+        while let Ok(d) = Document::from_reader(&mut read) {
+            let new_pos = read.stream_position()?;
+            let len = new_pos - pos;
+            let record = bson::from_document::<Opt>(d)?;
+            match record {
+                Opt::Set { key, .. } => {
+                    if let Some(old) = map.insert(key, CommandPos { pos, len }) {
+                        uncompact += old.len;
                     }
-                    pos = new_pos;
                 }
-                Err(_) => break,
+                Opt::Rm { key } => {
+                    map.remove(&key);
+                    uncompact += len;
+                }
             }
+            pos = new_pos;
         }
 
         Ok(Self {
@@ -127,8 +123,8 @@ impl KvStore {
         let mut buff = Vec::new();
         for (_, command) in self.map.iter_mut() {
             self.file.seek(SeekFrom::Start(command.pos))?;
-            let mut buf_vec: Vec<u8> = vec![0; command.len as usize];
-            self.file.read(buf_vec.as_mut_slice())?;
+            let mut buf_vec = vec![0u8; command.len as usize];
+            self.file.read_exact(buf_vec.as_mut_slice())?;
 
             let pos = buff.len();
             buff.append(&mut buf_vec);
