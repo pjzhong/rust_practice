@@ -43,3 +43,5 @@ target/
 
 # custom #
 *.spv
+/talent_plan/Cargo.lock
+/algorithms/Cargo.lock
