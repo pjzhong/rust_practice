@@ -20,8 +20,7 @@ impl fmt::Display for CliError {
     }
 }
 
-impl error::Error for CliError {
-}
+impl error::Error for CliError {}
 
 fn file_double<P: AsRef<Path>>(file_path: P) -> Result<i32, CliError> {
     let mut file = File::open(file_path).map_err(CliError::Io)?;

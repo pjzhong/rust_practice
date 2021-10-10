@@ -1,10 +1,10 @@
 use core::{fmt, num};
+use std::error::Error;
 use std::fmt::Formatter;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::{error, io};
-use std::error::Error;
 
 #[derive(Debug)]
 enum CliError {
@@ -22,7 +22,6 @@ impl fmt::Display for CliError {
 }
 
 impl error::Error for CliError {
-
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match *self {
             CliError::Io(ref err) => Some(err),
@@ -32,15 +31,13 @@ impl error::Error for CliError {
 }
 
 impl From<io::Error> for CliError {
-
-    fn from(err : io::Error) -> Self {
+    fn from(err: io::Error) -> Self {
         CliError::Io(err)
     }
 }
 
 impl From<num::ParseIntError> for CliError {
-
-    fn from(err : num::ParseIntError) -> Self {
+    fn from(err: num::ParseIntError) -> Self {
         CliError::Parse(err)
     }
 }

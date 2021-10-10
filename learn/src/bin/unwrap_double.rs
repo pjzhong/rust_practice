@@ -1,8 +1,8 @@
 use std::env;
 
- fn main() {
-     let mut argv = env::args();
-     let arg: String = argv.nth(1).unwrap(); // error 1
-     let n: i32 = arg.parse().unwrap(); // error 2
-     println!("{}", 2 * n);
- }
+fn main() {
+    let mut argv = env::args();
+    let arg: String = argv.nth(1).unwrap(); // error 1
+    let n: i32 = arg.parse().unwrap(); // error 2
+    println!("{}", 2 * n);
+}
