@@ -1,0 +1,21 @@
+[package]
+name = "platformer"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+imgui = "0.7.0"
+winit = "0.24.0"
+structopt = "0.3.21"
+wgpu = "0.8"
+futures = "0.3"
+anyhow = "1.0.40"
+gilrs = "0.8.1"
+bytemuck = {version = "1.5.1", features = ["derive"]}
+image = "0.23"
+
+[dependencies.cgmath]
+version = "0.18.0"
+features = ["swizzle"]
