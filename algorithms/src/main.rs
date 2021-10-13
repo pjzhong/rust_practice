@@ -8,12 +8,11 @@ use std::{
 pub fn main() {
     let current_dir = env::current_dir().unwrap();
     let algorithms_dir = current_dir
-        .join("algorithms")
         .join("src")
         .join("algorithms");
 
     let path_prefix = current_dir
-        .join("algorithms/")
+        .to_owned()
         .into_os_string()
         .into_string()
         .unwrap();
@@ -53,7 +52,7 @@ pub fn main() {
         }
     }
 
-    let mut read_me_file = File::create(current_dir.join("algorithms").join("README.md")).unwrap();
+    let mut read_me_file = File::create(current_dir.join("README.md")).unwrap();
     let all = format!(
         "{}\n\n# Questions-{}\n\n",
         "[LeetCode:pj_zhong](https://leetcode.com/pj_zhong/)",

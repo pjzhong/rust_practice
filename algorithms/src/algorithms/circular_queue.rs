@@ -8,6 +8,11 @@
  * let ret_5: bool = obj.is_empty();~
  * let ret_6: bool = obj.is_full();
  */
+
+
+/// click [`here`] to leetcode
+///
+/// [`here`]: https://leetcode.com/problems/design-circular-queue/
 struct MyCircularQueue {
     front: usize,
     back: usize,
