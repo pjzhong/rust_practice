@@ -9,6 +9,7 @@ mod reorganize_string;
 mod running_sum_of_1d_array;
 mod sort_characters_by_frequency;
 mod sum_of_subarray_minimums;
+mod remove_duplicates_from_sorted_array_ii;
 
 #[allow(dead_code)]
 pub struct Solution;

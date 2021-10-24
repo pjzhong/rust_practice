@@ -1,6 +1,6 @@
 [LeetCode:pj_zhong](https://leetcode.com/pj_zhong/)
 
-# Questions-11
+# Questions-12
 
 - [backspace_string_compare](/src/algorithms/backspace_string_compare.rs)
 - [circular_queue](/src/algorithms/circular_queue.rs)
@@ -9,6 +9,7 @@
 - [maximum_units_on_a_truck](/src/algorithms/maximum_units_on_a_truck.rs)
 - [number_of_good_pairs](/src/algorithms/number_of_good_pairs.rs)
 - [remove_all_adjacent_duplicates_in_string](/src/algorithms/remove_all_adjacent_duplicates_in_string.rs)
+- [remove_duplicates_from_sorted_array_ii](/src/algorithms/remove_duplicates_from_sorted_array_ii.rs)
 - [reorganize_string](/src/algorithms/reorganize_string.rs)
 - [running_sum_of_1d_array](/src/algorithms/running_sum_of_1d_array.rs)
 - [sort_characters_by_frequency](/src/algorithms/sort_characters_by_frequency.rs)

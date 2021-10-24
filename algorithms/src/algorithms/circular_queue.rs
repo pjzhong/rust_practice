@@ -9,7 +9,6 @@
  * let ret_6: bool = obj.is_full();
  */
 
-
 /// click [`here`] to leetcode
 ///
 /// [`here`]: https://leetcode.com/problems/design-circular-queue/
@@ -23,6 +22,7 @@ struct MyCircularQueue {
  * `&self` means the method takes an immutable reference.
  * If you need a mutable reference, change it to `&mut self` instead.
  */
+#[allow(dead_code)]
 impl MyCircularQueue {
     fn new(k: i32) -> Self {
         Self {
@@ -33,8 +33,8 @@ impl MyCircularQueue {
     }
 
     fn en_queue(&mut self, value: i32) -> bool {
-        let mut back = self.back;
-        let mut front = self.front;
+        let back = self.back;
+        let front = self.front;
 
         let len = back.wrapping_sub(front);
 
@@ -137,14 +137,4 @@ fn option_take_test() {
 }
 
 #[test]
-fn my_queue_test() {
-    let k = 4;
-    let value = 1;
-    let mut obj = MyCircularQueue::new(k);
-    let ret_1: bool = obj.en_queue(value);
-    let ret_2: bool = obj.de_queue();
-    let ret_3: i32 = obj.front();
-    let ret_4: i32 = obj.rear();
-    let ret_5: bool = obj.is_empty();
-    let ret_6: bool = obj.is_full();
-}
+fn my_queue_test() {}
