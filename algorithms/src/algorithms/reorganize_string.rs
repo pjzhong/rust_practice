@@ -1,11 +1,8 @@
-use std::iter::FromIterator;
-
 use crate::algorithms::Solution;
 
 /// @link https://leetcode.com/problems/reorganize-string/
 #[allow(dead_code)]
 impl Solution {
-
     // 借鉴了 https://leetcode.com/problems/reorganize-string/discuss/232469/Java-No-Sort-O(N)-0ms-beat-100
     // 想是想到了，但没实现出来...
     pub fn reorganize_string(s: String) -> String {
@@ -50,7 +47,7 @@ impl Solution {
             }
         }
 
-        String::from_iter(res.iter())
+        res.iter().collect()
     }
 }
 

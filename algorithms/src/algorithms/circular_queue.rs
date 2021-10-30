@@ -67,7 +67,7 @@ impl MyCircularQueue {
             -1
         } else {
             let idx = self.front % self.elements.capacity();
-            return self.elements[idx];
+            self.elements[idx]
         }
     }
 
@@ -76,7 +76,7 @@ impl MyCircularQueue {
             -1
         } else {
             let idx = (self.back - 1) % self.elements.capacity();
-            return self.elements[idx];
+            self.elements[idx]
         }
     }
 

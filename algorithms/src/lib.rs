@@ -1,4 +1,5 @@
 mod algorithms;
+pub mod pretree;
 
 #[cfg(test)]
 mod tests {

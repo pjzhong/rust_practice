@@ -67,7 +67,7 @@ fn image_transfer(mut argv: env::Args) -> Result<i32, String> {
 
 fn main() {
     match image_transfer(env::args()) {
-        Ok(n) => println!("suc co  py  {} files", n),
+        Ok(n) => println!("suc copy  {} files", n),
         Err(err) => println!("Error: {}", err),
     }
 }
