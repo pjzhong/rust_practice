@@ -83,16 +83,16 @@ impl PreTree {
     ///    assert_eq!(vars.get("id"),Some(&"929239".to_string()));
     /// }
     /// ```
-    pub fn query(&self, method: &str, url_path: &str) -> Option<(String, HashMap<String, String>)> {
-        if let Some((t, vars)) = self.tree_group.get(method).and_then(|t| t.search(url_path)) {
-            if t.is_end {
-                Some((t.rule.to_string(), vars))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    pub fn query(
+        &self,
+        method: &str,
+        url_path: &str,
+    ) -> Option<(&String, HashMap<String, String>)> {
+        self.tree_group
+            .get(method)
+            .and_then(|t| t.search(url_path))
+            .filter(|(t, _)| t.is_end)
+            .map(|(t, vars)| (&t.rule, vars))
     }
 }
 
@@ -138,8 +138,7 @@ impl Tree {
     fn insert(&mut self, url_rule: &str) -> Result<(), PreTreeErr> {
         let list = parse_rule(url_rule);
         let mut cursor = Some(self);
-        let last_idx = list.len() - 1;
-        for (world_idx, word) in list.iter().enumerate() {
+        for word in list.iter() {
             if let Some(tree) = cursor.take() {
                 let mut index = None;
                 let mut has_var = false;
@@ -150,8 +149,8 @@ impl Tree {
                     }
                 }
 
-                //同一层有不能存在多个路径参数
-                if has_var && is_variable(word) && last_idx == world_idx {
+                //同一层只能有一个路径参数
+                if index.is_none() && has_var && is_variable(word) {
                     return Err(PreTreeErr::Ambiguity(url_rule.into()));
                 }
 
@@ -166,6 +165,7 @@ impl Tree {
                 break;
             }
         }
+
         if let Some(tree) = cursor {
             if tree.is_end {
                 Err(PreTreeErr::Duplicated(url_rule.into()))
@@ -184,26 +184,28 @@ impl Tree {
         let mut cursor = Some(self);
         let list = parse_path(url_path);
 
-        'for_List: for (index, word) in list.into_iter().enumerate() {
+        for (index, word) in list.into_iter().enumerate() {
             if let Some(tree) = cursor.take() {
                 //尝试直接匹配
-                for n in tree.nodes.iter() {
-                    if n.name == word {
-                        cursor.replace(n);
-                        continue 'for_List;
+                for t in tree.nodes.iter() {
+                    if t.name == word {
+                        cursor.replace(t);
+                        break;
                     }
                 }
 
                 //没找到，看下是否有变量。第一个词不能是变量
-                if 0 < index {
-                    for m in tree.nodes.iter() {
-                        if m.is_variable {
-                            vars.insert(m.var_name(), word);
-                            cursor.replace(m);
-                            continue 'for_List;
+                if cursor.is_none() && 0 < index {
+                    for t in tree.nodes.iter() {
+                        if t.is_variable {
+                            vars.insert(t.var_name(), word);
+                            cursor.replace(t);
+                            break;
                         }
                     }
                 }
+            } else {
+                break;
             }
         }
 
@@ -249,6 +251,7 @@ mod tests {
 
         let mut p = PreTree::new();
         assert!(p.store("GET", "/pet").is_ok());
+        assert!(p.store("GET", "/pet/hi").is_ok());
         assert_eq!(
             Err(PreTreeErr::Duplicated(String::from("/pet"))),
             p.store("GET", "/pet")
@@ -257,13 +260,23 @@ mod tests {
         assert!(p.store("GET", "/pet/{petId}/").is_ok());
         assert!(p.store("GET", "/pet/2/").is_ok());
         assert_eq!(
-            Err(PreTreeErr::Ambiguity(String::from("/pet/{petId}/"))),
+            Err(PreTreeErr::Duplicated(String::from("/pet/{petId}/"))),
             p.store("GET", "/pet/{petId}/")
+        );
+        assert_eq!(
+            Err(PreTreeErr::Ambiguity(String::from("/pet/{petName}/"))),
+            p.store("GET", "/pet/{petName}/")
         );
         assert!(p.store("GET", "/pet/{petId}/{petName}").is_ok());
         assert_eq!(
             Err(PreTreeErr::Ambiguity(String::from("/pet/{petId}/{petSex}"))),
             p.store("GET", "/pet/{petId}/{petSex}")
+        );
+        assert_eq!(
+            Err(PreTreeErr::Ambiguity(String::from(
+                "/pet/{petName}/{petSex}"
+            ))),
+            p.store("GET", "/pet/{petName}/{petSex}")
         );
         assert!(p.store("GET", "/pet/{petId}/info").is_ok());
         assert!(p.store("GET", "/pet/{petId}/test").is_ok());
@@ -277,14 +290,24 @@ mod tests {
     fn test_match() {
         use super::PreTree;
 
-        let data: [[&str; 3]; 8] = [
+        let data: [[&str; 3]; 10] = [
             ["GET", "/pet", "/pet"],
+            ["GET", "/pet/hi", "/pet/hi"],
             ["GET", "/pet/{petId}", "/pet/1"],
             ["POST", "/pet/{petId}", "/pet/2"],
             ["POST", "/pet/3", "/pet/3"],
             ["POST", "/pet/{petId}/uploadImage", "/pet/1/uploadImage"],
             ["POST", "/pet/{petId}/info", "/pet/1/info"],
-            ["POST", "/pet/{petId}/{petSex}", "/pet/1/girl"],
+            [
+                "POST",
+                "/pet/{petId}/{petName}/{petSex}/info",
+                "/pet/1/z/girl/info",
+            ],
+            [
+                "POST",
+                "/test/{petId}/{petName}/{petSex}/info",
+                "/test/1/z/girl/info",
+            ],
             ["GET", "/store/inventory", "/store/inventory"],
         ];
 
@@ -313,7 +336,7 @@ mod tests {
             let url_path = v[2];
             let (rule, vars) = p.query(method, url_path).unwrap();
             println!("rule:{:?} vars:{:?}", rule, vars);
-            assert_eq!(rule, source_rule);
+            assert_eq!(source_rule, rule);
 
             match url_path {
                 "/pet/1" => {
@@ -322,20 +345,18 @@ mod tests {
                 "/pet/2" => {
                     assert_eq!(Some(&String::from("2")), vars.get("petId"));
                 }
-                "/pet/1/uploadImage" => {
+                "/pet/1/uploadImage" | "/pet/1/info" => {
                     assert_eq!(Some(&String::from("1")), vars.get("petId"));
                 }
-                "/pet/1/info" => {
-                    assert_eq!(Some(&String::from("1")), vars.get("petId"));
-                }
-                "/pet/1/girl" => {
+                "/pet/1/z/girl/info" | "/test/1/z/girl/info" => {
                     let mut map = HashMap::new();
-                    map.insert("petId".into(), "1".into());
+                    map.insert("petName".into(), "z".into());
                     map.insert("petSex".into(), "girl".into());
+                    map.insert("petId".into(), "1".into());
 
                     assert_eq!(map, vars);
                 }
-                _ => assert!(vars.is_empty()),
+                _ => assert!(vars.is_empty(), "{:?}", url_path),
             }
         }
     }
