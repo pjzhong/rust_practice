@@ -88,7 +88,7 @@ impl PreTree {
             if t.is_end {
                 Some((t.rule.to_string(), vars))
             } else {
-                Some((String::default(), vars))
+                None
             }
         } else {
             None
@@ -100,6 +100,7 @@ impl PreTree {
 struct Tree {
     rule: String,
     name: String,
+    /// 如果有很多节点，换map会有效果吗?
     nodes: Vec<Tree>,
     is_end: bool,
     is_variable: bool,
@@ -184,7 +185,7 @@ impl Tree {
         let list = parse_path(url_path);
 
         'for_List: for (index, word) in list.into_iter().enumerate() {
-            if let Some(tree) = cursor {
+            if let Some(tree) = cursor.take() {
                 //尝试直接匹配
                 for n in tree.nodes.iter() {
                     if n.name == word {
@@ -301,6 +302,10 @@ mod tests {
                 res,
             );
         }
+
+        assert!(p.query("GET", "/pets").is_none());
+        assert!(p.query("GET", "/store").is_none());
+        assert!(p.query("POST", "/pet/{petId}/info/xxxx").is_none());
 
         for v in data {
             let method = v[0];
