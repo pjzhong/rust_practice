@@ -254,6 +254,7 @@ mod tests {
         );
 
         assert!(p.store("GET", "/pet/{petId}/").is_ok());
+        assert!(p.store("GET", "/pet/2/").is_ok());
         assert_eq!(
             Err(PreTreeErr::Ambiguity(String::from("/pet/{petId}/"))),
             p.store("GET", "/pet/{petId}/")
@@ -275,10 +276,11 @@ mod tests {
     fn test_match() {
         use super::PreTree;
 
-        let data: [[&str; 3]; 7] = [
+        let data: [[&str; 3]; 8] = [
             ["GET", "/pet", "/pet"],
             ["GET", "/pet/{petId}", "/pet/1"],
             ["POST", "/pet/{petId}", "/pet/2"],
+            ["POST", "/pet/3", "/pet/3"],
             ["POST", "/pet/{petId}/uploadImage", "/pet/1/uploadImage"],
             ["POST", "/pet/{petId}/info", "/pet/1/info"],
             ["POST", "/pet/{petId}/{petSex}", "/pet/1/girl"],
