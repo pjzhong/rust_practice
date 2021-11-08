@@ -54,7 +54,6 @@ fn handle_connection(mut stream: TcpStream) {
             if let Err(e) = stream.shutdown(Shutdown::Both) {
                 println!("shutdown error {:?}", e)
             }
-            return;
         }
     }
 }
