@@ -18,6 +18,9 @@ mod app;
 mod event;
 mod game;
 
+/// thanks ['game2048']
+///
+/// ['game2048']:https://github.com/WanderHuang/game-2048-tui
 fn main() -> Result<(), Box<dyn Error>> {
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
