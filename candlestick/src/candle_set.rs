@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Candle {
     /// 开盘价
     pub open: f64,
@@ -14,7 +14,7 @@ pub struct Candle {
     pub timestamp: Option<i64>,
 }
 
-pub(crate) enum CanleType {
+pub(crate) enum CandleType {
     /// 熊市
     Bearish,
     /// 牛市
@@ -22,11 +22,21 @@ pub(crate) enum CanleType {
 }
 
 impl Candle {
-    pub(crate) fn get_type(&self) -> CanleType {
+    pub fn new(open: f64, high: f64, low: f64, close: f64) -> Candle {
+        Candle {
+            open,
+            high,
+            low,
+            close,
+            timestamp: None,
+        }
+    }
+
+    pub(crate) fn get_type(&self) -> CandleType {
         if self.open < self.close {
-            CanleType::Bearish
+            CandleType::Bearish
         } else {
-            CanleType::Bullish
+            CandleType::Bullish
         }
     }
 }
