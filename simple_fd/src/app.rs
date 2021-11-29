@@ -1,8 +1,8 @@
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 
 pub fn build_app() -> App<'static, 'static> {
-    let mut app = App::new("fd")
-        .version(create_version!())
+    let app = App::new("fd")
+        .version(crate_version!())
         .after_help(
             "Note: `fd -h` prints a short and concise overview while `fd --help` gives all \
                  details.",

@@ -1,9 +1,13 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
+use regex::bytes::RegexSetBuilder;
 
 use exit_codes::ExitCode;
+
+use crate::config::Config;
+use std::sync::Arc;
 
 mod app;
 mod error;
@@ -19,9 +23,9 @@ fn main() -> Result<()> {
     let current_directory = Path::new(".");
     let search_paths = extract_search_paths(&matches, current_directory)?;
 
+    let config = construct_config(&matches)?;
 
-
-    let result = walk::scan(&search_paths);
+    let result = walk::scan(Arc::new(config), &search_paths);
     match result {
         Ok(exit_code) => exit_code.exit(),
         Err(err) => {
@@ -59,4 +63,19 @@ fn extract_search_paths(
     }
 
     Ok(search_path)
+}
+
+fn construct_config( matches: &clap::ArgMatches) -> Result<Config> {
+    Ok(Config {
+        extensions: matches.values_of("extension")
+            .map(|exts| {
+                let patterns = exts
+                    .map(|e| e.trim_start_matches('.'))
+                    .map(|e| format!(r".\.{}$", regex::escape(e)));
+                RegexSetBuilder::new(patterns)
+                    .case_insensitive(true)
+                    .build()
+            })
+            .transpose()?,
+    })
 }

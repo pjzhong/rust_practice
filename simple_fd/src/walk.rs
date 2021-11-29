@@ -1,23 +1,23 @@
-use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
-use std::{io, thread, time};
+use std::{io, thread};
 
 use anyhow::{anyhow, Result};
 use ignore::overrides::OverrideBuilder;
-use ignore::{Error, WalkBuilder};
-use once_cell::unsync::OnceCell;
+use ignore::WalkBuilder;
 
+use crate::config::Config;
 use crate::error::print_error;
 use crate::exit_codes::ExitCode;
+use crate::filesystem;
 use crate::output;
 
 /// Maximum size of the output buffer before flushing results to the console
 pub const MAX_BUFFER_LENGTH: usize = 1000;
 /// Default duration until output buffering switches to streaming.
-pub const DEFAULT_MAX_BUFFER_TIME: time::Duration = time::Duration::from_millis(100);
+//pub const DEFAULT_MAX_BUFFER_TIME: time::Duration = time::Duration::from_millis(100);
 
 /// The Worker threads can result in a valid entry having PathBuf or an error.
 pub enum WorkerResult {
@@ -27,31 +27,27 @@ pub enum WorkerResult {
 
 enum DirEntryInner {
     Normal(ignore::DirEntry),
-    BrokenSymlink(PathBuf),
 }
 
 pub struct DirEntry {
     inner: DirEntryInner,
-    metadata: OnceCell<Option<Metadata>>,
 }
 
 impl DirEntry {
     fn normal(e: ignore::DirEntry) -> Self {
         Self {
             inner: DirEntryInner::Normal(e),
-            metadata: OnceCell::new(),
         }
     }
 
     pub fn path(&self) -> &Path {
         match &self.inner {
             DirEntryInner::Normal(e) => e.path(),
-            DirEntryInner::BrokenSymlink(path_buf) => path_buf.as_path(),
         }
     }
 }
 
-pub fn scan(path_vec: &[PathBuf]) -> Result<ExitCode> {
+pub fn scan(config: Arc<Config>, path_vec: &[PathBuf]) -> Result<ExitCode> {
     let mut path_iter = path_vec.iter();
     let first_path_buf = path_iter
         .next()
@@ -76,7 +72,7 @@ pub fn scan(path_vec: &[PathBuf]) -> Result<ExitCode> {
     let parallel_walker = walker.threads(num_cpus::get()).build_parallel();
     let receiver_thread = spawn_receiver(&wants_to_quit, rx);
 
-    spawn_sender(&wants_to_quit, parallel_walker, tx);
+    spawn_sender(&config, &wants_to_quit, parallel_walker, tx);
 
     let exit_code = receiver_thread.join().unwrap();
 
@@ -94,8 +90,6 @@ fn spawn_receiver(
     let wants_to_quit = Arc::clone(wants_to_quit);
 
     thread::spawn(move || {
-        let start = time::Instant::now();
-
         let stdout = io::stdout();
         let stdout = stdout.lock();
         let mut stdout = io::BufWriter::new(stdout);
@@ -127,11 +121,13 @@ fn spawn_receiver(
 }
 
 fn spawn_sender(
+    config: &Arc<Config>,
     wants_to_quit: &Arc<AtomicBool>,
     parallel_walker: ignore::WalkParallel,
     tx: Sender<WorkerResult>,
 ) {
     parallel_walker.run(|| {
+        let config = Arc::clone(config);
         let tx_thread = tx.clone();
         let wants_to_quit = Arc::clone(wants_to_quit);
 
@@ -154,6 +150,16 @@ fn spawn_sender(
             };
 
             let entry_path = entry.path();
+
+            if let Some(ref exts_regeix) = config.extensions {
+                if let Some(path_str) = entry_path.file_name() {
+                    if !exts_regeix.is_match(&filesystem::osstr_to_bytes(path_str)) {
+                        return ignore::WalkState::Continue;
+                    }
+                } else {
+                    return ignore::WalkState::Continue;
+                }
+            }
 
             let send_result = tx_thread.send(WorkerResult::Entry(entry_path.to_owned()));
 

@@ -6,7 +6,7 @@ use crate::error::print_error;
 use crate::exit_codes::ExitCode;
 
 // TODO: this function is performance critical and can probably be optimized
-pub fn print_entry<W: Write>(stdout: &mut W, entry: &Path, wants_to_quit: &AtomicBool) {
+pub fn print_entry<W: Write>(stdout: &mut W, entry: &Path, _wants_to_quit: &AtomicBool) {
     let path = entry;
 
     let r = print_entry_uncolorized(stdout, path);

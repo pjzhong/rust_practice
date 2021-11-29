@@ -218,6 +218,7 @@ dependencies = [
  "normpath",
  "num_cpus",
  "once_cell",
+ "regex",
 ]
 
 [[package]]
