@@ -1,5 +1,6 @@
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use regex::bytes::RegexSetBuilder;
@@ -7,15 +8,16 @@ use regex::bytes::RegexSetBuilder;
 use exit_codes::ExitCode;
 
 use crate::config::Config;
-use std::sync::Arc;
+use crate::filetypes::FileTypes;
 
 mod app;
+mod config;
 mod error;
 mod exit_codes;
 mod filesystem;
+mod filetypes;
 mod output;
 mod walk;
-mod config;
 
 fn main() -> Result<()> {
     let matches = app::build_app().get_matches_from(env::args_os());
@@ -65,9 +67,10 @@ fn extract_search_paths(
     Ok(search_path)
 }
 
-fn construct_config( matches: &clap::ArgMatches) -> Result<Config> {
+fn construct_config(matches: &clap::ArgMatches) -> Result<Config> {
     Ok(Config {
-        extensions: matches.values_of("extension")
+        extensions: matches
+            .values_of("extension")
             .map(|exts| {
                 let patterns = exts
                     .map(|e| e.trim_start_matches('.'))
@@ -77,5 +80,27 @@ fn construct_config( matches: &clap::ArgMatches) -> Result<Config> {
                     .build()
             })
             .transpose()?,
+        file_types: matches.values_of("file-type").map_or_else(
+            || Some(FileTypes::files_and_dir_only()),
+            |values| {
+                let mut file_types = FileTypes::default();
+                for value in values {
+                    match value {
+                        "f" | "file" => file_types.files = true,
+                        "d" | "directory" => file_types.directories = true,
+                        "l" | "symlink" => file_types.symlinks = true,
+                        "x" | "executable" => {
+                            file_types.executables_only = true;
+                            file_types.files = true;
+                        }
+                        "e" | "empty" => file_types.empty_only = true,
+                        "s" | "socket" => file_types.sockets = true,
+                        "p" | "pipe" => file_types.pipes = true,
+                        _ => unreachable!()
+                    }
+                }
+                Some(file_types)
+            },
+        ),
     })
 }

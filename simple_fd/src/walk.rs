@@ -1,3 +1,4 @@
+use std::fs::{FileType, Metadata};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
@@ -7,6 +8,7 @@ use std::{io, thread};
 use anyhow::{anyhow, Result};
 use ignore::overrides::OverrideBuilder;
 use ignore::WalkBuilder;
+use once_cell::sync::OnceCell;
 
 use crate::config::Config;
 use crate::error::print_error;
@@ -31,12 +33,14 @@ enum DirEntryInner {
 
 pub struct DirEntry {
     inner: DirEntryInner,
+    metadata: OnceCell<Option<Metadata>>,
 }
 
 impl DirEntry {
     fn normal(e: ignore::DirEntry) -> Self {
         Self {
             inner: DirEntryInner::Normal(e),
+            metadata: OnceCell::new(),
         }
     }
 
@@ -44,6 +48,20 @@ impl DirEntry {
         match &self.inner {
             DirEntryInner::Normal(e) => e.path(),
         }
+    }
+
+    pub fn file_type(&self) -> Option<FileType> {
+        match &self.inner {
+            DirEntryInner::Normal(e) => e.file_type(),
+        }
+    }
+
+    pub fn metadata(&self) -> Option<&Metadata> {
+        self.metadata
+            .get_or_init(|| match &self.inner {
+                DirEntryInner::Normal(e) => e.metadata().ok(),
+            })
+            .as_ref()
     }
 }
 
@@ -148,6 +166,12 @@ fn spawn_sender(
                     }
                 }
             };
+
+            if let Some(ref file_types) = config.file_types {
+                if file_types.should_ignore(&entry) {
+                    return ignore::WalkState::Continue;
+                }
+            }
 
             let entry_path = entry.path();
 
