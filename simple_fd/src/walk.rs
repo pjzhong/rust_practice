@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs::{FileType, Metadata};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -174,6 +175,19 @@ fn spawn_sender(
             }
 
             let entry_path = entry.path();
+
+            let search_str = match entry_path.file_name() {
+                Some(filename) => Cow::Borrowed(filename),
+                None => unreachable!(
+                    "Encountered file system entry without a file name. This should only \
+                         happen for paths like 'foo/bar/..' or '/' which are not supposed to \
+                         appear in a file system traversal."
+                ),
+            };
+
+            if !config.regex.is_match(&filesystem::osstr_to_bytes(search_str.as_ref())) {
+                return ignore::WalkState::Continue;
+            }
 
             if let Some(ref exts_regeix) = config.extensions {
                 if let Some(path_str) = entry_path.file_name() {

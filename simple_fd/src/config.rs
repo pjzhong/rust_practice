@@ -1,4 +1,5 @@
 use regex::bytes::RegexSet;
+
 use crate::filetypes::FileTypes;
 
 pub struct Config {
@@ -9,5 +10,8 @@ pub struct Config {
 
     /// The type of file to search for. If set to `None`, no file would displayed. If
     /// set to `Some(..)`, only the types that are specified are shown.
-    pub file_types: Option<FileTypes>
+    pub file_types: Option<FileTypes>,
+
+    /// 搜索正则表达式
+    pub regex: regex::bytes::Regex,
 }

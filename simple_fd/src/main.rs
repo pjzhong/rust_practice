@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use regex::bytes::RegexSetBuilder;
+use regex::bytes::{RegexBuilder, RegexSetBuilder};
 
 use exit_codes::ExitCode;
 
@@ -25,7 +25,10 @@ fn main() -> Result<()> {
     let current_directory = Path::new(".");
     let search_paths = extract_search_paths(&matches, current_directory)?;
 
-    let config = construct_config(&matches)?;
+    let pattern = extract_search_pattern(&matches)?;
+    let pattern = build_pattern_regex(pattern)?;
+
+    let config = construct_config(&matches, &pattern)?;
 
     let result = walk::scan(Arc::new(config), &search_paths);
     match result {
@@ -35,6 +38,22 @@ fn main() -> Result<()> {
             ExitCode::GeneralError.exit();
         }
     }
+}
+
+fn extract_search_pattern<'a>(matches: &'a clap::ArgMatches) -> Result<&'a str> {
+    let pattern = matches
+        .value_of_os("pattern")
+        .map(|p| {
+            p.to_str()
+                .ok_or_else(|| anyhow!("The search pattern include invalid UTF-8 sequences."))
+        })
+        .transpose()?
+        .unwrap_or("");
+    Ok(pattern)
+}
+
+fn build_pattern_regex(pattern: &str) -> Result<String> {
+    Ok(String::from(pattern))
 }
 
 fn extract_search_paths(
@@ -67,7 +86,7 @@ fn extract_search_paths(
     Ok(search_path)
 }
 
-fn construct_config(matches: &clap::ArgMatches) -> Result<Config> {
+fn construct_config(matches: &clap::ArgMatches, pattern: &String) -> Result<Config> {
     Ok(Config {
         extensions: matches
             .values_of("extension")
@@ -96,11 +115,26 @@ fn construct_config(matches: &clap::ArgMatches) -> Result<Config> {
                         "e" | "empty" => file_types.empty_only = true,
                         "s" | "socket" => file_types.sockets = true,
                         "p" | "pipe" => file_types.pipes = true,
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     }
                 }
                 Some(file_types)
             },
         ),
+        regex: build_regex(pattern)?,
     })
+}
+
+fn build_regex(pattern_regex: &String) -> Result<regex::bytes::Regex> {
+    RegexBuilder::new(&pattern_regex)
+        .dot_matches_new_line(true)
+        .build()
+        .map_err(|e| {
+            anyhow!(
+                "{}\n\nNote: You can use the '--fixed-strings' option to search for a \
+                 literal string instead of a regular expression. Alternatively, you can \
+                 also use the '--glob' option to match on a glob pattern.",
+                e.to_string()
+            )
+        })
 }
