@@ -7,6 +7,16 @@ pub fn build_app() -> App<'static, 'static> {
             "Note: `fd -h` prints a short and concise overview while `fd --help` gives all \
                  details.",
         )
+
+        .arg(
+            Arg::with_name("pattern").help(
+                "the search pattern (a regular expression, unless '--glob' is used; optional)",
+            ).long_help(
+                "the search pattern which is either a regular expression (default) or a glob \
+                 pattern (if --glob is used). If no pattern has been specified, every entry \
+                 is considered a match. If your pattern starts with a dash (-), make sure to \
+                 pass '--' first, or it will be considered as a flag (fd -- '-foo').")
+        )
         .arg(
             Arg::with_name("extension")
                 .long("extension")
@@ -83,6 +93,30 @@ pub fn build_app() -> App<'static, 'static> {
                        - Find empty directories:\n      \
                            fd --type empty --type directory\n      \
                            fd -te -td"
+                ),
+        )
+        .arg(
+            Arg::with_name("path")
+                .multiple(true)
+                .help("the root directory for the filesystem search (optional)")
+                .long_help(
+                    "The directory where the filesystem search is rooted (optional). If \
+                         omitted, search the current working directory.",
+                ),
+        )
+        .arg(
+            Arg::with_name("search-path")
+                .long("search-path")
+                .takes_value(true)
+                .conflicts_with("path")
+                .multiple(true)
+                .hidden_short_help(true)
+                .number_of_values(1)
+                .help("Provide paths to search as an alternative to the positional <path>")
+                .long_help(
+                    "Provide paths to search as an alternative to the positional <path> \
+                         argument. Changes the usage to `fd [FLAGS/OPTIONS] --search-path <path> \
+                         --search-path <path2> [<pattern>]`",
                 ),
         );
 
