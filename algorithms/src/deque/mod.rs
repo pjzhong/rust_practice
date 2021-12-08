@@ -4,6 +4,8 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
 use std::sync::atomic::{fence, AtomicIsize, AtomicPtr};
 use std::sync::Arc;
 
+use crate::deque::Stolen::{Abort, Data, Empty};
+
 static MIN_SIZE: usize = 32;
 
 struct Deque<T: Send> {
@@ -16,14 +18,43 @@ pub struct Worker<T: Send> {
     deque: Arc<Deque<T>>,
 }
 
+/// The stealing half of the work-stealing deque. Stealers have access to the
+/// opposite end of the deque from the worker, and they only have access to the
+/// `steal` method.
 pub struct Stealer<T: Send> {
     deque: Arc<Deque<T>>,
+}
+
+impl<T: Send> Clone for Stealer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            deque: self.deque.clone(),
+        }
+    }
+}
+
+/// When stealing some data, this is an enumeration of the possible outcomes.
+#[derive(PartialEq, Debug)]
+pub enum Stolen<T> {
+    /// The deque was empty at the time of stealing
+    Empty,
+    /// The stealer lost the race for stealing data, and a retry may return more
+    /// data.
+    Abort,
+    /// The stealer has successfully stolen some data.
+    Data(T),
 }
 
 struct Buffer<T: Send> {
     storage: *mut T,
     size: usize,
     prev: Option<Box<Buffer<T>>>,
+}
+
+impl<T: Send> Stealer<T> {
+    pub fn steal(&self) -> Stolen<T> {
+        self.deque.steal()
+    }
 }
 
 impl<T: Send> Deque<T> {
@@ -65,18 +96,42 @@ impl<T: Send> Deque<T> {
             return Some(data);
         }
 
-        return if self
+        self.bottom.store(t.wrapping_add(1), Relaxed);
+        if self
             .top
             .compare_exchange(t, t.wrapping_add(1), SeqCst, Relaxed)
             == Ok(t)
         {
-            self.bottom.store(t.wrapping_add(1), Relaxed);
             Some(data)
         } else {
-            self.bottom.store(t.wrapping_add(1), Relaxed);
             forget(data);
             None
-        };
+        }
+    }
+
+    fn steal(&self) -> Stolen<T> {
+        let t = self.top.load(Acquire);
+        fence(SeqCst);
+        let b = self.bottom.load(Acquire);
+
+        let size = b.wrapping_sub(t);
+        if size <= 0 {
+            return Empty;
+        }
+
+        let a = self.array.load(Acquire);
+        let data = unsafe { (*a).get(t) };
+
+        if self
+            .top
+            .compare_exchange(t, t.wrapping_add(1), SeqCst, Relaxed)
+            == Ok(t)
+        {
+            Data(data)
+        } else {
+            forget(data);
+            Abort
+        }
     }
 
     fn push(&self, data: T) {
@@ -102,18 +157,18 @@ impl<T: Send> Deque<T> {
 impl<T: Send> Buffer<T> {
     fn new(size: usize) -> Buffer<T> {
         Self {
-            storage: vec![].as_mut_ptr(),
+            storage: allocate(size),
             size,
             prev: None,
         }
     }
 
     fn size(&self) -> isize {
-        self.size() as isize
+        self.size as isize
     }
 
     fn mask(&self) -> isize {
-        self.size as isize - 1
+        (self.size - 1) as isize
     }
 
     fn elem(&self, i: isize) -> *mut T {
@@ -138,13 +193,17 @@ impl<T: Send> Buffer<T> {
             i = i.wrapping_add(1);
         }
         buf.prev = Some(self);
-        return buf;
+        buf
     }
 }
 
 impl<T: Send> Worker<T> {
     pub fn pop(&self) -> Option<T> {
         self.deque.pop()
+    }
+
+    pub fn push(&self, t: T) {
+        self.deque.push(t);
     }
 }
 
@@ -158,24 +217,36 @@ pub fn new<T: Send>() -> (Worker<T>, Stealer<T>) {
     )
 }
 
+fn allocate<T>(number: usize) -> *mut T {
+    let v = Vec::with_capacity(number);
+    take_ptr_from_vec(v)
+}
+
+fn take_ptr_from_vec<T>(mut buf: Vec<T>) -> *mut T {
+    let ptr = buf.as_mut_ptr();
+    forget(buf);
+    ptr
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::deque::Stolen::Empty;
+
     use super::*;
 
     #[test]
     fn smoke() {
         let (w, s) = new::<isize>();
         assert_eq!(w.pop(), None);
-    }
+        assert_eq!(s.steal(), Empty);
+        w.push(1);
+        assert_eq!(w.pop(), Some(1));
+        w.push(1);
+        assert_eq!(s.steal(), Data(1));
+        w.push(1);
+        assert_eq!(s.clone().steal(), Data(1));
 
-    #[test]
-    fn wrapping_test() {
-        let max_one = add(isize::MAX, 1);
-        let max_two = isize::MAX.wrapping_add(1);
-        assert_eq!(max_one, max_two);
-    }
-
-    fn add(one: isize, two:isize) -> isize {
-        one + two
+        assert_eq!(w.pop(), None);
+        assert_eq!(s.steal(), Empty);
     }
 }
