@@ -1,8 +1,8 @@
 use core::ptr;
 use std::mem::forget;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
-use std::sync::atomic::{fence, AtomicIsize, AtomicPtr};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicIsize, AtomicPtr, fence};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
 
 use crate::deque::Stolen::{Abort, Data, Empty};
 
@@ -226,27 +226,4 @@ fn take_ptr_from_vec<T>(mut buf: Vec<T>) -> *mut T {
     let ptr = buf.as_mut_ptr();
     forget(buf);
     ptr
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::deque::Stolen::Empty;
-
-    use super::*;
-
-    #[test]
-    fn smoke() {
-        let (w, s) = new::<isize>();
-        assert_eq!(w.pop(), None);
-        assert_eq!(s.steal(), Empty);
-        w.push(1);
-        assert_eq!(w.pop(), Some(1));
-        w.push(1);
-        assert_eq!(s.steal(), Data(1));
-        w.push(1);
-        assert_eq!(s.clone().steal(), Data(1));
-
-        assert_eq!(w.pop(), None);
-        assert_eq!(s.steal(), Empty);
-    }
 }
