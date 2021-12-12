@@ -5,8 +5,8 @@ use std::thread::JoinHandle;
 
 use rand::Rng;
 
-use algorithms::deque::new;
 use algorithms::deque::Stolen::{Data, Empty};
+use algorithms::deque::{new, Stealer, Worker};
 
 #[test]
 fn smoke() {
@@ -129,4 +129,80 @@ fn stress() {
     }
 
     assert_eq!(HITS.load(SeqCst), expected as usize);
+}
+
+#[derive(Clone, Copy)]
+struct UnsafeAtomicUsize(*mut AtomicUsize);
+
+unsafe impl Send for UnsafeAtomicUsize {}
+
+fn stampede(w: Worker<Box<isize>>, s: Stealer<Box<isize>>, nthreads: isize, amt: usize) {
+    for _ in 0..amt {
+        w.push(Box::new(20));
+    }
+
+    let mut remaining = AtomicUsize::new(amt);
+    let mut count = AtomicUsize::new(0);
+    let unsafe_remaing = UnsafeAtomicUsize(&mut remaining);
+    let unsafe_count = UnsafeAtomicUsize(&mut count);
+
+    let threads = (0..nthreads)
+        .map(|_| {
+            let s = s.clone();
+            thread::spawn(move || unsafe {
+                let UnsafeAtomicUsize(unsafe_remaing) = unsafe_remaing;
+                let UnsafeAtomicUsize(unsafe_count) = unsafe_count;
+                while (*unsafe_remaing).load(SeqCst) > 0 {
+                    match s.steal() {
+                        Data(ref i) if **i == 20 => {
+                            (*unsafe_remaing).fetch_sub(1, SeqCst);
+                            (*unsafe_count).fetch_add(1, SeqCst);
+                        }
+                        Data(..) => panic!(),
+                        _ => {}
+                    }
+                }
+            })
+        })
+        .collect::<Vec<JoinHandle<()>>>();
+
+    while remaining.load(SeqCst) > 0 {
+        match w.pop() {
+            Some(ref i) if **i == 20 => {
+                remaining.fetch_sub(1, SeqCst);
+                count.fetch_add(1, SeqCst);
+            }
+            Some(..) => panic!(),
+            None => {}
+        }
+    }
+
+    for thread in threads {
+        thread.join().unwrap();
+    }
+
+    assert_eq!(amt, count.load(SeqCst));
+}
+
+#[test]
+fn run_stampede() {
+    let (w, s) = new::<Box<isize>>();
+    stampede(w, s, 8, 10000)
+}
+
+#[test]
+fn many_stampede() {
+    static AMT: usize = 4;
+    let threads = (0..AMT)
+        .map(|_| {
+            let (w, s) = new::<Box<isize>>();
+            thread::spawn(move || {
+                stampede(w, s, 4, 100000);
+            })
+        })
+        .collect::<Vec<JoinHandle<()>>>();
+
+    for thread in threads {
+        thread.join().unwrap();
+    }
 }
