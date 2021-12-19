@@ -30,7 +30,8 @@ pub fn main() {
                     let path = String::from(path.to_str().unwrap_or(""));
                     let path_string = path
                         .chars()
-                        .skip(path_prefix.len())
+                        //+1 to skip the leaddng "/"
+                        .skip(path_prefix.len() + 1)
                         .collect::<String>()
                         .replace(MAIN_SEPARATOR, "/");
 
