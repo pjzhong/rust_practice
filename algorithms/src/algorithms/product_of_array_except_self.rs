@@ -9,7 +9,7 @@ impl Solution {
     pub fn product_except_self(nums: Vec<i32>) -> Vec<i32> {
         let len = nums.len();
         let mut res = Vec::from(nums.as_slice());
-        //calc the suffix sume first
+        //calc the suffix sum first
         for i in (1..len).rev() {
             res[i - 1] *= res[i];
         }
