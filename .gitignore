@@ -41,6 +41,9 @@ target/
 # css #
 *.min.css
 
+# rust #
+Cargo.lock
+
 # custom #
 *.spv
 /talent_plan/Cargo.lock
