@@ -13,8 +13,6 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
 
     // config watcher, 热更文件？
 
-    let (shutdown_tx, _) = broadcast::channel(1);
-
 
     Ok(())
 }

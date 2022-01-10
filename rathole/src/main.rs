@@ -22,8 +22,5 @@ async fn main() {
     });
 
 
-    while true {
-        println!("Hello, world!");
-    }
-
+    println!("Hello, world!");
 }
