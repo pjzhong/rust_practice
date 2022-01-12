@@ -1,13 +1,19 @@
-mod cli;
-mod config;
-mod server;
-
 use anyhow::Result;
-use core::panicking::panic;
-
-use crate::config::Config;
-pub use cli::Cli;
 use tokio::sync::broadcast;
+
+pub use cli::Cli;
+
+use crate::client::run_client;
+use crate::config::Config;
+use crate::server::run_server;
+
+mod cli;
+mod client;
+mod config;
+mod helper;
+mod protocol;
+mod server;
+mod transport;
 
 #[derive(PartialEq, Eq, Debug)]
 enum RunMode {
@@ -37,29 +43,25 @@ pub async fn run(args: Cli, shutdown_tx: broadcast::Sender<bool>) -> Result<()> 
 }
 
 async fn run_instance(config: Config, arg: Cli, shutdown_rx: broadcast::Receiver<bool>) {
-    let ret: Result<()> = match determine_run_mode(&config, &cli) {
-        RunMode::Server =>
-        {
-            #[cfg(feature = "client")]
-            run_server().await
-        }
-        RunMode::Client =>
-        {
+    let ret: Result<()> = match determine_run_mode(&config, &arg) {
+        RunMode::Server => {
+            #[cfg(not(feature = "server"))]
+            helper::feature_not_compile("server");
+
             #[cfg(feature = "server")]
-            run_client().await
+            run_server(&config, shutdown_rx).await
+        }
+        RunMode::Client => {
+            #[cfg(not(feature = "client"))]
+            helper::feature_not_compile("client");
+
+            #[cfg(feature = "client")]
+            run_client(&config, shutdown_rx).await
         }
         RunMode::Undetermined => panic!("Cannot determine running as a server or a client"),
     };
 
     ret.unwrap();
-}
-
-pub async fn run_client() -> Result<()> {
-    Ok(())
-}
-
-pub async fn run_server(config: &Config, args: &Cli) -> Result<()> {
-    Ok(())
 }
 
 fn determine_run_mode(config: &Config, args: &Cli) -> RunMode {

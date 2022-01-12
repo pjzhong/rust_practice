@@ -45,7 +45,7 @@ pub struct ServerServiceConfig {
     pub service_type: ServiceType,
     #[serde(skip)]
     pub name: String,
-    pub local_addr: String,
+    pub bind_addr: String,
     pub token: Option<String>,
 }
 
@@ -54,6 +54,8 @@ pub struct ClientConfig {
     pub remote_addr: String,
     pub default_token: Option<String>,
     pub services: HashMap<String, ClientServiceConfig>,
+    #[serde(default = "TransportType::default")]
+    pub transport: TransportType
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq, Clone)]
@@ -61,6 +63,9 @@ pub struct ServerConfig {
     pub bind_addr: String,
     pub default_token: Option<String>,
     pub services: HashMap<String, ServerServiceConfig>,
+    #[serde(default = "TransportType::default")]
+    pub transport: TransportType
+
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
