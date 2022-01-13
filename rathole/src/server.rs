@@ -21,8 +21,6 @@ use crate::{protocol, Config};
 type ServiceDigest = protocol::Digest;
 type Nonce = protocol::Digest;
 
-const TCP_POOL_SIZE: usize = 8; // The number of cached connections for TCP servies
-const UDP_POOL_SIZE: usize = 2; // The number of cached connections for UDP services
 const CHAN_SIZE: usize = 2048; // The capacity of various chans
 
 pub async fn run_server(config: &Config, shutdown_rx: broadcast::Receiver<bool>) -> Result<()> {
@@ -66,16 +64,6 @@ where
                 shutdown_tx.subscribe(),
             )),
         };
-
-        let pool_size = match service.service_type {
-            ServiceType::Tcp => TCP_POOL_SIZE,
-        };
-
-        for _ in 0..pool_size {
-            if let Err(e) = data_ch_req_tx.send(true) {
-                eprintln!("Failed to request data channel {}", e);
-            }
-        }
 
         tokio::spawn(async move {
             if let Err(err) =
