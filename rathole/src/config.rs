@@ -55,7 +55,7 @@ pub struct ClientConfig {
     pub default_token: Option<String>,
     pub services: HashMap<String, ClientServiceConfig>,
     #[serde(default = "TransportType::default")]
-    pub transport: TransportType
+    pub transport: TransportType,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq, Clone)]
@@ -64,8 +64,7 @@ pub struct ServerConfig {
     pub default_token: Option<String>,
     pub services: HashMap<String, ServerServiceConfig>,
     #[serde(default = "TransportType::default")]
-    pub transport: TransportType
-
+    pub transport: TransportType,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]

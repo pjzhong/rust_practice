@@ -13,7 +13,6 @@ pub fn digest(data: &[u8]) -> Digest {
     d.into()
 }
 
-
 #[derive(Deserialize, Serialize, Debug)]
 pub enum Hello {
     ControlChannelHello(Digest),
@@ -89,6 +88,14 @@ pub async fn read_hello<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Resu
     Ok(hello)
 }
 
+pub async fn read_auth<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Result<Auth> {
+    let mut buf = vec![0u8; PACK_LEN.auth];
+    conn.read_exact(&mut buf)
+        .await
+        .with_context(|| "Failed to read auth")?;
+    bincode::deserialize(&buf).with_context(|| "Failed to deserialize auth")
+}
+
 pub async fn read_ack<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Result<Ack> {
     let mut bytes = vec![08; PACK_LEN.ack];
     conn.read_exact(&mut bytes)
@@ -96,4 +103,25 @@ pub async fn read_ack<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Result
         .with_context(|| "Failed to read ack")?;
 
     bincode::deserialize(&bytes).with_context(|| "Failed to deserialize ack")
+}
+
+pub async fn read_control_cmd<T: AsyncRead + AsyncWrite + Unpin>(
+    conn: &mut T,
+) -> Result<ControlChannelCmd> {
+    let mut bytes = vec![0u8; PACK_LEN.c_cmd];
+
+    conn.read_exact(&mut bytes)
+        .await
+        .with_context(|| "Failed to read control cmd")?;
+    bincode::deserialize(&bytes).with_context(|| "Failed to deserialize control cmd")
+}
+
+pub async fn read_data_cmd<T: AsyncRead + AsyncWrite + Unpin>(
+    conn: &mut T,
+) -> Result<DataChannelCmd> {
+    let mut bytes = vec![0u8; PACK_LEN.d_cmd];
+    conn.read_exact(&mut bytes)
+        .await
+        .with_context(|| "Failed to read data cmd")?;
+    bincode::deserialize(&bytes).with_context(|| "Failed to deserialize")
 }

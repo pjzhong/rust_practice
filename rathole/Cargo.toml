@@ -24,6 +24,7 @@ sha2 = "0.10"
 backoff = { version="0.3", features=["tokio"] }
 bincode = "1"
 rand = "0.8"
+hex = "0.4"
 
 [build-dependencies]
 vergen = "6.0"
