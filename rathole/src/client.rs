@@ -194,6 +194,7 @@ impl<T: 'static + Transport> ControlChannel<T> {
 
         let remote_addr = self.remote_addr.clone();
         let local_addr = self.service.local_addr.clone();
+        let session_key = self.digest;
         let data_ch_args = Arc::new(RunDataChannelArgs {
             session_key,
             remote_addr,
@@ -228,7 +229,7 @@ impl<T: 'static + Transport> ControlChannel<T> {
 }
 
 struct RunDataChannelArgs<T: Transport> {
-    session_key: Nonce,
+    session_key: ServiceDigest,
     remote_addr: String,
     local_addr: String,
     connector: Arc<T>,
@@ -238,7 +239,9 @@ async fn run_data_channel<T: Transport>(args: Arc<RunDataChannelArgs<T>>) -> Res
     let mut conn = do_data_channel_handshake(args.clone()).await?;
 
     match read_data_cmd(&mut conn).await? {
-        DataChannelCmd::StartForwardTcp => {}
+        DataChannelCmd::StartForwardTcp => {
+            run_data_channel_for_tcp::<T>(conn, &args.local_addr).await?;
+        }
         DataChannelCmd::StartForwardUdp => {
             panic!("Forward udp is not support")
         }

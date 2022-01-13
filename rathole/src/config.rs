@@ -78,11 +78,11 @@ impl Config {
         let mut config: Config = toml::from_str(s).with_context(|| "Failed to parse config")?;
 
         if let Some(server) = config.server.as_mut() {
-            Config::validate_server_config(server);
+            Config::validate_server_config(server).unwrap();
         }
 
         if let Some(client) = config.client.as_mut() {
-            Config::validate_client_config(client);
+            Config::validate_client_config(client).unwrap();
         }
 
         if config.server.is_none() && config.client.is_none() {

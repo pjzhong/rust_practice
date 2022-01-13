@@ -6,15 +6,16 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Context, Result};
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
-use bincode::Options;
 use rand::RngCore;
-use tokio::io::{self, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::io::{self, copy_bidirectional, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time;
 
 use crate::config::{ServerConfig, ServerServiceConfig, ServiceType, TransportType};
-use crate::protocol::{read_auth, read_hello, Ack, ControlChannelCmd, Hello, HASH_WIDTH_IN_BYTES};
+use crate::protocol::{
+    read_auth, read_hello, Ack, ControlChannelCmd, DataChannelCmd, Hello, HASH_WIDTH_IN_BYTES,
+};
 use crate::transport::{TcpTransport, Transport};
 use crate::{protocol, Config};
 
@@ -118,20 +119,102 @@ where
     }
 }
 
-async fn run_tcp_connection_pool<T: Transport>(
+async fn run_tcp_connection_pool<T: 'static + Transport>(
     bind_addr: String,
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     shutdown_rx: broadcast::Receiver<bool>,
 ) -> Result<()> {
+    let mut stream_rx = tcp_listen_and_service_bind(bind_addr, data_ch_req_tx, shutdown_rx);
+    while let Some(mut steam) = stream_rx.recv().await {
+        if let Some(mut ch) = data_ch_rx.recv().await {
+            tokio::spawn(async move {
+                let cmd = bincode::serialize(&DataChannelCmd::StartForwardTcp).unwrap();
+                if ch.write_all(&cmd).await.is_ok() {
+                    let _ = copy_bidirectional(&mut ch, &mut steam).await;
+                }
+            });
+        } else {
+            break;
+        }
+    }
     Ok(())
 }
 
-fn tcp_listen_and_send(
-    add: String,
+///监听对应tcp端口并绑定服务
+fn tcp_listen_and_service_bind(
+    addr: String,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
-) {
+) -> mpsc::Receiver<TcpStream> {
+    let (tx, rx) = mpsc::channel(CHAN_SIZE);
+
+    tokio::spawn(async move {
+        let listener = backoff::future::retry(
+            ExponentialBackoff {
+                max_elapsed_time: None,
+                max_interval: Duration::from_secs(1),
+                ..Default::default()
+            },
+            || async { Ok(TcpListener::bind(&addr).await?) },
+        )
+        .await
+        .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
+
+        let listener: TcpListener = match listener {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("{:?}", e);
+                return;
+            }
+        };
+
+        println!("Listening at {}", &addr);
+
+        // Retry at least every 1s
+        let mut backoff = ExponentialBackoff {
+            max_interval: Duration::from_secs(1),
+            max_elapsed_time: None,
+            ..Default::default()
+        };
+
+        loop {
+            tokio::select! {
+                val = listener.accept() => {
+                    match val {
+                        Err(e) => {
+                            eprintln!("{}. Sleep for a while", e);
+                            if let Some(d) = backoff.next_backoff() {
+                                time::sleep(d).await;
+                            } else {
+                                  // This branch will never be reached for current backoff policy
+                                eprintln!("Too many retries. Aborting...");
+                                break;
+                            }
+                        }
+                        Ok((incoming, addr)) => {
+                            if let Err(e) = data_ch_req_tx.send(true)
+                            .with_context(|| "Failed to send data channel create request") {
+                                eprintln!("{:?}", e);
+                                break;
+                            }
+
+                            backoff.reset();
+
+                            println!("New visitor from {}", addr);
+
+                            let _ = tx.send(incoming).await;
+                        }
+                    }
+                },
+                _ = shutdown_rx.recv() => {
+                    break;
+                }
+            }
+        }
+    });
+
+    rx
 }
 
 struct Server<'a, T: Transport> {
@@ -313,7 +396,7 @@ async fn do_control_channel_handshake<T: 'static + Transport>(
 async fn do_data_channel_handshake<T: 'static + Transport>(
     conn: T::Stream,
     control_channels: Arc<RwLock<HashMap<ServiceDigest, ControlChannelHandle<T>>>>,
-    nonce: Nonce,
+    nonce: ServiceDigest,
 ) -> Result<()> {
     let control_channels_guard = control_channels.read().await;
     match control_channels_guard.get(&nonce) {
