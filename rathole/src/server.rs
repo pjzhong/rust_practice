@@ -56,10 +56,7 @@ where
     /// and the connection pool task are created.
     #[instrument(skip_all, fields(service = %service.name))]
     fn run(conn: T::Stream, service: ServerServiceConfig) -> Self {
-        info!(
-            "control channel established, Listening at:{:?}",
-            service.bind_addr
-        );
+        info!("control channel established");
 
         let (shutdown_tx, shutdown_rx) = broadcast::channel::<bool>(1);
         let (data_ch_tx, data_ch_rx) = mpsc::channel(CHAN_SIZE * 2);
@@ -67,6 +64,7 @@ where
 
         match service.service_type {
             ServiceType::Tcp => tokio::spawn(run_tcp_connection_pool::<T>(
+                service.name.clone(),
                 service.bind_addr.clone(),
                 data_ch_rx,
                 data_ch_req_tx,
@@ -133,12 +131,13 @@ where
 }
 
 async fn run_tcp_connection_pool<T: 'static + Transport>(
+    name: String,
     bind_addr: String,
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     shutdown_rx: broadcast::Receiver<bool>,
 ) -> Result<()> {
-    let mut stream_rx = tcp_listen_and_service_bind(bind_addr, data_ch_req_tx, shutdown_rx);
+    let mut stream_rx = tcp_listen_and_service_bind(name, bind_addr, data_ch_req_tx, shutdown_rx);
     while let Some(mut steam) = stream_rx.recv().await {
         if let Some(mut ch) = data_ch_rx.recv().await {
             tokio::spawn(async move {
@@ -156,6 +155,7 @@ async fn run_tcp_connection_pool<T: 'static + Transport>(
 
 ///监听对应tcp端口并绑定服务
 fn tcp_listen_and_service_bind(
+    name: String,
     addr: String,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
@@ -174,6 +174,8 @@ fn tcp_listen_and_service_bind(
             )
             .await
             .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
+
+            info!("service-{:?} Listening at:{:?}", name, addr);
 
             let listener: TcpListener = match listener {
                 Ok(l) => l,
