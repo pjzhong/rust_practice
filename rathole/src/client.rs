@@ -8,6 +8,7 @@ use tokio::io::{copy_bidirectional, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, oneshot};
 use tokio::time;
+use tracing::{debug, error, info, Span, instrument, Instrument};
 
 use crate::config::{ClientConfig, ClientServiceConfig, TransportType};
 use crate::protocol::{
@@ -18,7 +19,6 @@ use crate::transport::{TcpTransport, Transport};
 use crate::{protocol, Config};
 
 type ServiceDigest = protocol::Digest;
-type Nonce = protocol::Digest;
 
 pub async fn run_client(config: &Config, shutdown_rx: broadcast::Receiver<bool>) -> Result<()> {
     let config = match &config.client {
@@ -71,7 +71,7 @@ impl<'a, T: 'static + Transport> Client<'a, T> {
                     match val {
                         Ok(_) => {}
                         Err(err) => {
-                            eprintln!("Unable to listen for shutdown signal: {}", err);
+                            error!("Unable to listen for shutdown signal: {}", err);
                         }
                     }
                     break;
@@ -94,6 +94,8 @@ struct ControlChannelHandle {
 }
 
 impl ControlChannelHandle {
+
+    #[instrument(skip_all, fields(service = %service.name))]
     fn run<T: 'static + Transport>(
         service: ClientServiceConfig,
         remote_addr: String,
@@ -101,6 +103,7 @@ impl ControlChannelHandle {
     ) -> Self {
         let digest = protocol::digest(service.name.as_bytes());
 
+        info!("Starting {}", hex::encode(digest));
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let mut control_channel = ControlChannel {
             digest,
@@ -123,7 +126,7 @@ impl ControlChannelHandle {
                 }
 
                 let duration = Duration::from_secs(3);
-                eprintln!("{:?}\n\nRetry in {:?}...", err, duration);
+                error!("{:?}\n\nRetry in {:?}...", err, duration);
                 time::sleep(duration).await;
             }
         });
@@ -153,12 +156,14 @@ impl<T: 'static + Transport> ControlChannel<T> {
             .with_context(|| format!("Failed to connect to the server: {}", &self.remote_addr))?;
 
         //send hello
+        debug!("Sending hello");
         let hello_send = Hello::ControlChannelHello(self.digest[..].try_into().unwrap());
         conn_control
             .write_all(&bincode::serialize(&hello_send).unwrap())
             .await?;
 
         //reading hello
+        debug!("Reading hello");
         let nonce = match protocol::read_hello(&mut conn_control)
             .await
             .with_context(|| "Failed to read hello from the sever")?
@@ -169,7 +174,8 @@ impl<T: 'static + Transport> ControlChannel<T> {
             }
         };
 
-        println!("Sending auth");
+        // Read Ack
+        debug!("Sending auth");
         let mut concat = Vec::from(self.service.token.as_ref().unwrap().as_bytes());
         concat.extend_from_slice(&nonce);
 
@@ -180,9 +186,10 @@ impl<T: 'static + Transport> ControlChannel<T> {
             .await?;
 
         //Read ack
+        debug!("Reading ack");
         match read_ack(&mut conn_control).await? {
             Ack::Ok => {
-                println!("Authentication success")
+                info!("Authentication success")
             }
             v => {
                 return Err(anyhow!("{:?}", v))
@@ -190,7 +197,7 @@ impl<T: 'static + Transport> ControlChannel<T> {
             }
         }
 
-        println!("Control channel established");
+        info!("Control channel established");
 
         let remote_addr = self.remote_addr.clone();
         let local_addr = self.service.local_addr.clone();
@@ -211,9 +218,9 @@ impl<T: 'static + Transport> ControlChannel<T> {
                             let args = data_ch_args.clone();
                             tokio::spawn(async move {
                                 if let Err(e) = run_data_channel(args).await.with_context(|| "Failed to run the data channel") {
-                                    eprintln!("{:?}", e);
+                                    error!("{:?}", e);
                                 }
-                            });
+                            }.instrument(Span::current()));
                         }
                     }
                 },
@@ -278,7 +285,7 @@ async fn run_data_channel_for_tcp<T: Transport>(
     mut conn: T::Stream,
     local_addr: &str,
 ) -> Result<()> {
-    println!("New data channel starts forwarding to {:?}", local_addr);
+    debug!("New data channel starts forwarding to {:?}", local_addr);
 
     let mut local = TcpStream::connect(local_addr)
         .await

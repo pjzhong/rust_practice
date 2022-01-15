@@ -11,6 +11,7 @@ use tokio::io::{self, copy_bidirectional, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time;
+use tracing::{debug, error, info, info_span, instrument, Instrument, Span};
 
 use crate::config::{ServerConfig, ServerServiceConfig, ServiceType, TransportType};
 use crate::protocol::{
@@ -20,7 +21,6 @@ use crate::transport::{TcpTransport, Transport};
 use crate::{protocol, Config};
 
 type ServiceDigest = protocol::Digest;
-type Nonce = protocol::Digest;
 
 const CHAN_SIZE: usize = 2048; // The capacity of various chans
 
@@ -44,7 +44,7 @@ pub async fn run_server(config: &Config, shutdown_rx: broadcast::Receiver<bool>)
 
 pub struct ControlChannelHandle<T: Transport> {
     // shutdown the control channel by dropping it
-    shutdown_tx: broadcast::Sender<bool>,
+    _shutdown_tx: broadcast::Sender<bool>,
     data_channel_tx: mpsc::Sender<T::Stream>,
 }
 
@@ -52,7 +52,15 @@ impl<T> ControlChannelHandle<T>
 where
     T: 'static + Transport,
 {
+    /// Create a control channel handle, where the control channel handling task
+    /// and the connection pool task are created.
+    #[instrument(skip_all, fields(service = %service.name))]
     fn run(conn: T::Stream, service: ServerServiceConfig) -> Self {
+        info!(
+            "control channel established, Listening at:{:?}",
+            service.bind_addr
+        );
+
         let (shutdown_tx, shutdown_rx) = broadcast::channel::<bool>(1);
         let (data_ch_tx, data_ch_rx) = mpsc::channel(CHAN_SIZE * 2);
         let (data_ch_req_tx, data_ch_req_rx) = mpsc::unbounded_channel();
@@ -61,27 +69,32 @@ where
             ServiceType::Tcp => tokio::spawn(run_tcp_connection_pool::<T>(
                 service.bind_addr.clone(),
                 data_ch_rx,
-                data_ch_req_tx.clone(),
+                data_ch_req_tx,
                 shutdown_tx.subscribe(),
             )),
         };
 
-        tokio::spawn(async move {
-            if let Err(err) =
-                ControlChannelHandle::<T>::do_run(conn, service, shutdown_rx, data_ch_req_rx)
-                    .await
-                    .with_context(|| "Failed to write data cmds")
-            {
-                eprintln!("{:?}", err);
+        tokio::spawn(
+            async move {
+                if let Err(err) =
+                    ControlChannelHandle::<T>::do_run(conn, service, shutdown_rx, data_ch_req_rx)
+                        .await
+                        .with_context(|| "Failed to write data cmds")
+                {
+                    error!("{:?}", err);
+                }
             }
-        });
+            .instrument(Span::current()),
+        );
 
         Self {
-            shutdown_tx,
+            _shutdown_tx: shutdown_tx,
             data_channel_tx: data_ch_tx,
         }
     }
 
+    // Run a control channel
+    #[instrument(skip_all, fields(service = %service.name))]
     async fn do_run(
         mut conn: T::Stream,
         service: ServerServiceConfig,
@@ -114,7 +127,7 @@ where
             }
         }
 
-        println!("Control channel shutting down");
+        info!("Control channel shutting down");
         Ok(())
     }
 }
@@ -149,70 +162,71 @@ fn tcp_listen_and_service_bind(
 ) -> mpsc::Receiver<TcpStream> {
     let (tx, rx) = mpsc::channel(CHAN_SIZE);
 
-    tokio::spawn(async move {
-        let listener = backoff::future::retry(
-            ExponentialBackoff {
-                max_elapsed_time: None,
-                max_interval: Duration::from_secs(1),
-                ..Default::default()
-            },
-            || async { Ok(TcpListener::bind(&addr).await?) },
-        )
-        .await
-        .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
-
-        let listener: TcpListener = match listener {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("{:?}", e);
-                return;
-            }
-        };
-
-        println!("Listening at {}", &addr);
-
-        // Retry at least every 1s
-        let mut backoff = ExponentialBackoff {
-            max_interval: Duration::from_secs(1),
-            max_elapsed_time: None,
-            ..Default::default()
-        };
-
-        loop {
-            tokio::select! {
-                val = listener.accept() => {
-                    match val {
-                        Err(e) => {
-                            eprintln!("{}. Sleep for a while", e);
-                            if let Some(d) = backoff.next_backoff() {
-                                time::sleep(d).await;
-                            } else {
-                                  // This branch will never be reached for current backoff policy
-                                eprintln!("Too many retries. Aborting...");
-                                break;
-                            }
-                        }
-                        Ok((incoming, addr)) => {
-                            if let Err(e) = data_ch_req_tx.send(true)
-                            .with_context(|| "Failed to send data channel create request") {
-                                eprintln!("{:?}", e);
-                                break;
-                            }
-
-                            backoff.reset();
-
-                            println!("New visitor from {}", addr);
-
-                            let _ = tx.send(incoming).await;
-                        }
-                    }
+    tokio::spawn(
+        async move {
+            let listener = backoff::future::retry(
+                ExponentialBackoff {
+                    max_elapsed_time: None,
+                    max_interval: Duration::from_secs(1),
+                    ..Default::default()
                 },
-                _ = shutdown_rx.recv() => {
-                    break;
+                || async { Ok(TcpListener::bind(&addr).await?) },
+            )
+            .await
+            .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
+
+            let listener: TcpListener = match listener {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    return;
+                }
+            };
+
+            // Retry at least every 1s
+            let mut backoff = ExponentialBackoff {
+                max_interval: Duration::from_secs(1),
+                max_elapsed_time: None,
+                ..Default::default()
+            };
+
+            loop {
+                tokio::select! {
+                    val = listener.accept() => {
+                        match val {
+                            Err(e) => {
+                                error!("{}. Sleep for a while", e);
+                                if let Some(d) = backoff.next_backoff() {
+                                    time::sleep(d).await;
+                                } else {
+                                      // This branch will never be reached for current backoff policy
+                                    error!("Too many retries. Aborting...");
+                                    break;
+                                }
+                            }
+                            Ok((incoming, addr)) => {
+                                if let Err(e) = data_ch_req_tx.send(true)
+                                .with_context(|| "Failed to send data channel create request") {
+                                    error!("{:?}", e);
+                                    break;
+                                }
+
+                                backoff.reset();
+
+                                info!("New visitor from {}", addr);
+
+                                let _ = tx.send(incoming).await;
+                            }
+                        }
+                    },
+                    _ = shutdown_rx.recv() => {
+                        break;
+                    }
                 }
             }
         }
-    });
+        .instrument(Span::current()),
+    );
 
     rx
 }
@@ -255,7 +269,7 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
             .await
             .with_context(|| "Failed to listen at `server.bind_addr`")?;
 
-        println!("Listening at {}", self.config.bind_addr);
+        info!("Listening at {}", self.config.bind_addr);
 
         let mut backoff = ExponentialBackoff {
             max_interval: Duration::from_millis(100),
@@ -268,7 +282,7 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
                 ret = self.transport.accept(&l) => {
                     match ret {
                         Err(err) => {
-                            if let Some(err) = err.downcast_ref::<io::Error>() {
+                            if err.downcast_ref::<io::Error>().is_some() {
                                 if let Some(d) = backoff.next_backoff() {
                                     time::sleep(d).await;
                                 } else {
@@ -279,7 +293,7 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
                         }
                         Ok((conn, addr)) => {
                             backoff.reset();
-                            println!("Incoming connection from {}", addr);
+                            debug!("Incoming connection from {}", addr);
 
                             let services = self.services.clone();
                             let control_channels = self.control_channels.clone();
@@ -287,14 +301,14 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
                                 if let Err(err) = handle_connection(conn, addr, services, control_channels)
                                 .await
                                 .with_context(||"Failed to handle a connection to `server.bind_addr`") {
-                                    eprintln!("{:?}", err);
+                                    error!("{:?}", err);
                                 }
-                            });
+                            }.instrument(info_span!("handle_connection", %addr)));
                         }
                     }
                 },
                 _ = shutdown_rx.recv() => {
-                    println!("Shutting down gracefully...");
+                    info!("Shutting down gracefully...");
                     break;
                 }
             }
@@ -330,7 +344,7 @@ async fn do_control_channel_handshake<T: 'static + Transport>(
     control_channels: Arc<RwLock<HashMap<ServiceDigest, ControlChannelHandle<T>>>>,
     service_digest: ServiceDigest,
 ) -> Result<()> {
-    println!("New control channel incoming from {}", addr);
+    info!("New control channel incoming from {}", addr);
 
     let mut nonce = vec![0u8; HASH_WIDTH_IN_BYTES];
     rand::thread_rng().fill_bytes(&mut nonce);
@@ -360,7 +374,7 @@ async fn do_control_channel_handshake<T: 'static + Transport>(
     if session_key != d {
         conn.write_all(&bincode::serialize(&Ack::AuthFailed).unwrap())
             .await?;
-        println!(
+        debug!(
             "Expect {}, but got {}",
             hex::encode(session_key),
             hex::encode(d)
@@ -382,8 +396,6 @@ async fn do_control_channel_handshake<T: 'static + Transport>(
 
         conn.write_all(&bincode::serialize(&Ack::Ok).unwrap())
             .await?;
-
-        println!("{} control channel established", service_config.name);
 
         let handle = ControlChannelHandle::run(conn, service_config);
 

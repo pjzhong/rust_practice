@@ -97,7 +97,7 @@ pub async fn read_auth<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Resul
 }
 
 pub async fn read_ack<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Result<Ack> {
-    let mut bytes = vec![08; PACK_LEN.ack];
+    let mut bytes = vec![0u8; PACK_LEN.ack];
     conn.read_exact(&mut bytes)
         .await
         .with_context(|| "Failed to read ack")?;

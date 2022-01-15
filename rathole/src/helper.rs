@@ -12,7 +12,7 @@ pub fn try_set_tcp_keep_alive(conn: &TcpStream) -> Result<()> {
 }
 
 pub fn set_tcp_keep_alive(conn: &TcpStream) {
-    if let Err(e) = try_set_tcp_keep_alive(conn) {
+    if try_set_tcp_keep_alive(conn).is_err() {
         //TODO ! logging
     }
 }

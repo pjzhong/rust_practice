@@ -3,6 +3,7 @@ use clap::Parser;
 use rathole::{run, Cli};
 use tokio::signal;
 use tokio::sync::broadcast;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,6 +22,13 @@ async fn main() -> Result<()> {
             panic!("Failed to send shutdown signal: {:?}", e);
         }
     });
+
+    let level = "info"; // if RUST_LOG not present, use `info` level
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::from(level)),
+        )
+        .init();
 
     run(args, shutdown_tx).await
 }

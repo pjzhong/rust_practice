@@ -1,5 +1,6 @@
 use anyhow::Result;
 use tokio::sync::broadcast;
+use tracing::debug;
 
 pub use cli::Cli;
 
@@ -30,6 +31,8 @@ pub async fn run(args: Cli, shutdown_tx: broadcast::Sender<bool>) -> Result<()> 
 
     let config = Config::from_file(config_path)?;
 
+    debug!("{:?}", config);
+
     let join = tokio::spawn(run_instance(
         config.clone(),
         args.clone(),
@@ -37,7 +40,7 @@ pub async fn run(args: Cli, shutdown_tx: broadcast::Sender<bool>) -> Result<()> 
     ));
 
     join.await?;
-    shutdown_tx.send(true);
+    let _ = shutdown_tx.send(true);
 
     Ok(())
 }
