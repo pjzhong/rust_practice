@@ -7,18 +7,18 @@ use anyhow::{anyhow, bail, Context, Result};
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use rand::RngCore;
-use tokio::io::{self, copy_bidirectional, AsyncWriteExt};
+use tokio::io::{self, AsyncWriteExt, copy_bidirectional};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time;
 use tracing::{debug, error, info, info_span, instrument, Instrument, Span};
 
+use crate::{Config, protocol};
 use crate::config::{ServerConfig, ServerServiceConfig, ServiceType, TransportType};
 use crate::protocol::{
-    read_auth, read_hello, Ack, ControlChannelCmd, DataChannelCmd, Hello, HASH_WIDTH_IN_BYTES,
+    Ack, ControlChannelCmd, DataChannelCmd, HASH_WIDTH_IN_BYTES, Hello, read_auth, read_hello,
 };
 use crate::transport::{TcpTransport, Transport};
-use crate::{protocol, Config};
 
 type ServiceDigest = protocol::Digest;
 
@@ -49,12 +49,12 @@ pub struct ControlChannelHandle<T: Transport> {
 }
 
 impl<T> ControlChannelHandle<T>
-where
-    T: 'static + Transport,
+    where
+        T: 'static + Transport,
 {
     /// Create a control channel handle, where the control channel handling task
     /// and the connection pool task are created.
-    #[instrument(skip_all, fields(service = %service.name))]
+    #[instrument(skip_all, fields(service = % service.name))]
     fn run(conn: T::Stream, service: ServerServiceConfig) -> Self {
         info!("control channel established");
 
@@ -64,25 +64,24 @@ where
 
         match service.service_type {
             ServiceType::Tcp => tokio::spawn(run_tcp_connection_pool::<T>(
-                service.name.clone(),
                 service.bind_addr.clone(),
                 data_ch_rx,
                 data_ch_req_tx,
                 shutdown_tx.subscribe(),
-            )),
+            ).instrument(Span::current())),
         };
 
         tokio::spawn(
             async move {
                 if let Err(err) =
-                    ControlChannelHandle::<T>::do_run(conn, service, shutdown_rx, data_ch_req_rx)
-                        .await
-                        .with_context(|| "Failed to write data cmds")
+                ControlChannelHandle::<T>::do_run(conn, service, shutdown_rx, data_ch_req_rx)
+                    .await
+                    .with_context(|| "Failed to write data cmds")
                 {
                     error!("{:?}", err);
                 }
             }
-            .instrument(Span::current()),
+                .instrument(Span::current()),
         );
 
         Self {
@@ -92,15 +91,15 @@ where
     }
 
     // Run a control channel
-    #[instrument(skip_all, fields(service = %service.name))]
+    #[instrument(skip_all, fields(service = % service.name))]
     async fn do_run(
         mut conn: T::Stream,
         service: ServerServiceConfig,
         mut shutdown_rx: broadcast::Receiver<bool>,
         mut data_ch_req_rx: mpsc::UnboundedReceiver<bool>,
     ) -> Result<()>
-    where
-        T: Transport,
+        where
+            T: Transport,
     {
         let cmd = bincode::serialize(&ControlChannelCmd::CreateDataChannel).unwrap();
 
@@ -131,21 +130,21 @@ where
 }
 
 async fn run_tcp_connection_pool<T: 'static + Transport>(
-    name: String,
     bind_addr: String,
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     shutdown_rx: broadcast::Receiver<bool>,
 ) -> Result<()> {
-    let mut stream_rx = tcp_listen_and_service_bind(name, bind_addr, data_ch_req_tx, shutdown_rx);
+    let mut stream_rx = tcp_listen_and_service_bind(bind_addr, data_ch_req_tx, shutdown_rx);
     while let Some(mut steam) = stream_rx.recv().await {
         if let Some(mut ch) = data_ch_rx.recv().await {
             tokio::spawn(async move {
                 let cmd = bincode::serialize(&DataChannelCmd::StartForwardTcp).unwrap();
                 if ch.write_all(&cmd).await.is_ok() {
+                    info!("start forwarding");
                     let _ = copy_bidirectional(&mut ch, &mut steam).await;
                 }
-            });
+            }.instrument(Span::current()));
         } else {
             break;
         }
@@ -155,7 +154,6 @@ async fn run_tcp_connection_pool<T: 'static + Transport>(
 
 ///监听对应tcp端口并绑定服务
 fn tcp_listen_and_service_bind(
-    name: String,
     addr: String,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
@@ -172,10 +170,10 @@ fn tcp_listen_and_service_bind(
                 },
                 || async { Ok(TcpListener::bind(&addr).await?) },
             )
-            .await
-            .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
+                .await
+                .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
 
-            info!("service-{:?} Listening at:{:?}", name, addr);
+            info!("Listening at:{:?}", addr);
 
             let listener: TcpListener = match listener {
                 Ok(l) => l,
@@ -227,7 +225,7 @@ fn tcp_listen_and_service_bind(
                 }
             }
         }
-        .instrument(Span::current()),
+            .instrument(Span::current()),
     );
 
     rx
@@ -295,11 +293,11 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
                         }
                         Ok((conn, addr)) => {
                             backoff.reset();
-                            debug!("Incoming connection from {}", addr);
 
                             let services = self.services.clone();
                             let control_channels = self.control_channels.clone();
                             tokio::spawn(async move {
+                                info!("Incoming connection from {}", addr);
                                 if let Err(err) = handle_connection(conn, addr, services, control_channels)
                                 .await
                                 .with_context(||"Failed to handle a connection to `server.bind_addr`") {
@@ -416,6 +414,7 @@ async fn do_data_channel_handshake<T: 'static + Transport>(
     match control_channels_guard.get(&nonce) {
         Some(handle) => {
             handle.data_channel_tx.send(conn).await?;
+            info!("data channel ready")
         }
         None => {
             eprintln!("Data channels has incorrect nonce");

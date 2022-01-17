@@ -148,6 +148,8 @@ struct ControlChannel<T: Transport> {
 }
 
 impl<T: 'static + Transport> ControlChannel<T> {
+
+    #[instrument(skip(self), fields(service = %self.service.name))]
     async fn run(&mut self) -> Result<()> {
         let mut conn_control = self
             .transport
@@ -245,6 +247,7 @@ struct RunDataChannelArgs<T: Transport> {
 async fn run_data_channel<T: Transport>(args: Arc<RunDataChannelArgs<T>>) -> Result<()> {
     let mut conn = do_data_channel_handshake(args.clone()).await?;
 
+    info!("new data channel created waiting");
     match read_data_cmd(&mut conn).await? {
         DataChannelCmd::StartForwardTcp => {
             run_data_channel_for_tcp::<T>(conn, &args.local_addr).await?;
@@ -285,12 +288,12 @@ async fn run_data_channel_for_tcp<T: Transport>(
     mut conn: T::Stream,
     local_addr: &str,
 ) -> Result<()> {
-    debug!("New data channel starts forwarding to {:?}", local_addr);
-
     let mut local = TcpStream::connect(local_addr)
         .await
         .with_context(|| "Failed to connect to local_addr")?;
     let _ = copy_bidirectional(&mut conn, &mut local).await;
+
+    info!("New data channel starts forwarding to {:?}", local_addr);
 
     Ok(())
 }
