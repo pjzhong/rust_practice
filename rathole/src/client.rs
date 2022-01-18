@@ -8,7 +8,7 @@ use tokio::io::{copy_bidirectional, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, oneshot};
 use tokio::time;
-use tracing::{debug, error, info, Span, instrument, Instrument};
+use tracing::{debug, error, info, instrument, Instrument, Span};
 
 use crate::config::{ClientConfig, ClientServiceConfig, TransportType};
 use crate::protocol::{
@@ -94,7 +94,6 @@ struct ControlChannelHandle {
 }
 
 impl ControlChannelHandle {
-
     #[instrument(skip_all, fields(service = %service.name))]
     fn run<T: 'static + Transport>(
         service: ClientServiceConfig,
@@ -148,7 +147,6 @@ struct ControlChannel<T: Transport> {
 }
 
 impl<T: 'static + Transport> ControlChannel<T> {
-
     #[instrument(skip(self), fields(service = %self.service.name))]
     async fn run(&mut self) -> Result<()> {
         let mut conn_control = self
@@ -227,6 +225,8 @@ impl<T: 'static + Transport> ControlChannel<T> {
                     }
                 },
                 _ = &mut self.shutdown_rx => {
+                    let close_send = Hello::ControlChannelClose(self.digest[..].try_into().unwrap());
+                    conn_control.write_all(&bincode::serialize(&close_send).unwrap()).await?;
                     println!("Control channel shutting down..");
                     break;
                 }

@@ -1,7 +1,9 @@
 [client]
-remote_addr = "127.0.0.1:2333"
+#remote_addr = "101.33.203.68:3333"
+remote_addr = "127.0.0.1:3333"
+
 
 [client.services.rdp]
 type = "tcp"
-token = "zhongjianping"
+token = "zhongjianping19950321"
 local_addr = "127.0.0.1:3389"

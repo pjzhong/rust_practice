@@ -17,6 +17,7 @@ pub fn digest(data: &[u8]) -> Digest {
 pub enum Hello {
     ControlChannelHello(Digest),
     DataChannelHello(Digest),
+    ControlChannelClose(Digest),
 }
 
 #[derive(Deserialize, Serialize, Debug)]

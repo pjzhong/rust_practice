@@ -1,6 +1,6 @@
 [server]
-bind_addr = "127.0.0.1:2333"
+bind_addr = "127.0.0.1:3333"
 
 [server.services.rdp]
-token = "zhongjianping"
+token = "zhongjianping19950321"
 bind_addr = "127.0.0.1:6666"
