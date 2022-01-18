@@ -5,5 +5,5 @@ remote_addr = "127.0.0.1:3333"
 
 [client.services.rdp]
 type = "tcp"
-token = "zhongjianping19950321"
+token = "123456"
 local_addr = "127.0.0.1:3389"
