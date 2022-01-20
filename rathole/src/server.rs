@@ -68,15 +68,13 @@ where
         let (data_ch_req_tx, data_ch_req_rx) = mpsc::unbounded_channel();
 
         match service.service_type {
-            ServiceType::Tcp => tokio::spawn(
-                run_tcp_connection_pool::<T>(
-                    service.name.clone(),
-                    service.bind_addr.clone(),
-                    data_ch_rx,
-                    data_ch_req_tx,
-                    shutdown_tx.subscribe(),
-                ),
-            ),
+            ServiceType::Tcp => tokio::spawn(run_tcp_connection_pool::<T>(
+                service.name.clone(),
+                service.bind_addr.clone(),
+                data_ch_rx,
+                data_ch_req_tx,
+                shutdown_tx.subscribe(),
+            )),
         };
 
         tokio::spawn(
@@ -139,7 +137,6 @@ where
                 }
             }
         }
-
 
         Ok(())
     }
@@ -322,10 +319,10 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
                             let services = self.services.clone();
                             let control_channels = self.control_channels.clone();
                             tokio::spawn(async move {
-                                info!("Incoming connection from {}", addr);
+                                info!("Handling");
                                 if let Err(err) = handle_connection(conn, addr, services, control_channels)
                                 .await
-                                .with_context(||"Failed to handle a connection to `server.bind_addr`") {
+                                .with_context(|| format!("Failed to handle connection")) {
                                     error!("{:?}", err);
                                 }
                             }.instrument(info_span!("handle_connection", %addr)));
@@ -423,7 +420,12 @@ async fn do_control_channel_handshake<T: 'static + Transport>(
         conn.write_all(&bincode::serialize(&Ack::Ok).unwrap())
             .await?;
 
-        let handle = ControlChannelHandle::run(conn, service_config, service_digest, control_channels.clone());
+        let handle = ControlChannelHandle::run(
+            conn,
+            service_config,
+            service_digest,
+            control_channels.clone(),
+        );
 
         let _ = h.insert(service_digest, handle);
     }
