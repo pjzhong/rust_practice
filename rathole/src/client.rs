@@ -247,7 +247,7 @@ struct RunDataChannelArgs<T: Transport> {
 async fn run_data_channel<T: Transport>(args: Arc<RunDataChannelArgs<T>>) -> Result<()> {
     let mut conn = do_data_channel_handshake(args.clone()).await?;
 
-    info!("new data channel created waiting");
+    info!("New data channel created waiting");
     match read_data_cmd(&mut conn).await? {
         DataChannelCmd::StartForwardTcp => {
             run_data_channel_for_tcp::<T>(conn, &args.local_addr).await?;

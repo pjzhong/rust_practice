@@ -54,7 +54,7 @@ where
 {
     /// Create a control channel handle, where the control channel handling task
     /// and the connection pool task are created.
-    #[instrument(skip_all, fields(service = % service.name))]
+
     fn run(
         conn: T::Stream,
         service: ServerServiceConfig,
@@ -70,12 +70,12 @@ where
         match service.service_type {
             ServiceType::Tcp => tokio::spawn(
                 run_tcp_connection_pool::<T>(
+                    service.name.clone(),
                     service.bind_addr.clone(),
                     data_ch_rx,
                     data_ch_req_tx,
                     shutdown_tx.subscribe(),
-                )
-                .instrument(Span::current()),
+                ),
             ),
         };
 
@@ -145,13 +145,15 @@ where
     }
 }
 
+#[instrument(skip_all, fields(service = %name))]
 async fn run_tcp_connection_pool<T: 'static + Transport>(
+    name: String,
     bind_addr: String,
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     shutdown_rx: broadcast::Receiver<bool>,
 ) -> Result<()> {
-    let mut stream_rx = tcp_listen_and_service_bind(bind_addr, data_ch_req_tx, shutdown_rx);
+    let mut stream_rx = tcp_listen_and_service_bind(name, bind_addr, data_ch_req_tx, shutdown_rx);
     while let Some(mut steam) = stream_rx.recv().await {
         if let Some(mut ch) = data_ch_rx.recv().await {
             tokio::spawn(
@@ -173,7 +175,9 @@ async fn run_tcp_connection_pool<T: 'static + Transport>(
 }
 
 ///监听对应tcp端口并绑定服务
+#[instrument(skip_all, fields(service = %name))]
 fn tcp_listen_and_service_bind(
+    name: String,
     addr: String,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
