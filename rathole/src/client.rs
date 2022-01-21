@@ -288,12 +288,13 @@ async fn run_data_channel_for_tcp<T: Transport>(
     mut conn: T::Stream,
     local_addr: &str,
 ) -> Result<()> {
+    info!("New data channel starts forwarding to {:?}", local_addr);
     let mut local = TcpStream::connect(local_addr)
         .await
         .with_context(|| "Failed to connect to local_addr")?;
     let _ = copy_bidirectional(&mut conn, &mut local).await;
 
-    info!("New data channel starts forwarding to {:?}", local_addr);
 
+    info!("Data channel Stp forwarding to {:?}", local_addr);
     Ok(())
 }
