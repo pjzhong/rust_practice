@@ -127,10 +127,8 @@ where
                         }
                     }
                 },
-                val = read_hello(&mut conn) => {
-                    if let Hello::ControlChannelClose(_) = val? {
-                        break;
-                    }
+                Ok(Hello::ControlChannelClose(_)) = read_hello(&mut conn) => {
+                    break;
                 }
                 _ = shutdown_rx.recv() => {
                     break;
