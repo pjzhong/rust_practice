@@ -1,5 +1,5 @@
-use yew::{Component, Context, html, Html};
 use yew::prelude::*;
+use yew::{html, Component, Context, Html};
 
 use super::cell::Cell;
 use super::cell::CellValue;

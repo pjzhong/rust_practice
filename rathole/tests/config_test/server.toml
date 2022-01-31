@@ -1,6 +1,12 @@
 [server]
 bind_addr = "127.0.0.1:3333"
+default_token = "123456"
 
-[server.services.rdp]
-token = "123456"
+[server.services.mstsc1]
 bind_addr = "127.0.0.1:6666"
+
+[server.services.mstsc2]
+bind_addr = "127.0.0.1:7777"
+
+[server.services.mstsc3]
+bind_addr = "127.0.0.1:8888"

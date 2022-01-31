@@ -13,9 +13,10 @@
       --tile-absent-bg: #787c7e;
       --tile-absent-fg: white;
       --tile-size: 62px;
+      --tile-wrong-bg: red;
+      --tile-wrong-fg: black;
       --tile-border-size: 2px;
       --grid-gap: 5px;
-      --row-wrong-bg: red;
       --key-bg: #d3d6da;
       --key-fg: black;
       --key-width: 43px;
@@ -42,10 +43,6 @@
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: var(--grid-gap);
-    }
-
-    .wrong > .tile[data-status="empty"] {
-      background-color: var(--row-wrong-bg);
     }
 
     .tile {
@@ -108,6 +105,11 @@
     div[data-status="unused"] {
       background-color: var(--key-bg);
       color: var(--key-fg);
+    }
+
+     div[data-status="wrong"] {
+      background-color: var(--tile-wrong-bg);
+      color: var(--tile-wrong-fg);
     }
 
     .scoreboard {

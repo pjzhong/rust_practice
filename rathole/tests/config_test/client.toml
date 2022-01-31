@@ -2,8 +2,17 @@
 #remote_addr = "101.33.203.68:3333"
 remote_addr = "127.0.0.1:3333"
 
+[client.services.mstsc1]
+type = "tcp"
+token = "123456"
+local_addr = "127.0.0.1:3389"
 
-[client.services.rdp]
+[client.services.mstsc2]
+type = "tcp"
+token = "123456"
+local_addr = "127.0.0.1:3389"
+
+[client.services.mstsc3]
 type = "tcp"
 token = "123456"
 local_addr = "127.0.0.1:3389"

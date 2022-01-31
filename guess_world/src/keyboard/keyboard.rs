@@ -1,15 +1,96 @@
+use std::collections::HashMap;
+
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
+use yew::html::{ImplicitClone, IntoPropValue};
 use yew::prelude::*;
+
+use crate::CellValue;
 
 pub const ENTER: &str = "Enter";
 pub const BACKSPACE: &str = "Backspace";
 
+#[derive(PartialEq, Clone, Debug)]
+pub enum KeyStatus {
+    Unused,
+    Absent,
+    Present,
+    Correct,
+}
+
+#[derive(PartialEq, Clone)]
+pub struct KeyboardStatus {
+    keys: HashMap<char, KeyStatus>,
+}
+
+impl KeyboardStatus {
+    pub fn new() -> Self {
+        Self {
+            keys: HashMap::new(),
+        }
+    }
+
+    pub fn update_status(&mut self, guess: &[CellValue]) {
+        for cell in guess {
+            match cell {
+                CellValue::Absent(c) => {
+                    self.keys.entry(*c).or_insert(KeyStatus::Absent);
+                }
+                CellValue::Present(c) => {
+                    self.keys
+                        .entry(*c)
+                        .and_modify(|e| {
+                            if *e != KeyStatus::Correct {
+                                *e = KeyStatus::Present
+                            }
+                        })
+                        .or_insert(KeyStatus::Present);
+                }
+                CellValue::Correct(c) => {
+                    self.keys.entry(*c).or_insert(KeyStatus::Correct);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn get_status(&self, letter: char) -> KeyType {
+        let status = self.keys
+            .get(&letter.to_ascii_lowercase())
+            .cloned()
+            .unwrap_or(KeyStatus::Unused);
+        KeyType::Letter(KeyValue { letter, status })
+    }
+}
+
+#[derive(Properties, PartialEq, Clone)]
+pub struct KeyValue {
+    pub letter: char,
+    pub status: KeyStatus,
+}
+
+impl KeyValue {
+    pub fn new(letter: char) -> Self {
+        Self {
+            letter,
+            status: KeyStatus::Unused,
+        }
+    }
+}
+
 #[derive(PartialEq, Clone)]
 pub enum KeyType {
-    Letter(char),
+    Letter(KeyValue),
     Enter,
     Backspace,
+}
+
+impl ImplicitClone for KeyType {}
+
+impl IntoPropValue<KeyType> for KeyValue {
+    fn into_prop_value(self) -> KeyType {
+        KeyType::Letter(self)
+    }
 }
 
 #[derive(Properties, PartialEq)]
@@ -27,21 +108,28 @@ impl KeyProps {
 
     fn status_string(&self) -> String {
         match &self.def {
+            KeyType::Letter(v) => match v.status {
+                KeyStatus::Unused => "unused",
+                KeyStatus::Absent => "absent",
+                KeyStatus::Present => "present",
+                KeyStatus::Correct => "correct"
+            }
             _ => "unused",
-        }.to_string()
+        }
+            .to_string()
     }
 }
 
 #[function_component(Key)]
 pub fn key(key_pro: &KeyProps) -> Html {
     let key_id = match key_pro.def {
-        KeyType::Letter(l) => l.to_string(),
+        KeyType::Letter(ref v) => v.letter.to_string(),
         KeyType::Enter => "Enter".to_string(),
         KeyType::Backspace => "Backspace".to_string(),
     };
 
     let disp = match key_pro.def {
-        KeyType::Letter(l) => l.to_string(),
+        KeyType::Letter(ref v) => v.letter.to_string(),
         KeyType::Enter => "Enter".to_string(),
         KeyType::Backspace => "Del".to_string(),
     };
@@ -56,6 +144,7 @@ pub fn key(key_pro: &KeyProps) -> Html {
 #[derive(Properties, PartialEq)]
 pub struct KeyboardProperties {
     pub key_press: Callback<KeyType>,
+    pub keys: KeyboardStatus,
 }
 
 pub struct Keyboard;
@@ -70,7 +159,7 @@ impl Component for Keyboard {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let key = |c: char| {
-            html! { <Key def={KeyType::Letter(c)} /> }
+            html! { <Key def={ctx.props().keys.get_status(c)} /> }
         };
 
         let row_one = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P']
@@ -93,7 +182,7 @@ impl Component for Keyboard {
                     if let Some(key) = div.get_attribute("data-key-id") {
                         if key.len() == 1 {
                             if let Some(c) = key.chars().next() {
-                                key_press.emit(KeyType::Letter(c))
+                                key_press.emit(KeyType::Letter(KeyValue::new(c)))
                             }
                         }
 
