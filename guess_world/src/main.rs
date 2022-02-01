@@ -90,7 +90,7 @@ fn evaluate_guess(word: &str, guessing: &str) -> Vec<CellValue> {
             .map(|v| v.unwrap_or(CellValue::Empty))
             .collect()
     } else {
-        return word.chars().map(CellValue::BAD).collect::<Vec<_>>();
+        return word.chars().map(CellValue::Bad).collect::<Vec<_>>();
     }
 }
 
@@ -108,7 +108,7 @@ impl Component for WorldGuess {
     type Message = KeyType;
     type Properties = ();
 
-    fn create(ctx: &Context<Self>) -> Self {
+    fn create(_: &Context<Self>) -> Self {
         let word = WORLD_LIST
             .lines()
             .choose(&mut thread_rng())

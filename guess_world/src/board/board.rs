@@ -1,7 +1,5 @@
-use std::cell::Cell;
-
 use yew::prelude::function_component;
-use yew::{html, prelude::*, props, Html};
+use yew::{html, prelude::*, Html};
 
 use crate::CellValue;
 

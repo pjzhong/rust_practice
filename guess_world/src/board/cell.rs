@@ -8,7 +8,7 @@ pub enum CellValue {
     Absent(char),
     Present(char),
     Correct(char),
-    BAD(char),
+    Bad(char),
 }
 
 impl CellValue {
@@ -41,7 +41,7 @@ pub fn cell(props: &CellProps) -> Html {
         CellValue::Absent(v) => html! {
                 <div data-status="absent" class="tile">{v}</div>
         },
-        CellValue::BAD(v) => html! {
+        CellValue::Bad(v) => html! {
                 <div data-status="wrong" class="tile">{v}</div>
         },
         _ => html! {

@@ -15,7 +15,7 @@ impl Component for Row {
     type Message = ();
     type Properties = RowProps;
 
-    fn create(ctx: &Context<Self>) -> Self {
+    fn create(_: &Context<Self>) -> Self {
         Self {}
     }
 
