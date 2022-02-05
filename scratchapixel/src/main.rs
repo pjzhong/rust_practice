@@ -1,314 +1,298 @@
-use std::fmt::Debug;
-use std::ops::{Add, Index, IndexMut, Mul, Sub};
+use std::env;
+use std::f32::consts::PI;
+use std::fs::File;
+use std::io::Write;
 
-#[derive(Debug, PartialEq)]
-struct Vec3<T: Debug + PartialEq> {
-    x: T,
-    y: T,
-    z: T,
+use crate::vec::Vec3;
+
+mod matrix;
+mod vec;
+
+const MAX_RAY_DEPTH: usize = 15;
+
+struct Sphere {
+    /// position of the sphere
+    center: Vec3<f32>,
+    /// surface color and emission (light)
+    surface_color: Vec3<f32>,
+    emission_color: Vec3<f32>,
+    /// sphere radius and radius^2
+    radius2: f32,
+    /// surface transparency
+    transparency: f32,
+    /// reflectivity
+    reflection: f32,
 }
 
-macro_rules! vec3_impl {
-    ($($t:ty)+, $n:ident) => ($(
+impl Sphere {
+    pub fn new(
+        center: Vec3<f32>,
+        surface_color: Vec3<f32>,
+        emission_color: Vec3<f32>,
+        radius: f32,
+        reflection: f32,
+        transparency: f32,
+    ) -> Self {
+        Self {
+            center,
+            surface_color,
+            emission_color,
+            radius2: radius * radius,
+            reflection,
+            transparency,
+        }
+    }
 
-        impl Vec3<$t> {
-            fn $n(x: $t, y: $t, z: $t) -> Self {
-                Self {
-                    x,
-                    y,
-                    z,
-                }
-            }
-
-            fn length(&self) -> $t {
-                (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
-            }
-
-            fn dot_product(&self, v:&Vec3<$t>) -> $t {
-                self.x * v.x + self.y * v.y + self.z * v.z
-            }
-
-            fn cross(&self,  v:&Vec3<$t>) -> Vec3<$t> {
-                return Self {
-                   x: self.y * v.z - self.z * v.y,
-                   y: self.z * v.x - self.x * v.z,
-                   z: self.x * v.y - self.y * v.x
-                }
-            }
-
-            fn normalize(&mut self) -> &Self {
-                let len = self.length();
-                if len > 0.0 {
-                    let inv_len = 1.0 / len;
-                    self.x *= inv_len;
-                    self.y *= inv_len;
-                    self.z *= inv_len;
-                }
-                self
-            }
-         }
-
-        impl Add for Vec3<$t> {
-            type Output = Vec3<$t>;
-
-            fn add(self, other: Self) -> Self {
-                Self {
-                    x: self.x + other.x,
-                    y: self.y + other.y,
-                    z: self.z + other.z,
-                }
-            }
+    fn intersect(
+        &self,
+        ray_origination: &Vec3<f32>,
+        ray_direction: &Vec3<f32>,
+        t0: &mut f32,
+        t1: &mut f32,
+    ) -> bool {
+        let l = self.center - *ray_origination;
+        let tca = l.dot_product(ray_direction);
+        if tca < 0.0 {
+            return false;
         }
 
-        impl Sub for Vec3<$t> {
-            type Output = Vec3<$t>;
-
-            fn sub(self, other: Self) -> Self {
-                Self {
-                    x: self.x - other.x,
-                    y: self.y - other.y,
-                    z: self.z - other.z,
-                }
-            }
+        let d2 = l.dot_product(&l) - tca * tca;
+        if self.radius2 < d2 {
+            return false;
         }
 
-        impl Mul for Vec3<$t> {
-            type Output = Vec3<$t>;
+        let thc = (self.radius2 - d2).sqrt();
+        *t0 = tca - thc;
+        *t1 = tca + thc;
 
-            fn mul(self, other: Self) -> Self {
-                Self {
-                    x: self.x * other.x,
-                    y: self.y * other.y,
-                    z: self.z * other.z,
-                }
-            }
-        }
-
-    )+)
+        true
+    }
 }
 
-vec3_impl! { f32,f32 }
-vec3_impl! { f64,f64 }
-
-#[derive(Debug, PartialEq)]
-struct Matrix44<T: Debug + PartialEq> {
-    m: [[T; 4]; 4],
+impl Default for Sphere {
+    fn default() -> Self {
+        Self {
+            center: Vec3::f32(0., 0., 0.),
+            surface_color: Vec3::f32(0., 0., 0.),
+            emission_color: Vec3::f32(0., 0., 0.),
+            radius2: 0.0,
+            transparency: 0.0,
+            reflection: 0.0,
+        }
+    }
 }
 
-macro_rules! matrix_impl {
-    ($($t:ty)+, $n:ident) => ($(
+fn mix(a: f32, b: f32, mix: f32) -> f32 {
+    b * mix + a * (1.0 - mix)
+}
 
-        impl Matrix44<$t> {
-            fn transpose(&self) -> Matrix44<$t> {
-                let mut transp_mat = Matrix44::<$t>::default();
+fn trace(
+    ray_origination: &Vec3<f32>,
+    ray_direction: &Vec3<f32>,
+    spheres: &[Sphere],
+    depth: usize,
+) -> Vec3<f32> {
+    let mut tnear = f32::INFINITY;
+    let mut sphere: Option<&Sphere> = None;
 
-                for i in 0..4 {
-                    for j in 0..4 {
-                        transp_mat[i][j] = self[j][i];
+    for s in spheres {
+        let mut t0 = f32::INFINITY;
+        let mut t1 = f32::INFINITY;
+        if s.intersect(ray_origination, ray_direction, &mut t0, &mut t1) {
+            if t0 < 0f32 {
+                t0 = t1;
+            }
+
+            if t0 < tnear {
+                tnear = t0;
+                sphere = Some(s);
+            }
+        }
+    }
+
+    // if there's no intersection return black or background color
+    let sphere = match sphere {
+        Some(v) => v,
+        None => return Vec3::f32(2., 2., 2.),
+    };
+
+    // color of the ray/surface of the object intersected by the ray
+    let mut surface_color = Vec3::<f32>::default();
+    // point of intersection
+    let point_intersection = *ray_origination + ray_direction.mul(tnear);
+    // normal at the intersection point
+    let mut normal_intersection_point = (point_intersection - sphere.center).normalize();
+
+    // if the normal and the view direction are not opposite to each other
+    // reverse the normal direction. That also means we are inside the sphere so set
+    // the inside bool to true. Finally reverse the sign of IdotN which we want positive.
+    let bias = 1e-4;
+    let mut inside = false;
+    if 0.0 < ray_direction.dot_product(&normal_intersection_point) {
+        normal_intersection_point = -normal_intersection_point;
+        inside = true;
+    }
+    if (0.0 < sphere.transparency || 0.0 < sphere.reflection) && depth < MAX_RAY_DEPTH {
+        let fracing_ration = -ray_direction.dot_product(&normal_intersection_point);
+        let fresneleffect = mix(f32::powf(1.0 - fracing_ration, 3.0), 1.0, 0.1);
+
+        let refl_dir =
+            (*ray_direction - normal_intersection_point.mul(2.0).mul(ray_direction.dot_product(&normal_intersection_point))).normalize();
+
+        // compute reflection direction (not need to normalize because all vectors are already normalized)
+        let reflection = trace(&(point_intersection + normal_intersection_point.mul(bias)), &refl_dir, spheres, depth + 1);
+        let mut refraction = Vec3::<f32>::default();
+
+        // if the sphere is also transparent compute refraction ray(transmission)
+        if 0.0 < sphere.transparency {
+            let ior = 1.1;
+            let eta = if inside { ior } else { 1.0 / ior };
+            let cosi = -normal_intersection_point.dot_product(ray_direction);
+            let k = 1.0 - eta * eta * (1.0 - cosi * cosi);
+            let refrdir = (ray_direction.mul(eta) + normal_intersection_point.mul(eta * cosi - k.sqrt())).normalize();
+            refraction = trace(&(point_intersection - normal_intersection_point.mul(bias)), &refrdir, spheres, depth + 1)
+        }
+
+        // the result is a min of reflection and refraction (if the sphere is transparent);
+        surface_color = (reflection.mul(fresneleffect)
+            + refraction.mul(1.0 - fresneleffect).mul(sphere.transparency))
+            * sphere.surface_color;
+    } else {
+        for i in 0..spheres.len() {
+            if 0.0 < spheres[i].emission_color.x {
+                let mut transmission = 1.0;
+                let light_direction = (spheres[i].center - point_intersection).normalize();
+                for (j, sphere) in spheres.iter().enumerate() {
+                    if i != j {
+                        let mut t0 = 0.0;
+                        let mut t1 = 0.0;
+                        if sphere.intersect(
+                            &(point_intersection + normal_intersection_point.mul(bias)),
+                            &light_direction,
+                            &mut t0,
+                            &mut t1,
+                        ) {
+                            transmission = 0.0;
+                            break;
+                        }
                     }
                 }
-
-                transp_mat
+                surface_color = surface_color
+                    + (sphere
+                    .surface_color
+                    .mul(transmission)
+                    .mul(normal_intersection_point.dot_product(&light_direction).max(0.0)))
+                    * spheres[i].emission_color;
             }
         }
+    }
 
-        impl Index<usize> for Matrix44<$t> {
-            type Output = [$t;4];
-
-            fn index(&self, index: usize) -> &Self::Output {
-                &self.m[index]
-            }
-        }
-
-        impl IndexMut<usize> for Matrix44<$t> {
-
-            fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-                &mut self.m[index]
-            }
-        }
-
-        impl Default for Matrix44<$t> {
-            fn default() -> Self {
-                Self {
-                    m: [
-                        [1., 0., 0., 0.],
-                        [0., 1., 0., 0.],
-                        [0., 0., 1., 0.],
-                        [0., 0., 0., 1.],
-                    ]
-                }
-            }
-        }
-
-        impl Mul for Matrix44<$t> {
-            type Output = Matrix44<$t>;
-
-            fn mul(self, other: Matrix44<$t>) -> Matrix44<$t> {
-                let mut matrix = Matrix44::<$t>::default();
-
-                for i in 0..4 {
-                    for j in 0..4 {
-                        matrix[i][j] = self[i][0] * other[0][j] +
-                                       self[i][1] * other[1][j] +
-                                       self[i][2] * other[2][j] +
-                                       self[i][3] * other[3][j];
-                    }
-                }
-
-                matrix
-            }
-        }
-
-    )+)
+    surface_color + sphere.emission_color
 }
 
-matrix_impl! { f32,f32 }
-matrix_impl! { f64,f64 }
+fn render(spheres: &[Sphere]) {
+    const WIDTH: usize = 1280usize;
+    const HEIGHT: usize = 960usize;
+    let ray = Vec3::<f32>::default();
+    let mut image = vec![Vec3::<f32>::default(); WIDTH * HEIGHT];
+    let inv_width = 1.0 / WIDTH as f32;
+    let inv_height = 1.0 / HEIGHT as f32;
 
+    let fov = 30.0;
+    let aspect_ration = WIDTH as f32 / HEIGHT as f32;
+    let angle = (PI * 0.5 * fov / 180.0).tan();
+
+    // Trace rays
+    for y in 0..HEIGHT {
+        for x in 0..WIDTH {
+            let xx = (2.0 * ((x as f32 + 0.5) * inv_width) - 1.0) * angle * aspect_ration;
+            let yy = (1.0 - 2.0 * ((y as f32 + 0.5) * inv_height)) * angle;
+            let ray_dir = Vec3::f32(xx, yy, -1.0).normalize();
+            image[y * WIDTH + x] = trace(&ray, &ray_dir, spheres, 0);
+        }
+    }
+
+    let current_dir = env::current_dir().unwrap();
+    let mut file = File::create(current_dir.join("untitled.ppm")).unwrap();
+    if file
+        .write_all(format!("P6\n{} {}\n255\n", WIDTH, HEIGHT).as_bytes())
+        .is_err()
+    {
+        eprintln!("write file err");
+        return;
+    }
+
+    for i in image {
+        if file
+            .write_all(&[
+                (i.x.min(1.0) * 255.0) as u8,
+                (i.y.min(1.0) * 255.0) as u8,
+                (i.z.min(1.0) * 255.0) as u8,
+            ])
+            .is_err()
+        {
+            eprintln!("write color err");
+            return;
+        }
+    }
+}
+
+/// thanks [`scratchapixel`]
+/// This code is copy from ['raytracer'] and translate to rust
+///
+/// [`scratchapixel`]: https://www.scratchapixel.com/index.php/
+/// [`raytracer`]: https://www.scratchapixel.com/code.php?id=3&origin=/lessons/3d-basic-rendering/introduction-to-ray-tracing
 fn main() {
-    let v = Vec3::f32(1.0, 1.0, 1.0);
-    let v2 = Vec3::f32(1.0, 1.0, 1.0);
-    println!("{:?}", v + v2);
-}
+    let spheres = vec![
+        Sphere::new(
+            Vec3::f32(0.0, -10004.0, -20.0),
+            Vec3::f32(0.20, 0.20, 0.20),
+            Vec3::<f32>::default(),
+            10000.0,
+            0.0,
+            0.0,
+        ),
+        Sphere::new(
+            Vec3::f32(0.0, 0.0, -20.0),
+            Vec3::f32(1.00, 0.32, 0.36),
+            Vec3::<f32>::default(),
+            4.0,
+            1.0,
+            0.5,
+        ),
+        Sphere::new(
+            Vec3::f32(5.0, -1.0, -15.0),
+            Vec3::f32(0.90, 0.76, 0.46),
+            Vec3::<f32>::default(),
+            2.0,
+            1.0,
+            0.0,
+        ),
+        Sphere::new(
+            Vec3::f32(5.0, 0.0, -25.0),
+            Vec3::f32(0.65, 0.77, 0.97),
+            Vec3::<f32>::default(),
+            3.0,
+            1.0,
+            0.0,
+        ),
+        Sphere::new(
+            Vec3::f32(-5.5, 0.0, -15.0),
+            Vec3::f32(0.90, 0.90, 0.90),
+            Vec3::<f32>::default(),
+            3.0,
+            1.0,
+            0.0,
+        ),
+        Sphere::new(
+            Vec3::f32(0.0, 20.0, -30.0),
+            Vec3::f32(0.00, 0.00, 0.00),
+            Vec3::f32(3.0, 3.0, 3.0),
+            3.0,
+            0.0,
+            0.0,
+        ),
+    ];
 
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn test_add() {
-        assert_eq!(
-            Vec3::f32(2.0, 2.0, 2.0),
-            Vec3::f32(1.0, 1.0, 1.0) + Vec3::f32(1.0, 1.0, 1.0)
-        );
-
-        assert_eq!(
-            Vec3::f64(2.0, 2.0, 2.0),
-            Vec3::f64(1.0, 1.0, 1.0) + Vec3::f64(1.0, 1.0, 1.0)
-        );
-    }
-
-    #[test]
-    fn test_sub() {
-        assert_eq!(
-            Vec3::f32(0.0, 0.0, 0.0),
-            Vec3::f32(1.0, 1.0, 1.0) - Vec3::f32(1.0, 1.0, 1.0)
-        );
-
-        assert_eq!(
-            Vec3::f64(0.0, 0.0, 0.0),
-            Vec3::f64(1.0, 1.0, 1.0) - Vec3::f64(1.0, 1.0, 1.0)
-        );
-    }
-
-    #[test]
-    fn test_mul() {
-        assert_eq!(
-            Vec3::f32(4.0, 1.0, 9.0),
-            Vec3::f32(2.0, 1.0, 3.0) * Vec3::f32(2.0, 1.0, 3.0)
-        );
-
-        assert_eq!(
-            Vec3::f64(4.0, 1.0, 9.0),
-            Vec3::f64(2.0, 1.0, 3.0) * Vec3::f64(2.0, 1.0, 3.0)
-        );
-    }
-
-    #[test]
-    fn test_length() {
-        assert_eq!(3.0_f32.sqrt(), Vec3::f32(1.0, 1.0, 1.0).length());
-
-        assert_eq!(27_f64.sqrt(), Vec3::f64(3.0, 3.0, 3.0).length());
-    }
-
-    #[test]
-    fn test_matrix_mul_f32() {
-        let matrix_one: Matrix44<f32> = Matrix44 {
-            m: [
-                [2., 0., 0., 0.],
-                [0., 2., 0., 0.],
-                [0., 0., 2., 0.],
-                [0., 0., 0., 2.],
-            ],
-        };
-        let matrix_two = Matrix44 {
-            m: [
-                [2., 0., 0., 0.],
-                [0., 2., 0., 0.],
-                [0., 0., 2., 0.],
-                [0., 0., 0., 2.],
-            ],
-        };
-
-        let expect = Matrix44 {
-            m: [
-                [4., 0., 0., 0.],
-                [0., 4., 0., 0.],
-                [0., 0., 4., 0.],
-                [0., 0., 0., 4.],
-            ],
-        };
-
-        assert_eq!(expect, matrix_one * matrix_two);
-    }
-
-    #[test]
-    fn test_matrix_mul_f64() {
-        let matrix_one = Matrix44 {
-            m: [
-                [2., 0., 0., 0.],
-                [0., 2., 0., 0.],
-                [0., 0., 2., 0.],
-                [0., 0., 0., 2.],
-            ],
-        };
-        let matrix_two = Matrix44 {
-            m: [
-                [2., 0., 0., 0.],
-                [0., 2., 0., 0.],
-                [0., 0., 2., 0.],
-                [0., 0., 0., 2.],
-            ],
-        };
-
-        let expect = Matrix44 {
-            m: [
-                [4., 0., 0., 0.],
-                [0., 4., 0., 0.],
-                [0., 0., 4., 0.],
-                [0., 0., 0., 4.],
-            ],
-        };
-
-        assert_eq!(expect, matrix_one * matrix_two);
-    }
-
-    #[test]
-    fn test_matrix_transpose() {
-        assert_eq!(
-            Matrix44::<f32>::default(),
-            Matrix44::<f32>::default().transpose()
-        );
-
-        let expect = Matrix44::<f64> {
-            m: [
-                [0., 4., 8., 12.],
-                [1., 5., 9., 13.],
-                [2., 6., 10., 14.],
-                [3., 7., 11., 15.],
-            ],
-        };
-
-        let matrix = Matrix44::<f64> {
-            m: [
-                [0., 1., 2., 3.],
-                [4., 5., 6., 7.],
-                [8., 9., 10., 11.],
-                [12., 13., 14., 15.],
-            ],
-        };
-
-        assert_eq!(expect, matrix.transpose())
-    }
+    render(&spheres);
 }
