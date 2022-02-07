@@ -8,7 +8,7 @@ use crate::vec::Vec3;
 mod matrix;
 mod vec;
 
-const MAX_RAY_DEPTH: usize = 15;
+const MAX_RAY_DEPTH: usize = 5;
 
 struct Sphere {
     /// position of the sphere
@@ -93,25 +93,25 @@ fn trace(
     depth: usize,
 ) -> Vec3<f32> {
     let mut tnear = f32::INFINITY;
-    let mut sphere: Option<&Sphere> = None;
+    let mut nearest_sphere: Option<&Sphere> = None;
 
     for s in spheres {
         let mut t0 = f32::INFINITY;
         let mut t1 = f32::INFINITY;
         if s.intersect(ray_origination, ray_direction, &mut t0, &mut t1) {
-            if t0 < 0f32 {
+            if t0 < 0.0 {
                 t0 = t1;
             }
 
             if t0 < tnear {
                 tnear = t0;
-                sphere = Some(s);
+                nearest_sphere = Some(s);
             }
         }
     }
 
     // if there's no intersection return black or background color
-    let sphere = match sphere {
+    let nearest_sphere = match nearest_sphere {
         Some(v) => v,
         None => return Vec3::f32(2., 2., 2.),
     };
@@ -121,7 +121,7 @@ fn trace(
     // point of intersection
     let point_intersection = *ray_origination + ray_direction.mul(tnear);
     // normal at the intersection point
-    let mut normal_intersection_point = (point_intersection - sphere.center).normalize();
+    let mut normal_intersection_point = (point_intersection - nearest_sphere.center).normalize();
 
     // if the normal and the view direction are not opposite to each other
     // reverse the normal direction. That also means we are inside the sphere so set
@@ -132,31 +132,46 @@ fn trace(
         normal_intersection_point = -normal_intersection_point;
         inside = true;
     }
-    if (0.0 < sphere.transparency || 0.0 < sphere.reflection) && depth < MAX_RAY_DEPTH {
+    if (0.0 < nearest_sphere.transparency || 0.0 < nearest_sphere.reflection) && depth < MAX_RAY_DEPTH {
         let fracing_ration = -ray_direction.dot_product(&normal_intersection_point);
         let fresneleffect = mix(f32::powf(1.0 - fracing_ration, 3.0), 1.0, 0.1);
 
-        let refl_dir =
-            (*ray_direction - normal_intersection_point.mul(2.0).mul(ray_direction.dot_product(&normal_intersection_point))).normalize();
+        let refl_dir = (*ray_direction
+            - normal_intersection_point
+                .mul(2.0)
+                .mul(ray_direction.dot_product(&normal_intersection_point)))
+        .normalize();
 
         // compute reflection direction (not need to normalize because all vectors are already normalized)
-        let reflection = trace(&(point_intersection + normal_intersection_point.mul(bias)), &refl_dir, spheres, depth + 1);
+        let reflection = trace(
+            &(point_intersection + normal_intersection_point.mul(bias)),
+            &refl_dir,
+            spheres,
+            depth + 1,
+        );
         let mut refraction = Vec3::<f32>::default();
 
         // if the sphere is also transparent compute refraction ray(transmission)
-        if 0.0 < sphere.transparency {
+        if 0.0 < nearest_sphere.transparency {
             let ior = 1.1;
             let eta = if inside { ior } else { 1.0 / ior };
             let cosi = -normal_intersection_point.dot_product(ray_direction);
             let k = 1.0 - eta * eta * (1.0 - cosi * cosi);
-            let refrdir = (ray_direction.mul(eta) + normal_intersection_point.mul(eta * cosi - k.sqrt())).normalize();
-            refraction = trace(&(point_intersection - normal_intersection_point.mul(bias)), &refrdir, spheres, depth + 1)
+            let refrdir = (ray_direction.mul(eta)
+                + normal_intersection_point.mul(eta * cosi - k.sqrt()))
+            .normalize();
+            refraction = trace(
+                &(point_intersection - normal_intersection_point.mul(bias)),
+                &refrdir,
+                spheres,
+                depth + 1,
+            )
         }
 
         // the result is a min of reflection and refraction (if the sphere is transparent);
         surface_color = (reflection.mul(fresneleffect)
-            + refraction.mul(1.0 - fresneleffect).mul(sphere.transparency))
-            * sphere.surface_color;
+            + refraction.mul(1.0 - fresneleffect).mul(nearest_sphere.transparency))
+            * nearest_sphere.surface_color;
     } else {
         for i in 0..spheres.len() {
             if 0.0 < spheres[i].emission_color.x {
@@ -178,22 +193,22 @@ fn trace(
                     }
                 }
                 surface_color = surface_color
-                    + (sphere
-                    .surface_color
-                    .mul(transmission)
-                    .mul(normal_intersection_point.dot_product(&light_direction).max(0.0)))
-                    * spheres[i].emission_color;
+                    + (nearest_sphere.surface_color.mul(transmission).mul(
+                        normal_intersection_point
+                            .dot_product(&light_direction)
+                            .max(0.0),
+                    )) * spheres[i].emission_color;
             }
         }
     }
 
-    surface_color + sphere.emission_color
+    surface_color + nearest_sphere.emission_color
 }
 
 fn render(spheres: &[Sphere]) {
     const WIDTH: usize = 1280usize;
     const HEIGHT: usize = 960usize;
-    let ray = Vec3::<f32>::default();
+    let primary_ray = Vec3::<f32>::default();
     let mut image = vec![Vec3::<f32>::default(); WIDTH * HEIGHT];
     let inv_width = 1.0 / WIDTH as f32;
     let inv_height = 1.0 / HEIGHT as f32;
@@ -208,7 +223,7 @@ fn render(spheres: &[Sphere]) {
             let xx = (2.0 * ((x as f32 + 0.5) * inv_width) - 1.0) * angle * aspect_ration;
             let yy = (1.0 - 2.0 * ((y as f32 + 0.5) * inv_height)) * angle;
             let ray_dir = Vec3::f32(xx, yy, -1.0).normalize();
-            image[y * WIDTH + x] = trace(&ray, &ray_dir, spheres, 0);
+            image[y * WIDTH + x] = trace(&primary_ray, &ray_dir, spheres, 0);
         }
     }
 
