@@ -46,14 +46,6 @@ macro_rules! vec3_impl {
                 }
                 self
             }
-
-            pub fn mul(&self, t: $t) -> Self {
-                Self {
-                    x: self.x * t,
-                    y: self.y * t,
-                    z: self.z * t,
-                }
-            }
          }
 
         impl Add for Vec3<$t> {
@@ -88,6 +80,18 @@ macro_rules! vec3_impl {
                     x: self.x * other.x,
                     y: self.y * other.y,
                     z: self.z * other.z,
+                }
+            }
+        }
+
+        impl Mul<$t> for Vec3<$t> {
+            type Output = Vec3<$t>;
+
+            fn mul(self, rhs: $t) -> Self::Output {
+                Self {
+                    x: self.x * rhs,
+                    y: self.y * rhs,
+                    z: self.z * rhs,
                 }
             }
         }

@@ -119,7 +119,7 @@ fn trace(
     // color of the ray/surface of the object intersected by the ray
     let mut surface_color = Vec3::<f32>::default();
     // point of intersection
-    let point_intersection = *ray_origination + ray_direction.mul(tnear);
+    let point_intersection = *ray_origination + *ray_direction * tnear;
     // normal at the intersection point
     let mut normal_intersection_point = (point_intersection - nearest_sphere.center).normalize();
 
@@ -132,19 +132,21 @@ fn trace(
         normal_intersection_point = -normal_intersection_point;
         inside = true;
     }
-    if (0.0 < nearest_sphere.transparency || 0.0 < nearest_sphere.reflection) && depth < MAX_RAY_DEPTH {
+    if (0.0 < nearest_sphere.transparency || 0.0 < nearest_sphere.reflection)
+        && depth < MAX_RAY_DEPTH
+    {
         let fracing_ration = -ray_direction.dot_product(&normal_intersection_point);
         let fresneleffect = mix(f32::powf(1.0 - fracing_ration, 3.0), 1.0, 0.1);
 
         let refl_dir = (*ray_direction
             - normal_intersection_point
-                .mul(2.0)
-                .mul(ray_direction.dot_product(&normal_intersection_point)))
+                * 2.0
+                * ray_direction.dot_product(&normal_intersection_point))
         .normalize();
 
         // compute reflection direction (not need to normalize because all vectors are already normalized)
         let reflection = trace(
-            &(point_intersection + normal_intersection_point.mul(bias)),
+            &(point_intersection + normal_intersection_point * bias),
             &refl_dir,
             spheres,
             depth + 1,
@@ -157,11 +159,11 @@ fn trace(
             let eta = if inside { ior } else { 1.0 / ior };
             let cosi = -normal_intersection_point.dot_product(ray_direction);
             let k = 1.0 - eta * eta * (1.0 - cosi * cosi);
-            let refrdir = (ray_direction.mul(eta)
-                + normal_intersection_point.mul(eta * cosi - k.sqrt()))
+            let refrdir = (*ray_direction * eta
+                + normal_intersection_point * (eta * cosi - k.sqrt()))
             .normalize();
             refraction = trace(
-                &(point_intersection - normal_intersection_point.mul(bias)),
+                &(point_intersection - normal_intersection_point * bias),
                 &refrdir,
                 spheres,
                 depth + 1,
@@ -169,8 +171,8 @@ fn trace(
         }
 
         // the result is a min of reflection and refraction (if the sphere is transparent);
-        surface_color = (reflection.mul(fresneleffect)
-            + refraction.mul(1.0 - fresneleffect).mul(nearest_sphere.transparency))
+        surface_color = (reflection * fresneleffect
+            + refraction * (1.0 - fresneleffect) * nearest_sphere.transparency)
             * nearest_sphere.surface_color;
     } else {
         for i in 0..spheres.len() {
@@ -182,7 +184,7 @@ fn trace(
                         let mut t0 = 0.0;
                         let mut t1 = 0.0;
                         if sphere.intersect(
-                            &(point_intersection + normal_intersection_point.mul(bias)),
+                            &(point_intersection + normal_intersection_point * bias),
                             &light_direction,
                             &mut t0,
                             &mut t1,
@@ -193,11 +195,12 @@ fn trace(
                     }
                 }
                 surface_color = surface_color
-                    + (nearest_sphere.surface_color.mul(transmission).mul(
-                        normal_intersection_point
+                    + (nearest_sphere.surface_color
+                        * transmission
+                        * normal_intersection_point
                             .dot_product(&light_direction)
-                            .max(0.0),
-                    )) * spheres[i].emission_color;
+                            .max(0.0)
+                        * spheres[i].emission_color);
             }
         }
     }
