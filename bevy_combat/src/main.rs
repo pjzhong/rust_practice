@@ -10,7 +10,10 @@ use bevy_combat::ai::movement::TurnToDestinationBehavior;
 use bevy_combat::ai::AIPlugin;
 use bevy_combat::combat::attack::{CoolDown, FireInfo};
 use bevy_combat::combat::effects::Effector;
+use bevy_combat::combat::mortal::{Health, MaxHealth, Mortal};
 use bevy_combat::combat::{CombatPlugin, Target, Team};
+use bevy_combat::fx::animated::AnimatedEffects;
+use bevy_combat::fx::death::DeathEffect;
 use bevy_combat::fx::EffectsPlugin;
 use bevy_combat::game::BaseGamePlugin;
 use bevy_combat::movement::{Mass, MaxTurnSpeed, MovementBundle, MovementPlugin, Thrust};
@@ -52,7 +55,7 @@ fn setup(
         .spawn()
         .insert_bundle(OrthographicCameraBundle::new_2d());
 
-    for _ in 0..3 {
+    for _ in 0..20 {
         let position =
             Vec2::new(-20.0, 0.0) + Vec2::new(rng.gen_range(-5.0..5.0), rng.gen_range(-20.0..20.0));
         let translation = (position * tile_size).extend(0.0);
@@ -89,6 +92,9 @@ fn setup(
                     interval: 4.0,
                     remaining_time: 4.0,
                 },
+                Health(100.0),
+                MaxHealth(100.0),
+                Mortal,
             ))
             .insert_bundle((
                 CoolDown::new(1.0),
@@ -100,10 +106,16 @@ fn setup(
                 Effector {
                     spawn_effect: pulse_laser_attack,
                 },
-            ));
+            ))
+            .insert(DeathEffect {
+                time_to_explosion: 0.1,
+                time_to_smoke: 0.05,
+                dying_explosion: AnimatedEffects::SmallExplosion,
+                death_explosion: AnimatedEffects::MediumExplosion,
+            });
     }
 
-    for _ in 0..6 {
+    for _ in 0..60 {
         let drone_size = Vec2::splat(8.0);
         let position =
             Vec2::new(60.0, 0.0) + Vec2::new(rng.gen_range(-5.0..5.0), rng.gen_range(-30.0..30.0));
@@ -141,6 +153,9 @@ fn setup(
                     interval: 4.0,
                     remaining_time: 4.0,
                 },
+                Health(50.0),
+                MaxHealth(50.0),
+                Mortal,
             ))
             .insert_bundle((
                 CoolDown::new(0.2),
@@ -152,6 +167,12 @@ fn setup(
                 Effector {
                     spawn_effect: small_pulse_laser_attack,
                 },
-            ));
+            ))
+            .insert(DeathEffect {
+                time_to_explosion: 0.1,
+                time_to_smoke: 0.05,
+                dying_explosion: AnimatedEffects::SmallExplosion,
+                death_explosion: AnimatedEffects::MediumExplosion,
+            });
     }
 }

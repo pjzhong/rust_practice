@@ -13,10 +13,12 @@ pub struct RoamBehavior {
 pub const ARRIVEAL_TOLERANCE: f32 = 10.0;
 
 pub fn do_roaming(
-    mut query: Query<(
-        &GlobalTransform,
-        &RoamBehavior,
-        &mut TurnToDestinationBehavior),
+    mut query: Query<
+        (
+            &GlobalTransform,
+            &RoamBehavior,
+            &mut TurnToDestinationBehavior,
+        ),
         With<IdleBehavior>,
     >,
 ) {

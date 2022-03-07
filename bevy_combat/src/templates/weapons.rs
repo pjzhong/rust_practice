@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::combat::damage::Damage;
 use crate::{
     combat::attack::Attack,
     fx::{beams::BeamStyle, HitEffect},
@@ -12,7 +13,7 @@ pub fn pulse_laser_attack(commands: &mut Commands) -> Entity {
         .spawn()
         .insert_bundle((
             Attack::new(3.0),
-            // Damage::new(20.0),
+            Damage(20.0),
             BeamStyle {
                 effect: crate::fx::animated::AnimatedEffects::BlueLaserBeam,
                 width: 1.0,
@@ -29,7 +30,7 @@ pub fn small_pulse_laser_attack(commands: &mut Commands) -> Entity {
         .spawn()
         .insert_bundle((
             Attack::new(2.0),
-            //Damage::new(2.0),
+            Damage(2.0),
             BeamStyle {
                 effect: crate::fx::animated::AnimatedEffects::GreenLaserBeam,
                 width: 0.5,

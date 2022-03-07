@@ -1,4 +1,4 @@
-use crate::game::{game_loop_run_criteria, GameTimeDelta};
+use crate::game::{game_loop_run_criteria, GameConfig, GameTimeDelta};
 use bevy::math::Vec3;
 use bevy::prelude::*;
 
@@ -53,9 +53,28 @@ pub struct MovementBundle {
     pub heading: Heading,
 }
 
-fn update_translation(dt: Res<GameTimeDelta>, mut query: Query<(&Velocity, &mut Transform)>) {
+fn update_translation(
+    dt: Res<GameTimeDelta>,
+    config: Res<GameConfig>,
+    mut query: Query<(&Velocity, &mut Transform)>,
+) {
     for (vel, mut trans) in query.iter_mut() {
         trans.translation += vel.0 * dt.0;
+
+        let mut x = trans.translation.x;
+        let mut y = trans.translation.y;
+        if x < config.min_x {
+            x = config.max_x;
+        } else if y < config.min_y {
+            y = config.max_y;
+        } else if x > config.max_x {
+            x = config.min_x
+        } else if y > config.max_y {
+            y = config.min_y;
+        }
+
+        trans.translation.x = x;
+        trans.translation.y = y;
     }
 }
 

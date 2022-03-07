@@ -4,6 +4,7 @@ use bevy::app::{AppBuilder, Plugin};
 
 pub mod animated;
 pub mod beams;
+pub mod death;
 
 /// An effect that spawns when an effect hits a target.
 pub struct HitEffect {

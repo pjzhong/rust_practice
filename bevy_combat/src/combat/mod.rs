@@ -1,9 +1,16 @@
 pub mod attack;
+pub mod damage;
 pub mod effects;
+pub mod mortal;
 
 use crate::combat::attack::{fire, update_cool_downs, AttackSystems};
+use crate::combat::damage::{apply_damage, DamageSystems};
 use crate::combat::effects::{apply_effects, remove_old_effects, EffectSystems};
-use crate::game::game_loop_run_criteria;
+use crate::combat::mortal::{
+    check_for_dieing_entities, dispose_dieing, update_dieing, MortalSystems,
+};
+use crate::fx::death::do_death_effects;
+use crate::game::{game_loop_run_criteria, DESPAWN_STAGE};
 use bevy::app::{AppBuilder, CoreStage, Plugin};
 use bevy::prelude::*;
 
@@ -35,11 +42,21 @@ impl Plugin for CombatPlugin {
                 )
                 .with_system(fire.system().label(AttackSystems::FireAttack))
                 .with_system(apply_effects.system().label(EffectSystems::ApplyEffects))
+                .with_system(apply_damage.system().label(DamageSystems::ApplyDamage))
+                .with_system(update_dieing.system().label(MortalSystems::UpdateDieing))
+                .with_system(
+                    check_for_dieing_entities
+                        .system()
+                        .label(MortalSystems::CheckForDieingEntities),
+                )
+                .with_system(do_death_effects.system().label(MortalSystems::UpdateDieing))
                 .with_system(
                     remove_old_effects
                         .system()
                         .label(EffectSystems::RemoveOldEffects),
                 ),
         );
+
+        app.add_system_to_stage(DESPAWN_STAGE, dispose_dieing.system());
     }
 }

@@ -1,7 +1,7 @@
+use crate::fx::beams::BeamTracking;
 use crate::game::GameTimeDelta;
 use bevy::prelude::*;
 use std::time::Duration;
-use crate::fx::beams::BeamTracking;
 
 /// Component that indicates an explosion should be created at the location of the entity.
 pub struct CreateAnimatedEffect {
@@ -141,7 +141,7 @@ fn create_animated(
     mut commands: Commands,
     prefabs: Res<AnimatedEffectPrefabs>,
     query: Query<(Entity, &CreateAnimatedEffect)>,
-    beam_track_query: Query<&BeamTracking>
+    beam_track_query: Query<&BeamTracking>,
 ) {
     for (entity, effect) in query.iter() {
         commands.entity(entity).despawn_recursive();

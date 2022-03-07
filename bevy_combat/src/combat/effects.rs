@@ -57,7 +57,9 @@ pub fn apply_effects(
             ));
 
             if let Ok(target_transform) = pos_query.get_component::<GlobalTransform>(target) {
-                commands.entity(spawned).insert(EffectLocation(target_transform.translation));
+                commands
+                    .entity(spawned)
+                    .insert(EffectLocation(target_transform.translation));
             }
         }
     }

@@ -42,8 +42,7 @@ impl Plugin for BeamEffectPlugin {
                 .after(CombatSystems::Set)
                 .with_system(spawn_hit_effects.system())
                 .with_system(beams_tracking.system())
-                .with_system(spawn_beams.system())
-            ,
+                .with_system(spawn_beams.system()),
         );
     }
 }
@@ -72,23 +71,29 @@ fn spawn_beams(
     for (beam_style, source, effect, target, instigator, attack) in query.iter() {
         if let Some(target) = target.0 {
             let transform = get_transform(source.0.translation, effect.0, beam_style.width);
-            commands.spawn().insert(CreateAnimatedEffect {
-                transform,
-                effect: beam_style.effect,
-                parent: None,
-            }).insert(BeamTracking {
-                target,
-                source: instigator.0,
-                start: source.0.translation,
-                end: effect.0,
-                width: beam_style.width,
-                track_target: attack.result == AttackResult::Hit,
-            });
+            commands
+                .spawn()
+                .insert(CreateAnimatedEffect {
+                    transform,
+                    effect: beam_style.effect,
+                    parent: None,
+                })
+                .insert(BeamTracking {
+                    target,
+                    source: instigator.0,
+                    start: source.0.translation,
+                    end: effect.0,
+                    width: beam_style.width,
+                    track_target: attack.result == AttackResult::Hit,
+                });
         }
     }
 }
 
-fn beams_tracking(mut query: Query<(&mut BeamTracking, &mut Transform)>, world_query: Query<&GlobalTransform>) {
+fn beams_tracking(
+    mut query: Query<(&mut BeamTracking, &mut Transform)>,
+    world_query: Query<&GlobalTransform>,
+) {
     for (mut tracking, mut transform) in query.iter_mut() {
         if let Ok(start_t) = world_query.get_component::<GlobalTransform>(tracking.source) {
             tracking.start = start_t.translation;
@@ -102,13 +107,9 @@ fn beams_tracking(mut query: Query<(&mut BeamTracking, &mut Transform)>, world_q
 
         *transform = get_transform(tracking.start, tracking.end, tracking.width);
     }
-
 }
 
-fn spawn_hit_effects(
-    mut commands: Commands,
-    query: Query<(&HitEffect, &EffectLocation, &Attack)>,
-) {
+fn spawn_hit_effects(mut commands: Commands, query: Query<(&HitEffect, &EffectLocation, &Attack)>) {
     let mut rng = rand::thread_rng();
 
     for (hit_effect, location, attack) in query.iter() {
