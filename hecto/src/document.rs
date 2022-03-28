@@ -2,10 +2,12 @@ use crate::Position;
 use crate::Row;
 use std::fs;
 use std::io::{Error, Write};
+use crate::SearchDirection;
 
 #[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
+    dirty: bool,
     pub file_name: Option<String>,
 }
 
@@ -15,6 +17,7 @@ impl Document {
 
         Ok(Self {
             rows: contents.lines().map(Row::from).collect::<Vec<_>>(),
+            dirty: false,
             file_name: Some(filename.to_string()),
         })
     }
@@ -32,10 +35,6 @@ impl Document {
     }
 
     fn insert_newline(&mut self, at: &Position) {
-        if at.y > self.len() {
-            return;
-        }
-
         if at.y == self.len() {
             self.rows.push(Row::default());
         } else if let Some(row) = self.rows.get_mut(at.y) {
@@ -45,6 +44,11 @@ impl Document {
     }
 
     pub fn insert(&mut self, at: &Position, c: char) {
+        if at.y > self.len() {
+            return;
+        }
+
+        self.dirty = true;
         if c == '\n' {
             self.insert_newline(at);
             return;
@@ -54,10 +58,8 @@ impl Document {
             let mut row = Row::default();
             row.insert(0, c);
             self.rows.push(row);
-        } else if at.y < self.len() {
-            if let Some(row) = self.rows.get_mut(at.y) {
-                row.insert(at.x, c);
-            }
+        } else if let Some(row) = self.rows.get_mut(at.y) {
+            row.insert(at.x, c);
         }
     }
 
@@ -85,14 +87,60 @@ impl Document {
         }
     }
 
-    pub fn save(&self) -> Result<(), Error> {
+    pub fn save(&mut self) -> Result<(), Error> {
         if let Some(file_name) = &self.file_name {
             let mut file = fs::File::create(file_name)?;
             for row in &self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
             }
+
+            self.dirty = false;
         }
         Ok(())
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    pub fn find(&self, query: &str, at: &Position, direction: SearchDirection) -> Option<Position> {
+        if at.y >= self.rows.len() {
+            return None;
+        }
+
+        let mut position = at.clone();
+        
+        let start = if direction == SearchDirection::Forward {
+            at.y
+        } else {
+            0
+        };
+
+        let end = if direction == SearchDirection::Forward {
+            self.rows.len()
+        } else {
+            at.y.saturating_add(1)
+        };
+
+        for _ in start..end {
+            if let Some(row) = self.rows.get(position.y) {
+                if let Some(x) = row.find(query, position.x, direction) {
+                    position.x = x;
+                    return Some(position);
+                }
+
+                if direction == SearchDirection::Forward {
+                    position.y = position.y.saturating_add(1);
+                    position.x = 0;
+                } else {
+                    position.y = position.y.saturating_sub(1);
+                    position.x = self.rows[position.y].len();
+                }
+            } else {
+                return None;
+            }
+        }
+        None
     }
 }

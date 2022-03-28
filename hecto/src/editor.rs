@@ -2,17 +2,24 @@ use crate::Document;
 use crate::Row;
 use crate::Terminal;
 use std::env;
+use std::io::Error;
 use std::time::Duration;
 use std::time::Instant;
 use termion::color;
 use termion::event::Key;
-use std::io::Error;
 
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const QUIT_TIMES: u8 = 3;
 
-#[derive(Default)]
+#[derive(PartialEq, Copy, Clone)]
+pub enum SearchDirection {
+    Forward,
+    Backward,
+}
+
+#[derive(Default, Clone)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -39,6 +46,7 @@ pub struct Editor {
     cursor_position: Position,
     offset: Position,
     status_message: StatusMessage,
+    quit_times: u8,
 }
 
 impl Editor {
@@ -61,19 +69,20 @@ impl Editor {
     fn process_keypress(&mut self) -> Result<(), Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
-            Key::Ctrl('q') => self.should_quit = true,
-            Key::Ctrl('s') => {
-                if self.document.file_name.is_none() {
-                    self.document.file_name = Some(self.prompt("Save as: ")?);
-                }
-
-                if self.document.save().is_ok() {
-                    self.status_message =
-                        StatusMessage::from("Fil saved successfully.".to_string());
+            Key::Ctrl('q') => {
+                if self.quit_times > 0 && self.document.is_dirty() {
+                    self.status_message = StatusMessage::from(format!(
+                        "WARNING! File has unsaved changed. Press Ctrl-Q {} more times to quit.",
+                        self.quit_times
+                    ));
+                    self.quit_times -= 1;
+                    return Ok(());
                 } else {
-                    self.status_message = StatusMessage::from("Error writing file!".to_string());
+                    self.should_quit = true
                 }
             }
+            Key::Ctrl('s') => self.save(),
+            Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(Key::Right);
@@ -98,9 +107,43 @@ impl Editor {
             | Key::Home => self.move_cursor(pressed_key),
             _ => (),
         }
+        if self.quit_times < QUIT_TIMES {
+            self.quit_times = QUIT_TIMES;
+            self.status_message = StatusMessage::from(String::new());
+        }
 
         self.scroll();
         Ok(())
+    }
+
+    fn search(&mut self) {
+        let old_position = self.cursor_position.clone();
+        let query = self
+            .prompt(
+                "Search(ESC to cancel, Arrows to navigate):",
+                |editor, key, query| {
+                    let (moved, direction) = match key {
+                        Key::Right | Key::Down => {
+                            editor.move_cursor(Key::Right);
+                            (true, SearchDirection::Forward)
+                        }
+                        Key::Left | Key::Up => (false, SearchDirection::Backward),
+                        _ => (false, SearchDirection::Forward),
+                    };
+                    if let Some(position) = editor.document.find(query, &editor.cursor_position, direction) {
+                        editor.cursor_position = position;
+                        editor.scroll();
+                    } else if moved {
+                        editor.move_cursor(Key::Left);
+                    }
+                },
+            )
+            .unwrap_or(None);
+
+        if query.is_none() {
+            self.cursor_position = old_position;
+            self.scroll();
+        }
     }
 
     fn move_cursor(&mut self, key: Key) {
@@ -243,21 +286,35 @@ impl Editor {
 
     fn draw_status_bar(&self) {
         let width = self.terminal.size().width as usize;
+        let modified_indicator = if self.document.is_dirty() {
+            " (modified)"
+        } else {
+            ""
+        };
+
         let mut file_name = "[No Name]".to_string();
         if let Some(name) = &self.document.file_name {
             file_name = name.clone();
             file_name.truncate(20);
         }
-        let mut status = format!("{} - {} lines", file_name, self.document.len());
+        let mut status = format!(
+            "{} - {} lines{}",
+            file_name,
+            self.document.len(),
+            modified_indicator
+        );
+
         let line_indicator = format!(
             "{}/{}",
             self.cursor_position.y.saturating_add(1),
             self.document.len()
         );
+
         let len = status.len() + line_indicator.len();
         if width > len {
             status.push_str(&" ".repeat(width - len));
         }
+
         status = format!("{}{}", status, line_indicator);
         status.truncate(width);
         Terminal::set_fg_color(STATUS_FG_COLOR);
@@ -277,39 +334,77 @@ impl Editor {
         }
     }
 
-    fn prompt(&mut self, prompt: &str) -> Result<String, Error> {
+    fn save(&mut self) {
+        if self.document.file_name.is_none() {
+            let new_name = self.prompt("Save as: ", |_, _, _| {}).unwrap_or(None);
+            if new_name.is_none() {
+                self.status_message = StatusMessage::from("Save aborted.".to_string());
+                return;
+            }
+            self.document.file_name = new_name;
+        }
+
+        if self.document.save().is_ok() {
+            self.status_message = StatusMessage::from("File saved successfully.".to_string());
+        } else {
+            self.status_message = StatusMessage::from("Error writing file!".to_string());
+        }
+    }
+
+    fn prompt<C>(&mut self, prompt: &str, callback: C) -> Result<Option<String>, Error>
+    where
+        C: Fn(&mut Self, Key, &String),
+    {
         let mut result = String::new();
         loop {
             self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
             self.refresh_screen()?;
-            if let Key::Char(c) = Terminal::read_key()? {
-                if c == '\n' {
-                    self.status_message = StatusMessage::from(String::new());
+
+            let key = Terminal::read_key()?;
+            match key {
+                Key::Backspace => {
+                    if !result.is_empty() {
+                        result.truncate(result.len() - 1);
+                    }
+                }
+                Key::Char('\n') => break,
+                Key::Char(c) => {
+                    if !c.is_control() {
+                        result.push(c);
+                    }
+                }
+                Key::Esc => {
+                    result.truncate(0);
                     break;
                 }
-
-                if !c.is_control() {
-                    result.push(c);
-                }
+                _ => (),
             }
+            callback(self, key, &result);
         }
-        Ok(result)
+        self.status_message = StatusMessage::from(String::new());
+
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 
 impl Default for Editor {
     fn default() -> Self {
         let mut args = env::args();
-        let mut initial_status = String::from("HELP: Ctrl-S = save | Ctrl-Q = quit");
+        let mut initial_status =
+            String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
         let _ = args.next();
         let document = if let Some(file_name) = args.next() {
-            let doc = Document::open(&file_name);
-            if doc.is_ok() {
-                doc.unwrap()
+            let doc = if let Ok(doc) = Document::open(&file_name) {
+                doc
             } else {
                 initial_status = format!("ERR: Could not open file: {}", file_name);
                 Document::default()
-            }
+            };
+            doc
         } else {
             Document::default()
         };
@@ -321,6 +416,7 @@ impl Default for Editor {
             cursor_position: Position::default(),
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
+            quit_times: QUIT_TIMES,
         }
     }
 }
