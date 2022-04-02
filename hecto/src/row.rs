@@ -134,16 +134,10 @@ impl Row {
             return None;
         }
 
-        let start = if direction == SearchDirection::Forward {
-            at
+        let (start, end) = if direction == SearchDirection::Forward {
+            (at, self.len)
         } else {
-            0
-        };
-
-        let end = if direction == SearchDirection::Forward {
-            self.len
-        } else {
-            at
+            (0, at)
         };
 
         let substring: String = self
@@ -178,7 +172,7 @@ impl Row {
             let count = word.graphemes(true).count();
             while let Some(search_match) = self.find(word, index, SearchDirection::Forward) {
                 if let Some(next_index) = search_match.checked_add(count) {
-                    for i in index.saturating_add(search_match)..next_index {
+                    for i in search_match..next_index {
                         self.highlighting[i] = light::Type::Match;
                     }
                     index = next_index;
@@ -244,15 +238,13 @@ impl Row {
         chars: &[char],
     ) -> bool {
         if opts.strings() && c == '"' {
-            loop {
+            for _ in *index..chars.len() {
                 self.highlighting.push(light::Type::String);
                 *index += 1;
                 if let Some(next_char) = chars.get(*index) {
                     if *next_char == '"' {
                         break;
                     }
-                } else {
-                    break;
                 }
             }
             self.highlighting.push(light::Type::String);
@@ -279,15 +271,13 @@ impl Row {
                 }
             }
 
-            loop {
+            for _ in *index..chars.len() {
                 self.highlighting.push(light::Type::Number);
                 *index += 1;
                 if let Some(next_char) = chars.get(*index) {
                     if *next_char != '.' && !next_char.is_ascii_digit() {
                         break;
                     }
-                } else {
-                    break;
                 }
             }
 
