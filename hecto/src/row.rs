@@ -1,25 +1,52 @@
 use crate::SearchDirection;
+use crate::{light, LightOptions};
+use termion::color;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Default)]
 pub struct Row {
     string: String,
+    highlighting: Vec<light::Type>,
     len: usize,
 }
 
 impl Row {
     pub fn render(&self, start: usize, end: usize) -> String {
+        if self.string.is_empty() {
+            return String::new();
+        }
+
         let end = end.min(self.string.len());
         let start = start.min(end);
         let mut result = String::new();
-        for grapheme in self.string.graphemes(true).skip(start).take(end - start) {
-            if grapheme == "\t" {
-                result.push(' ');
-            } else {
-                result.push_str(grapheme);
+        let mut current_light = &light::Type::None;
+        let start_highlight = format!("{}", color::Fg(current_light.to_color()));
+        result.push_str(&start_highlight);
+
+        for (index, grapheme) in self
+            .string
+            .graphemes(true)
+            .enumerate()
+            .skip(start)
+            .take(end - start)
+        {
+            if let Some(c) = grapheme.chars().next() {
+                let light_type = self.highlighting.get(index).unwrap_or(&light::Type::None);
+                if light_type != current_light {
+                    current_light = light_type;
+                    let start_highlight = format!("{}", color::Fg(light_type.to_color()));
+                    result.push_str(&start_highlight);
+                }
+                if c == '\t' {
+                    result.push(' ');
+                } else {
+                    result.push(c)
+                }
             }
         }
 
+        let end_highlight = format!("{}", color::Fg(color::Reset));
+        result.push_str(&end_highlight);
         result
     }
 
@@ -94,6 +121,7 @@ impl Row {
         Self {
             string: splitted_row,
             len: splitted_length,
+            highlighting: Vec::new(),
         }
     }
 
@@ -102,7 +130,7 @@ impl Row {
     }
 
     pub fn find(&self, query: &str, at: usize, direction: SearchDirection) -> Option<usize> {
-        if at > self.len() {
+        if at > self.len() || query.is_empty() {
             return None;
         }
 
@@ -139,12 +167,161 @@ impl Row {
         }
         None
     }
+
+    fn highlight_match(&mut self, word: Option<&str>) {
+        if let Some(word) = word {
+            if word.is_empty() {
+                return;
+            }
+
+            let mut index = 0;
+            let count = word.graphemes(true).count();
+            while let Some(search_match) = self.find(word, index, SearchDirection::Forward) {
+                if let Some(next_index) = search_match.checked_add(count) {
+                    for i in index.saturating_add(search_match)..next_index {
+                        self.highlighting[i] = light::Type::Match;
+                    }
+                    index = next_index;
+                }
+            }
+        }
+    }
+
+    fn highlight_char(
+        &mut self,
+        index: &mut usize,
+        opts: &LightOptions,
+        c: char,
+        chars: &[char],
+    ) -> bool {
+        if opts.characters() && c == '\'' {
+            if let Some(next_char) = chars.get(index.saturating_add(1)) {
+                let closing_index = if *next_char == '\\' {
+                    index.saturating_add(3)
+                } else {
+                    index.saturating_add(2)
+                };
+
+                if let Some(closing_char) = chars.get(closing_index) {
+                    if *closing_char == '\'' {
+                        for _ in 0..=closing_index.saturating_sub(*index) {
+                            self.highlighting.push(light::Type::Character);
+                            *index += 1;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn highlight_comment(
+        &mut self,
+        index: &mut usize,
+        opts: &LightOptions,
+        c: char,
+        chars: &[char],
+    ) -> bool {
+        if opts.comments() && c == '/' && *index < chars.len() {
+            if let Some(next_char) = chars.get(index.saturating_add(1)) {
+                if *next_char == '/' {
+                    for _ in *index..chars.len() {
+                        self.highlighting.push(light::Type::Comment);
+                        *index += 1;
+                    }
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn highlight_string(
+        &mut self,
+        index: &mut usize,
+        opts: &LightOptions,
+        c: char,
+        chars: &[char],
+    ) -> bool {
+        if opts.strings() && c == '"' {
+            loop {
+                self.highlighting.push(light::Type::String);
+                *index += 1;
+                if let Some(next_char) = chars.get(*index) {
+                    if *next_char == '"' {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            self.highlighting.push(light::Type::String);
+            *index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn highlight_number(
+        &mut self,
+        index: &mut usize,
+        opts: &LightOptions,
+        c: char,
+        chars: &[char],
+    ) -> bool {
+        if opts.numbers() && c.is_ascii_digit() {
+            if *index > 0 {
+                if let Some(prev_char) = chars.get(*index - 1) {
+                    if !prev_char.is_ascii_punctuation() && !prev_char.is_ascii_whitespace() {
+                        return false;
+                    }
+                }
+            }
+
+            loop {
+                self.highlighting.push(light::Type::Number);
+                *index += 1;
+                if let Some(next_char) = chars.get(*index) {
+                    if *next_char != '.' && !next_char.is_ascii_digit() {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn highlight(&mut self, opts: &LightOptions, word: Option<&str>) {
+        self.highlighting.clear();
+        let chars = self.string.chars().collect::<Vec<char>>();
+        let mut index = 0;
+        while let Some(c) = chars.get(index) {
+            if self.highlight_char(&mut index, opts, *c, &chars)
+                || self.highlight_comment(&mut index, opts, *c, &chars)
+                || self.highlight_string(&mut index, opts, *c, &chars)
+                || self.highlight_number(&mut index, opts, *c, &chars)
+            {
+                continue;
+            }
+
+            self.highlighting.push(light::Type::None);
+            index += 1;
+        }
+        self.highlight_match(word);
+    }
 }
 
 impl From<&str> for Row {
     fn from(slice: &str) -> Self {
         Self {
             string: String::from(slice),
+            highlighting: Vec::new(),
             len: slice.graphemes(true).count(),
         }
     }

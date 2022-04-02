@@ -1,23 +1,32 @@
-use crate::Position;
-use crate::Row;
+use crate::{FileType, Position, Row, SearchDirection};
 use std::fs;
 use std::io::{Error, Write};
-use crate::SearchDirection;
 
 #[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
     dirty: bool,
+    file_type: FileType,
     pub file_name: Option<String>,
 }
 
 impl Document {
     pub fn open(filename: &str) -> Result<Self, Error> {
         let contents = fs::read_to_string(filename)?;
+        let file_type: FileType = filename.into();
+        let rows = contents
+            .lines()
+            .map(|l| {
+                let mut row = Row::from(l);
+                row.highlight(file_type.light_options(), None);
+                row
+            })
+            .collect::<Vec<Row>>();
 
         Ok(Self {
-            rows: contents.lines().map(Row::from).collect::<Vec<_>>(),
+            rows,
             dirty: false,
+            file_type,
             file_name: Some(filename.to_string()),
         })
     }
@@ -38,7 +47,9 @@ impl Document {
         if at.y == self.len() {
             self.rows.push(Row::default());
         } else if let Some(row) = self.rows.get_mut(at.y) {
-            let new_row = row.split(at.x);
+            let mut new_row = row.split(at.x);
+            row.highlight(self.file_type.light_options(), None);
+            new_row.highlight(self.file_type.light_options(), None);
             self.rows.insert(at.y + 1, new_row);
         }
     }
@@ -57,9 +68,11 @@ impl Document {
         if at.y == self.len() {
             let mut row = Row::default();
             row.insert(0, c);
+            row.highlight(self.file_type.light_options(), None);
             self.rows.push(row);
         } else if let Some(row) = self.rows.get_mut(at.y) {
             row.insert(at.x, c);
+            row.highlight(self.file_type.light_options(), None);
         }
     }
 
@@ -81,9 +94,11 @@ impl Document {
             let next_row = self.rows.remove(at.y + 1);
             if let Some(row) = self.rows.get_mut(at.y) {
                 row.append(&next_row);
+                row.highlight(self.file_type.light_options(), None);
             }
         } else if let Some(row) = self.rows.get_mut(at.y) {
             row.delete(at.x);
+            row.highlight(self.file_type.light_options(), None);
         }
     }
 
@@ -94,7 +109,7 @@ impl Document {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
             }
-
+            self.file_type = file_name.as_str().into();
             self.dirty = false;
         }
         Ok(())
@@ -110,7 +125,7 @@ impl Document {
         }
 
         let mut position = at.clone();
-        
+
         let start = if direction == SearchDirection::Forward {
             at.y
         } else {
@@ -142,5 +157,15 @@ impl Document {
             }
         }
         None
+    }
+
+    pub fn highlight(&mut self, word: Option<&str>) {
+        for row in &mut self.rows {
+            row.highlight(self.file_type.light_options(), word);
+        }
+    }
+
+    pub fn file_type(&self) -> String {
+        self.file_type.name()
     }
 }

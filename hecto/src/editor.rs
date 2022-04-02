@@ -130,12 +130,17 @@ impl Editor {
                         Key::Left | Key::Up => (false, SearchDirection::Backward),
                         _ => (false, SearchDirection::Forward),
                     };
-                    if let Some(position) = editor.document.find(query, &editor.cursor_position, direction) {
+                    if let Some(position) =
+                        editor
+                            .document
+                            .find(query, &editor.cursor_position, direction)
+                    {
                         editor.cursor_position = position;
                         editor.scroll();
                     } else if moved {
                         editor.move_cursor(Key::Left);
                     }
+                    editor.document.highlight(Some(query));
                 },
             )
             .unwrap_or(None);
@@ -144,6 +149,7 @@ impl Editor {
             self.cursor_position = old_position;
             self.scroll();
         }
+        self.document.highlight(None);
     }
 
     fn move_cursor(&mut self, key: Key) {
