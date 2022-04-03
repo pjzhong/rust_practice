@@ -16,11 +16,7 @@ impl Document {
         let file_type: FileType = filename.into();
         let rows = contents
             .lines()
-            .map(|l| {
-                let mut row = Row::from(l);
-                row.highlight(file_type.light_options(), None);
-                row
-            })
+            .map(Row::from)
             .collect::<Vec<Row>>();
 
         Ok(Self {
@@ -47,9 +43,7 @@ impl Document {
         if at.y == self.len() {
             self.rows.push(Row::default());
         } else if let Some(row) = self.rows.get_mut(at.y) {
-            let mut new_row = row.split(at.x);
-            row.highlight(self.file_type.light_options(), None);
-            new_row.highlight(self.file_type.light_options(), None);
+            let new_row = row.split(at.x);
             self.rows.insert(at.y + 1, new_row);
         }
     }
@@ -62,18 +56,15 @@ impl Document {
         self.dirty = true;
         if c == '\n' {
             self.insert_newline(at);
-            return;
-        }
-
-        if at.y == self.len() {
+        } else if at.y == self.len() {
             let mut row = Row::default();
             row.insert(0, c);
-            row.highlight(self.file_type.light_options(), None);
             self.rows.push(row);
         } else if let Some(row) = self.rows.get_mut(at.y) {
             row.insert(at.x, c);
-            row.highlight(self.file_type.light_options(), None);
         }
+
+        self.un_light_rows(at.y);
     }
 
     pub fn delete(&mut self, at: &Position) {
@@ -94,12 +85,12 @@ impl Document {
             let next_row = self.rows.remove(at.y + 1);
             if let Some(row) = self.rows.get_mut(at.y) {
                 row.append(&next_row);
-                row.highlight(self.file_type.light_options(), None);
             }
         } else if let Some(row) = self.rows.get_mut(at.y) {
             row.delete(at.x);
-            row.highlight(self.file_type.light_options(), None);
         }
+
+        self.un_light_rows(at.y);
     }
 
     pub fn save(&mut self) -> Result<(), Error> {
@@ -159,9 +150,27 @@ impl Document {
         None
     }
 
-    pub fn highlight(&mut self, word: Option<&str>) {
-        for row in &mut self.rows {
-            row.highlight(self.file_type.light_options(), word);
+    pub fn highlight(&mut self, word: &Option<String>, until: Option<usize>) {
+        let mut start_with_comment = false;
+        let until = if let Some(until) = until {
+            if until.saturating_add(1) < self.rows.len() {
+                until.saturating_add(1)
+            } else {
+                self.rows.len()
+            }
+        } else {
+            self.rows.len()
+        };
+        for row in &mut self.rows[..until] {
+            start_with_comment =
+                row.highlight(self.file_type.light_options(), word, start_with_comment);
+        }
+    }
+
+    fn un_light_rows(&mut self, start: usize) {
+        let start = start.saturating_sub(1);
+        for row in self.rows.iter_mut().skip(start) {
+            row.is_lighted = false;
         }
     }
 
