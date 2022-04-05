@@ -6,14 +6,14 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Context, Result};
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
-use rand::RngCore;
+use rand::{Rng, RngCore};
 use tokio::io::{self, copy_bidirectional, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time;
 use tracing::{debug, error, info, info_span, instrument, Instrument, Span};
 
-use crate::config::{ServerConfig, ServerServiceConfig, ServiceType, TransportType};
+use crate::config::{ServerConfig, ServiceConfig, ServiceType, TransportType};
 use crate::protocol::{
     read_auth, read_hello, Ack, ControlChannelCmd, DataChannelCmd, Hello, HASH_WIDTH_IN_BYTES,
 };
@@ -57,7 +57,7 @@ where
 
     fn run(
         conn: T::Stream,
-        service: ServerServiceConfig,
+        service: ServiceConfig,
         service_digest: ServiceDigest,
         control_channels: Arc<RwLock<HashMap<ServiceDigest, ControlChannelHandle<T>>>>,
     ) -> Self {
@@ -70,7 +70,8 @@ where
         match service.service_type {
             ServiceType::Tcp => tokio::spawn(run_tcp_connection_pool::<T>(
                 service.name.clone(),
-                service.bind_addr.clone(),
+                service.bind_addrs.clone(),
+                service.xz_notify.clone(),
                 data_ch_rx,
                 data_ch_req_tx,
                 shutdown_tx.subscribe(),
@@ -104,7 +105,7 @@ where
     #[instrument(skip_all, fields(service = % service.name))]
     async fn do_run(
         mut conn: T::Stream,
-        service: ServerServiceConfig,
+        service: ServiceConfig,
         mut shutdown_rx: broadcast::Receiver<bool>,
         mut data_ch_req_rx: mpsc::UnboundedReceiver<bool>,
     ) -> Result<()>
@@ -143,12 +144,14 @@ where
 #[instrument(skip_all, fields(service = %name))]
 async fn run_tcp_connection_pool<T: 'static + Transport>(
     name: String,
-    bind_addr: String,
+    bind_addrs: Vec<String>,
+    xz_notify: Option<String>,
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     shutdown_rx: broadcast::Receiver<bool>,
 ) -> Result<()> {
-    let mut stream_rx = tcp_listen_and_service_bind(name, bind_addr, data_ch_req_tx, shutdown_rx);
+    let mut stream_rx =
+        tcp_listen_and_service_bind(name, bind_addrs, xz_notify, data_ch_req_tx, shutdown_rx);
     while let Some(mut steam) = stream_rx.recv().await {
         if let Some(mut ch) = data_ch_rx.recv().await {
             tokio::spawn(
@@ -173,7 +176,8 @@ async fn run_tcp_connection_pool<T: 'static + Transport>(
 #[instrument(skip_all, fields(service = %name))]
 fn tcp_listen_and_service_bind(
     name: String,
-    addr: String,
+    addrs: Vec<String>,
+    xz_notify: Option<String>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
 ) -> mpsc::Receiver<TcpStream> {
@@ -181,23 +185,18 @@ fn tcp_listen_and_service_bind(
 
     tokio::spawn(
         async move {
-            let listener = backoff::future::retry(
-                ExponentialBackoff {
-                    max_elapsed_time: None,
-                    max_interval: Duration::from_secs(1),
-                    ..Default::default()
-                },
-                || async { Ok(TcpListener::bind(&addr).await?) },
-            )
-            .await
-            .with_context(|| format!("Failed to listen for the service on addr:{:?}", addr));
-
-            info!("Listening at:{:?}", addr);
+            let mut listener = None;
+            for _ in 0..addrs.len() {
+                let idx = rand::thread_rng().gen_range(0..addrs.len());
+                if let Ok(lis) = TcpListener::bind(&addrs[idx]).await {
+                    listener = Some(lis);
+                }
+            }
 
             let listener: TcpListener = match listener {
-                Ok(l) => l,
-                Err(e) => {
-                    eprintln!("{:?}", e);
+                Some(l) => l,
+                None => {
+                    eprintln!("failed to bind to any adds:{:?}", addrs);
                     return;
                 }
             };
@@ -208,6 +207,18 @@ fn tcp_listen_and_service_bind(
                 max_elapsed_time: None,
                 ..Default::default()
             };
+
+            if let Some(xz_notify) = xz_notify {
+                if let Ok(add) = listener.local_addr() {
+                    if ureq::get(&xz_notify)
+                        .query("title", &add.port().to_string())
+                        .call()
+                        .is_err()
+                    {
+                        eprintln!("failed to notify xz, notify_url:{:?}", xz_notify);
+                    }
+                }
+            }
 
             loop {
                 tokio::select! {
@@ -255,16 +266,14 @@ struct Server<'a, T: Transport> {
     // `[server]` config
     config: &'a ServerConfig,
     // `[server.services]` config, indexed by ServiceDigest
-    services: Arc<RwLock<HashMap<ServiceDigest, ServerServiceConfig>>>,
+    services: Arc<RwLock<HashMap<ServiceDigest, ServiceConfig>>>,
     // Collection of control channels
     control_channels: Arc<RwLock<HashMap<ServiceDigest, ControlChannelHandle<T>>>>,
     // Wrapper around the transport layer
     transport: Arc<T>,
 }
 
-fn generate_service_hashmap(
-    server_config: &ServerConfig,
-) -> HashMap<ServiceDigest, ServerServiceConfig> {
+fn generate_service_hashmap(server_config: &ServerConfig) -> HashMap<ServiceDigest, ServiceConfig> {
     let mut ret = HashMap::new();
     for (key, config) in &server_config.services {
         ret.insert(protocol::digest(key.as_bytes()), config.clone());
@@ -320,7 +329,7 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
                                 info!("Handling");
                                 if let Err(err) = handle_connection(conn, addr, services, control_channels)
                                 .await
-                                .with_context(|| format!("Failed to handle connection")) {
+                                .with_context(|| "Failed to handle connection".to_string()) {
                                     error!("{:?}", err);
                                 }
                             }.instrument(info_span!("handle_connection", %addr)));
@@ -341,16 +350,16 @@ impl<'a, T: 'static + Transport> Server<'a, T> {
 async fn handle_connection<T: 'static + Transport>(
     mut conn: T::Stream,
     addr: SocketAddr,
-    services: Arc<RwLock<HashMap<ServiceDigest, ServerServiceConfig>>>,
+    services: Arc<RwLock<HashMap<ServiceDigest, ServiceConfig>>>,
     control_channels: Arc<RwLock<HashMap<ServiceDigest, ControlChannelHandle<T>>>>,
 ) -> Result<()> {
     let hello = read_hello(&mut conn).await?;
     match hello {
-        Hello::ControlChannelHello(service_digest) => {
+        Hello::ControlChannel(service_digest) => {
             do_control_channel_handshake(conn, addr, services, control_channels, service_digest)
                 .await?;
         }
-        Hello::DataChannelHello(nonce) => {
+        Hello::DataChannel(nonce) => {
             do_data_channel_handshake(conn, control_channels, nonce).await?;
         }
         _ => {}
@@ -361,7 +370,7 @@ async fn handle_connection<T: 'static + Transport>(
 async fn do_control_channel_handshake<T: 'static + Transport>(
     mut conn: T::Stream,
     addr: SocketAddr,
-    services: Arc<RwLock<HashMap<ServiceDigest, ServerServiceConfig>>>,
+    services: Arc<RwLock<HashMap<ServiceDigest, ServiceConfig>>>,
     control_channels: Arc<RwLock<HashMap<ServiceDigest, ControlChannelHandle<T>>>>,
     service_digest: ServiceDigest,
 ) -> Result<()> {
@@ -370,7 +379,7 @@ async fn do_control_channel_handshake<T: 'static + Transport>(
     let mut nonce = vec![0u8; HASH_WIDTH_IN_BYTES];
     rand::thread_rng().fill_bytes(&mut nonce);
 
-    let nonce_send = Hello::ControlChannelHello(nonce.clone().try_into().unwrap());
+    let nonce_send = Hello::ControlChannel(nonce.clone().try_into().unwrap());
     conn.write_all(&bincode::serialize(&nonce_send).unwrap())
         .await?;
 

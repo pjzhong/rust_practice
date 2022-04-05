@@ -15,8 +15,8 @@ pub fn digest(data: &[u8]) -> Digest {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum Hello {
-    ControlChannelHello(Digest),
-    DataChannelHello(Digest),
+    ControlChannel(Digest),
+    DataChannel(Digest),
     ControlChannelClose(Digest),
 }
 
@@ -54,7 +54,7 @@ impl PacketLength {
     pub fn new() -> Self {
         let username = "default";
         let d = digest(username.as_bytes());
-        let hello = bincode::serialized_size(&Hello::ControlChannelHello(d)).unwrap() as usize;
+        let hello = bincode::serialized_size(&Hello::ControlChannel(d)).unwrap() as usize;
 
         let ack = Ack::Ok;
         let ack = bincode::serialized_size(&ack).unwrap() as usize;

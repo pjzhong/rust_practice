@@ -6,7 +6,7 @@ edition = "2021"
 [features]
 default = ["server", "client"]
 
-server = []
+server = ["ureq"]
 client = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -27,6 +27,7 @@ rand = "0.8"
 hex = "0.4"
 tracing = "0.1"
 tracing-subscriber = "0.2"
+ureq  = {version = "2.4",  optional = true}
 
 [build-dependencies]
 vergen = "6.0"

@@ -157,7 +157,7 @@ impl<T: 'static + Transport> ControlChannel<T> {
 
         //send hello
         debug!("Sending hello");
-        let hello_send = Hello::ControlChannelHello(self.digest[..].try_into().unwrap());
+        let hello_send = Hello::ControlChannel(self.digest[..].try_into().unwrap());
         conn_control
             .write_all(&bincode::serialize(&hello_send).unwrap())
             .await?;
@@ -168,7 +168,7 @@ impl<T: 'static + Transport> ControlChannel<T> {
             .await
             .with_context(|| "Failed to read hello from the sever")?
         {
-            Hello::ControlChannelHello(d) => d,
+            Hello::ControlChannel(d) => d,
             _ => {
                 bail!("Unexpected type of hello");
             }
@@ -278,7 +278,7 @@ async fn do_data_channel_handshake<T: Transport>(
     .await?;
 
     let v: &[u8; HASH_WIDTH_IN_BYTES] = args.session_key[..].try_into().unwrap();
-    let hello = Hello::DataChannelHello(v.to_owned());
+    let hello = Hello::DataChannel(v.to_owned());
     conn.write_all(&bincode::serialize(&hello).unwrap()).await?;
 
     Ok(conn)
@@ -293,7 +293,6 @@ async fn run_data_channel_for_tcp<T: Transport>(
         .await
         .with_context(|| "Failed to connect to local_addr")?;
     let _ = copy_bidirectional(&mut conn, &mut local).await;
-
 
     info!("Data channel Stp forwarding to {:?}", local_addr);
     Ok(())

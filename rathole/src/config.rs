@@ -40,13 +40,14 @@ pub struct ClientServiceConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-pub struct ServerServiceConfig {
+pub struct ServiceConfig {
     #[serde(rename = "type", default = "ServiceType::default")]
     pub service_type: ServiceType,
     #[serde(skip)]
     pub name: String,
-    pub bind_addr: String,
+    pub bind_addrs: Vec<String>,
     pub token: Option<String>,
+    pub xz_notify: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq, Clone)]
@@ -62,7 +63,7 @@ pub struct ClientConfig {
 pub struct ServerConfig {
     pub bind_addr: String,
     pub default_token: Option<String>,
-    pub services: HashMap<String, ServerServiceConfig>,
+    pub services: HashMap<String, ServiceConfig>,
     #[serde(default = "TransportType::default")]
     pub transport: TransportType,
 }
