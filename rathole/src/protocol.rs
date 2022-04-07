@@ -13,11 +13,11 @@ pub fn digest(data: &[u8]) -> Digest {
     d.into()
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub enum Hello {
     ControlChannel(Digest),
     DataChannel(Digest),
-    ControlChannelClose(Digest),
+    ControlChannelClose,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

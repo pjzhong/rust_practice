@@ -225,9 +225,9 @@ impl<T: 'static + Transport> ControlChannel<T> {
                     }
                 },
                 _ = &mut self.shutdown_rx => {
-                    let close_send = Hello::ControlChannelClose(self.digest[..].try_into().unwrap());
+                    let close_send = Hello::ControlChannelClose;
                     conn_control.write_all(&bincode::serialize(&close_send).unwrap()).await?;
-                    println!("Control channel shutting down..");
+                    info!("Control channel shutting down..");
                     break;
                 }
             }
