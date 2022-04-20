@@ -1,5 +1,5 @@
-use scratchapixel::{ray_tracer, Sphere};
 use scratchapixel::vec::Vec3;
+use scratchapixel::{ray_tracer, Sphere};
 
 /// thanks [`scratchapixel`]
 /// This code is copy from ['raytracer'] and translate to rust
