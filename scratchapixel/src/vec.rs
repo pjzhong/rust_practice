@@ -1,11 +1,17 @@
 use std::fmt::Debug;
 use std::ops::{Add, Mul, Neg, Sub};
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct Vec3<T: Debug + PartialEq + Copy> {
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
+pub struct Vec3<T: Default + Debug + PartialEq + Copy> {
     pub x: T,
     pub y: T,
     pub z: T,
+}
+
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
+pub struct Vec2<T: Default + Debug + PartialEq + Copy> {
+    pub x: T,
+    pub y: T,
 }
 
 macro_rules! vec3_impl {
@@ -107,14 +113,73 @@ macro_rules! vec3_impl {
                  }
             }
         }
+    )+)
+}
 
-        impl Default for Vec3<$t> {
-            fn default() -> Self {
+macro_rules! vec2_impl {
+    ($($t:ty)+, $n:ident) => ($(
+
+        impl Vec2<$t> {
+            pub fn $n(x: $t, y: $t) -> Self {
                 Self {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
+                    x,
+                    y,
                 }
+            }
+         }
+
+        impl Add for Vec2<$t> {
+            type Output = Vec2<$t>;
+
+            fn add(self, other: Self) -> Self {
+                Self {
+                    x: self.x + other.x,
+                    y: self.y + other.y,
+                }
+            }
+        }
+
+        impl Sub for Vec2<$t> {
+            type Output = Vec2<$t>;
+
+            fn sub(self, other: Self) -> Self {
+                Self {
+                    x: self.x - other.x,
+                    y: self.y - other.y,
+                }
+            }
+        }
+
+        impl Mul for Vec2<$t> {
+            type Output = Vec2<$t>;
+
+            fn mul(self, other: Self) -> Self {
+                Self {
+                    x: self.x * other.x,
+                    y: self.y * other.y,
+                }
+            }
+        }
+
+        impl Mul<$t> for Vec2<$t> {
+            type Output = Vec2<$t>;
+
+            fn mul(self, rhs: $t) -> Self::Output {
+                Self {
+                    x: self.x * rhs,
+                    y: self.y * rhs,
+                }
+            }
+        }
+
+        impl Neg for Vec2<$t> {
+            type Output = Vec2<$t>;
+
+            fn neg(self) -> Self::Output {
+                 Self {
+                     x: -self.x,
+                     y: -self.y,
+                 }
             }
         }
     )+)
@@ -122,6 +187,9 @@ macro_rules! vec3_impl {
 
 vec3_impl! { f32,f32 }
 vec3_impl! { f64,f64 }
+
+vec2_impl! { f32,f32 }
+vec2_impl! { i32,i32 }
 
 #[cfg(test)]
 mod tests {
