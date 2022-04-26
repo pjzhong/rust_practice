@@ -1,10 +1,20 @@
-use std::io::{self, Read};
+mod document;
+mod editor;
+mod filetype;
+mod light;
+mod row;
+mod terminal;
+
+pub use document::Document;
+pub use editor::{Position, SearchDirection};
+pub use filetype::{FileType, LightOptions};
+pub use row::Row;
+pub use terminal::Terminal;
+
+use std::default::Default;
 
 fn main() {
-    for b in io::stdin().bytes() {
-        if let Ok(b) = b {
-            let c = b as char;
-            println!("{}", c);
-        }
-    }
+    let mut editor = editor::Editor::default();
+
+    editor.run();
 }
