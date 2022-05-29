@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use ray_tracing_in_one_weekend::clamp;
 use ray_tracing_in_one_weekend::hittable::{HitRecord, Hittable};
-use ray_tracing_in_one_weekend::material::{Lambertian, Metal};
+use ray_tracing_in_one_weekend::material::{Dielectric, Lambertian, Metal};
 use ray_tracing_in_one_weekend::ray::Ray;
 use ray_tracing_in_one_weekend::sphere::Sphere;
 use ray_tracing_in_one_weekend::vec::Vec3;
@@ -27,7 +27,7 @@ fn ray_color(r: &Ray, world: &[Box<dyn Hittable>], depth: i32) -> Color {
             }
         } else {
             Color::default()
-        }
+        };
     }
 
     let unit_direction = r.dir().normalize();
@@ -64,8 +64,9 @@ fn main() {
 
     let material_ground = Rc::new(Lambertian::new(Color::f32(0.8, 0.8, 0.0)));
     let material_center = Rc::new(Lambertian::new(Color::f32(0.7, 0.3, 0.3)));
-    let material_left = Rc::new(Metal::new(Color::f32(0.8, 0.8, 0.8)));
-    let material_right = Rc::new(Metal::new(Color::f32(0.8, 0.6, 0.2)));
+    // let material_left = Rc::new(Metal::new(Color::f32(0.8, 0.8, 0.8), 0.1));
+    let material_left = Rc::new(Dielectric::new(1.5));
+    let material_right = Rc::new(Metal::new(Color::f32(0.8, 0.6, 0.2), 0.1));
 
     // World
     let world: Vec<Box<dyn Hittable>> = vec![
@@ -82,6 +83,11 @@ fn main() {
         Box::new(Sphere::new(
             Vec3::f32(-1.0, 0.0, -1.0),
             0.5,
+            material_left.clone(),
+        )),
+        Box::new(Sphere::new(
+            Vec3::f32(-1.0, 0.0, -1.0),
+            -0.4,
             material_left.clone(),
         )),
         Box::new(Sphere::new(

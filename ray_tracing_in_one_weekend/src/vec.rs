@@ -87,6 +87,13 @@ macro_rules! vec3_impl {
             pub fn reflect(&self, n: &Self) -> Self {
                 return self - &(2.0 * self.dot_product(n) * n) ;
             }
+
+            pub fn refract(&self, n: &Self, etai_over_eta: $t) -> Self {
+                let cos_theta = (-self).dot_product(n).min(1.0);
+                let r_out_perp = etai_over_eta * (*self + cos_theta * n);
+                let r_out_parallel = -((1.0 - r_out_perp.length_squared()).abs().sqrt()) * n;
+                r_out_perp + r_out_parallel
+            }
          }
 
         impl Add for Vec3<$t> {
