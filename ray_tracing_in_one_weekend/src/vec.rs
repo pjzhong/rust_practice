@@ -31,6 +31,19 @@ macro_rules! vec3_impl {
                 }
             }
 
+            pub fn random_in_unit_disk() -> Self {
+                let mut rang = thread_rng();
+                loop {
+                    let x = rang.gen_range(-1.0..1.0);
+                    let y = rang.gen_range(-1.0..1.0);
+                    let p = Self::$n(x, y, 0.0);
+                    if p.length_squared() >= 1.0 {
+                        continue;
+                    }
+                    return p;
+                }
+            }
+
             pub fn random_unit_vecotr() -> Self {
                 return Self::random_in_unit_sphere().normalize();
             }
