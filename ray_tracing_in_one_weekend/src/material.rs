@@ -18,7 +18,7 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, ray_in: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
         let scatter_direction = {
             let mut t = rec.normal + Vec3::<f32>::random_unit_vecotr();
             if t.near_zero() {
@@ -27,7 +27,10 @@ impl Material for Lambertian {
             t
         };
 
-        Some((self.albedo, Ray::new(rec.p, scatter_direction)))
+        Some((
+            self.albedo,
+            Ray::new(rec.p, scatter_direction, ray_in.time()),
+        ))
     }
 }
 
@@ -46,11 +49,12 @@ impl Metal {
 }
 
 impl Material for Metal {
-    fn scatter(&self, r: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
-        let reflected = r.dir().normalize().reflect(&rec.normal);
+    fn scatter(&self, r_in: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
+        let reflected = r_in.dir().normalize().reflect(&rec.normal);
         let scattered = Ray::new(
             rec.p,
             reflected + self.fuzz * Vec3::<f32>::random_in_unit_sphere(),
+            r_in.time(),
         );
         let attenuation = self.albedo;
         if scattered.dir().dot_product(&rec.normal) > 0.0 {
@@ -78,14 +82,14 @@ impl Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, r: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, r_in: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
         let refraction_ration = if rec.front_face {
             1.0 / self.ir
         } else {
             self.ir
         };
 
-        let unit_direction = r.dir().normalize();
+        let unit_direction = r_in.dir().normalize();
         let cos_theta = (-unit_direction).dot_product(&rec.normal).min(1.0);
         let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
 
@@ -98,7 +102,7 @@ impl Material for Dielectric {
             unit_direction.refract(&rec.normal, refraction_ration)
         };
 
-        let scattered = Ray::new(rec.p, direction);
+        let scattered = Ray::new(rec.p, direction, r_in.time());
         Some((Color::f32(1.0, 1.0, 1.0), scattered))
     }
 }

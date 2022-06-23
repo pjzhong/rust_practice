@@ -4,11 +4,12 @@ use crate::vec::Vec3;
 pub struct Ray {
     origin: Vec3<f32>,
     dir: Vec3<f32>,
+    time: f32,
 }
 
 impl Ray {
-    pub fn new(origin: Vec3<f32>, dir: Vec3<f32>) -> Self {
-        Self { origin, dir }
+    pub fn new(origin: Vec3<f32>, dir: Vec3<f32>, time: f32) -> Self {
+        Self { origin, dir, time }
     }
 
     pub fn origin(&self) -> &Vec3<f32> {
@@ -21,5 +22,9 @@ impl Ray {
 
     pub fn at(&self, t: f32) -> Vec3<f32> {
         self.origin + t * self.dir
+    }
+
+    pub fn time(&self) -> f32 {
+        self.time
     }
 }

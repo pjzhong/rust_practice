@@ -60,7 +60,10 @@ fn random_scene() -> Vec<Box<dyn Hittable>> {
     let material_ground = Rc::new(Lambertian::new(Color::f32(0.5, 0.5, 0.5)));
     world.push(Box::new(Sphere::new(
         Vec3::f32(0.0, -1000., 0.0),
+        Vec3::f32(0.0, -1000., 0.0),
         1000.0,
+        1.0,
+        0.2,
         material_ground,
     )));
 
@@ -68,34 +71,44 @@ fn random_scene() -> Vec<Box<dyn Hittable>> {
     let point = Vec3::f32(4.0, 0.2, 0.0);
     for a in -11..11 {
         for b in -11..11 {
-            let choose_mat = rang.gen_range(0.0..1.0f32);
+            let choose_mat = rang.gen_range(0.0..1.0);
 
             let center = Vec3::f32(
-                a as f32 + 0.9 * rang.gen_range(0.0..1.0f32),
+                a as f32 + 0.9 * rang.gen_range(0.0..1.0),
                 0.2,
-                b as f32 + 0.9 * rang.gen_range(0.0..1.0f32),
+                b as f32 + 0.9 * rang.gen_range(0.0..1.0),
             );
 
             if (center - point).length() > 0.9 {
                 if choose_mat < 0.8 {
                     let albedo = Color::random() * Color::random();
+                    let center2 = center + Vec3::f32(0.0, rang.gen_range(0.0..0.5), 0.0);
                     world.push(Box::new(Sphere::new(
                         center,
+                        center2,
                         0.2,
+                        0.0,
+                        1.0,
                         Rc::new(Lambertian::new(albedo)),
                     )))
                 } else if choose_mat < 0.95 {
                     let albedo = Color::random_range(0.5, 1.0);
-                    let fuzz = rang.gen_range(0.0..0.5f32);
+                    let fuzz = rang.gen_range(0.0..0.5);
                     world.push(Box::new(Sphere::new(
                         center,
+                        center,
                         0.2,
+                        0.2,
+                        1.0,
                         Rc::new(Metal::new(albedo, fuzz)),
                     )))
                 } else {
                     world.push(Box::new(Sphere::new(
                         center,
+                        center,
                         0.2,
+                        0.2,
+                        1.0,
                         Rc::new(Dielectric::new(1.5)),
                     )))
                 }
@@ -105,20 +118,29 @@ fn random_scene() -> Vec<Box<dyn Hittable>> {
 
     world.push(Box::new(Sphere::new(
         Vec3::f32(0.0, 1.0, 0.0),
+        Vec3::f32(0.0, 1.0, 0.0),
+        1.0,
+        0.2,
         1.0,
         Rc::new(Dielectric::new(1.5)),
     )));
 
     world.push(Box::new(Sphere::new(
         Vec3::f32(-4.0, 1.0, 0.0),
+        Vec3::f32(-4.0, 1.0, 0.0),
+        1.0,
+        0.2,
         1.0,
         Rc::new(Lambertian::new(Color::f32(0.4, 0.2, 0.1))),
     )));
 
     world.push(Box::new(Sphere::new(
         Vec3::f32(4.0, 1.0, 0.0),
+        Vec3::f32(4.0, 1.0, 0.0),
         1.0,
-        Rc::new(Metal::new(Color::f32(0.4, 0.2, 0.1), 0.0)),
+        0.2,
+        1.0,
+        Rc::new(Metal::new(Color::f32(0.7, 0.6, 0.5), 0.0)),
     )));
 
     world
@@ -149,6 +171,8 @@ fn main() {
         aspect_ration,
         aperture,
         dist_to_focus,
+        0.0,
+        1.0,
     );
 
     // Render
