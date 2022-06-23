@@ -1,17 +1,17 @@
 use rand::{thread_rng, Rng};
-use ray_tracing_in_one_weekend::camera::Camera;
+use ray_tracing_in::camera::Camera;
 use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 
-use ray_tracing_in_one_weekend::clamp;
-use ray_tracing_in_one_weekend::hittable::{HitRecord, Hittable};
-use ray_tracing_in_one_weekend::material::{Dielectric, Lambertian, Metal};
-use ray_tracing_in_one_weekend::ray::Ray;
-use ray_tracing_in_one_weekend::sphere::Sphere;
-use ray_tracing_in_one_weekend::vec::Vec3;
-use ray_tracing_in_one_weekend::Color;
+use ray_tracing_in::clamp;
+use ray_tracing_in::hittable::{HitRecord, Hittable};
+use ray_tracing_in::material::{Dielectric, Lambertian, Metal};
+use ray_tracing_in::ray::Ray;
+use ray_tracing_in::sphere::Sphere;
+use ray_tracing_in::vec::Vec3;
+use ray_tracing_in::Color;
 
 fn ray_color(r: &Ray, world: &[Box<dyn Hittable>], depth: i32) -> Color {
     if depth <= 0 {
