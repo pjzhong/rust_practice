@@ -1,6 +1,6 @@
 use rand::{thread_rng, Rng};
 use std::fmt::Debug;
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};
+use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Neg, Sub};
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct Vec3<T: Default + Debug + PartialEq + Copy> {
@@ -246,13 +246,27 @@ macro_rules! vec3_impl {
             }
         }
 
-       impl Div<$t> for Vec3<$t> {
+        impl Div<$t> for Vec3<$t> {
             type Output = Vec3<$t>;
 
             fn div(self, rhs: $t) -> Self::Output {
                 (1.0 / rhs) * self
             }
         }
+
+        impl Index<usize> for Vec3<$t> {
+            type Output = $t;
+
+            fn index(&self, index: usize) -> &Self::Output {
+                match index {
+                    0 => &self.x,
+                    1 => &self.y,
+                    2 => &self.z,
+                    _ => &0.0,
+                }
+            }
+        }
+
     )+)
 }
 

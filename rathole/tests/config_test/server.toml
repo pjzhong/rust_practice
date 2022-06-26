@@ -3,10 +3,5 @@ bind_addr = "127.0.0.1:3333"
 default_token = "123456"
 
 [server.services.mstsc1]
-bind_addr = "127.0.0.1:6666"
-
-[server.services.mstsc2]
-bind_addr = "127.0.0.1:7777"
-
-[server.services.mstsc3]
-bind_addr = "127.0.0.1:8888"
+bind_addrs = ["0.0.0.0:6666","0.0.0.0:6667","0.0.0.0:6668","0.0.0.0:6669", "0.0.0.0:6670"]
+xz_notify = "https://xizhi.qqoq.net/XZe1bb91c01bd6f89fd0425530a5d15f83.send"

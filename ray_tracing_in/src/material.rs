@@ -1,18 +1,25 @@
 use crate::hittable::HitRecord;
 use crate::ray::Ray;
+use crate::texture::{SolidColor, Texture};
 use crate::{Color, Vec3};
 use rand::{thread_rng, Rng};
+use std::rc::Rc;
 
 pub trait Material {
     fn scatter(&self, r: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)>;
 }
 
 pub struct Lambertian {
-    albedo: Color,
+    albedo: Rc<dyn Texture>,
 }
 
 impl Lambertian {
-    pub fn new(albedo: Color) -> Self {
+    pub fn with_color(albedo: Color) -> Self {
+        let texture = Rc::new(SolidColor::new(albedo));
+        Self { albedo: texture }
+    }
+
+    pub fn with_texture(albedo: Rc<dyn Texture>) -> Self {
         Self { albedo }
     }
 }
@@ -28,7 +35,7 @@ impl Material for Lambertian {
         };
 
         Some((
-            self.albedo,
+            self.albedo.value(rec.u, rec.v, &rec.p),
             Ray::new(rec.p, scatter_direction, ray_in.time()),
         ))
     }

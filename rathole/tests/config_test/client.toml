@@ -6,13 +6,3 @@ remote_addr = "127.0.0.1:3333"
 type = "tcp"
 token = "123456"
 local_addr = "127.0.0.1:3389"
-
-[client.services.mstsc2]
-type = "tcp"
-token = "123456"
-local_addr = "127.0.0.1:3389"
-
-[client.services.mstsc3]
-type = "tcp"
-token = "123456"
-local_addr = "127.0.0.1:3389"
