@@ -37,14 +37,13 @@ fn ray_color(r: &Ray, world: &[Rc<dyn Hittable>], depth: i32) -> Color {
 }
 
 fn random_scene() -> Vec<Rc<dyn Hittable>> {
-    let mut world: Vec<Rc<dyn Hittable>> = Vec::new();
-    world.push(Rc::new(Sphere::steady(
+    let mut world: Vec<Rc<dyn Hittable>> = vec![Rc::new(Sphere::steady(
         Vec3::f32(0.0, -1000., 0.0),
         1000.0,
         Rc::new(Lambertian::with_texture(Rc::new(
             CheckerTexture::with_color(Color::f32(0.2, 0.3, 0.1), Color::f32(0.9, 0.9, 0.9)),
         ))),
-    )));
+    ))];
 
     let mut rang = thread_rng();
     let point = Vec3::f32(4.0, 0.2, 0.0);

@@ -41,6 +41,9 @@ impl Perlin {
         let u = p.x - p.x.floor();
         let v = p.y - p.y.floor();
         let w = p.z - p.z.floor();
+        let u = u * u * (3.0 - 2.0 * u);
+        let v = v * v * (3.0 - 2.0 * v);
+        let w = w * w * (3.0 - 2.0 * w);
 
         let i = p.x.floor() as i32;
         let j = p.y.floor() as i32;
@@ -48,14 +51,13 @@ impl Perlin {
 
         let mut c = [[[0.0, 0.0], [0.0, 0.0]], [[0.0, 0.0], [0.0, 0.0]]];
 
-        for di in 0..2 {
-            for dj in 0..2 {
-                for dk in 0..2 {
+        for (di, di_c) in c.iter_mut().enumerate() {
+            for (dj, dj_c) in di_c.iter_mut().enumerate() {
+                for (dk, dk_c) in dj_c.iter_mut().enumerate() {
                     let xi = ((i + di as i32) & 255) as usize;
                     let yj = ((j + dj as i32) & 255) as usize;
                     let yk = ((k + dk as i32) & 255) as usize;
-                    c[di][dj][dk] =
-                        self.ran_float[self.perm_x[xi] ^ self.perm_y[yj] ^ self.perm_z[yk]]
+                    *dk_c = self.ran_float[self.perm_x[xi] ^ self.perm_y[yj] ^ self.perm_z[yk]]
                 }
             }
         }
@@ -66,16 +68,16 @@ impl Perlin {
     fn trilinear_interp(c: &[[[f32; 2]; 2]; 2], u: f32, v: f32, w: f32) -> f32 {
         let mut accum = 0.0;
 
-        for i in 0..2 {
-            for j in 0..2 {
-                for k in 0..2 {
+        for (i, ic) in c.iter().enumerate() {
+            for (j, jc) in ic.iter().enumerate() {
+                for (k, element) in jc.iter().enumerate() {
                     let fi = i as f32;
                     let fj = j as f32;
                     let fk = k as f32;
                     accum += (fi * u + (1.0 - fi) * (1.0 - u))
                         * (fj * v + (1.0 - fj) * (1.0 - v))
                         * (fk * w + (1.0 - fk) * (1.0 - w))
-                        * c[i][j][k];
+                        * element;
                 }
             }
         }
