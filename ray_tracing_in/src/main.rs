@@ -136,7 +136,7 @@ fn two_perline_spheres() -> Vec<Rc<dyn Hittable>> {
             1000.0,
             material_ground.clone(),
         )),
-       Rc::new(Sphere::steady(
+        Rc::new(Sphere::steady(
             Vec3::f32(0.0, 2., 0.0),
             2.0,
             material_ground,

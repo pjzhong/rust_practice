@@ -27,14 +27,6 @@ impl Perlin {
         }
     }
 
-    pub fn noise(&self, p: &Point) -> f32 {
-        let i = ((4.0 * p.x) as i32 & 255) as usize;
-        let j = ((4.0 * p.y) as i32 & 255) as usize;
-        let k = ((4.0 * p.z) as i32 & 255) as usize;
-
-        self.ran_float[self.perm_x[i] ^ self.perm_y[j] ^ self.perm_z[k]]
-    }
-
     fn perlin_generate_perm() -> Vec<usize> {
         let mut result = vec![];
         for i in 0..Perlin::POINT_COUNT {
@@ -43,6 +35,52 @@ impl Perlin {
 
         result.shuffle(&mut rand::thread_rng());
         result
+    }
+
+    pub fn noise(&self, p: &Point) -> f32 {
+        let u = p.x - p.x.floor();
+        let v = p.y - p.y.floor();
+        let w = p.z - p.z.floor();
+
+        let i = p.x.floor() as i32;
+        let j = p.y.floor() as i32;
+        let k = p.z.floor() as i32;
+
+        let mut c = [[[0.0, 0.0], [0.0, 0.0]], [[0.0, 0.0], [0.0, 0.0]]];
+
+        for di in 0..2 {
+            for dj in 0..2 {
+                for dk in 0..2 {
+                    let xi = ((i + di as i32) & 255) as usize;
+                    let yj = ((j + dj as i32) & 255) as usize;
+                    let yk = ((k + dk as i32) & 255) as usize;
+                    c[di][dj][dk] =
+                        self.ran_float[self.perm_x[xi] ^ self.perm_y[yj] ^ self.perm_z[yk]]
+                }
+            }
+        }
+
+        Perlin::trilinear_interp(&c, u, v, w)
+    }
+
+    fn trilinear_interp(c: &[[[f32; 2]; 2]; 2], u: f32, v: f32, w: f32) -> f32 {
+        let mut accum = 0.0;
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let fi = i as f32;
+                    let fj = j as f32;
+                    let fk = k as f32;
+                    accum += (fi * u + (1.0 - fi) * (1.0 - u))
+                        * (fj * v + (1.0 - fj) * (1.0 - v))
+                        * (fk * w + (1.0 - fk) * (1.0 - w))
+                        * c[i][j][k];
+                }
+            }
+        }
+
+        accum
     }
 }
 
