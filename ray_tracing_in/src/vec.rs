@@ -1,5 +1,6 @@
 use rand::{thread_rng, Rng};
 use std::fmt::Debug;
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Neg, Sub};
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
@@ -264,6 +265,16 @@ macro_rules! vec3_impl {
                     2 => &self.z,
                     _ => &0.0,
                 }
+            }
+        }
+
+        impl Sum for Vec3<$t> {
+            fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+                let mut result = Vec3::default();
+                for i in iter {
+                    result += i;
+                }
+                result
             }
         }
 

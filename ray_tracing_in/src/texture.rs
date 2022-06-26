@@ -1,3 +1,4 @@
+use crate::perlin::Perlin;
 use crate::{Color, Point};
 use std::rc::Rc;
 
@@ -47,5 +48,16 @@ impl Texture for CheckerTexture {
         } else {
             self.even.value(u, v, p)
         }
+    }
+}
+
+#[derive(Default)]
+pub struct NoiseTexture {
+    noise: Perlin,
+}
+
+impl Texture for NoiseTexture {
+    fn value(&self, _: f32, _: f32, p: &Point) -> Color {
+        Color::f32(1.0,1.0, 1.0) * self.noise.noise(p)
     }
 }

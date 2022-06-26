@@ -15,7 +15,18 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn new(
+    pub fn steady(center1: Vec3<f32>, radius: f32, material: Rc<dyn Material>) -> Self {
+        Self {
+            center1,
+            center2: center1,
+            radius,
+            material,
+            time1: 0.0,
+            time2: 1.0,
+        }
+    }
+
+    pub fn motion(
         center1: Vec3<f32>,
         center2: Vec3<f32>,
         radius: f32,
@@ -34,8 +45,12 @@ impl Sphere {
     }
 
     pub fn center(&self, time: f32) -> Vec3<f32> {
-        self.center1
-            + ((time - self.time1) / (self.time2 - self.time1)) * (self.center2 - self.center1)
+        if self.center1 == self.center2 {
+            self.center1
+        } else {
+            self.center1
+                + ((time - self.time1) / (self.time2 - self.time1)) * (self.center2 - self.center1)
+        }
     }
 
     fn calc_sphere_uv(p: &Point) -> (f32, f32) {
