@@ -54,8 +54,8 @@ impl Sphere {
     }
 
     fn calc_sphere_uv(p: &Point) -> (f32, f32) {
-        let theta = -p.y.acos();
-        let phi = -p.z.atan2(p.x) + PI;
+        let theta = (-p.y).acos();
+        let phi = (-p.z).atan2(p.x) + PI;
 
         (phi / (2.0 * PI), theta / PI)
     }

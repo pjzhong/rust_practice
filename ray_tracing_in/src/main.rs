@@ -5,14 +5,14 @@ use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
 
-use ray_tracing_in::clamp;
 use ray_tracing_in::hittable::Hittable;
 use ray_tracing_in::material::{Dielectric, Lambertian, Metal};
 use ray_tracing_in::ray::Ray;
 use ray_tracing_in::sphere::Sphere;
-use ray_tracing_in::texture::{CheckerTexture, NoiseTexture};
+use ray_tracing_in::texture::{CheckerTexture, ImageTexture, NoiseTexture};
 use ray_tracing_in::vec::Vec3;
 use ray_tracing_in::Color;
+use ray_tracing_in::{clamp, Point};
 
 fn ray_color(r: &Ray, world: &[Rc<dyn Hittable>], depth: i32) -> Color {
     if depth <= 0 {
@@ -145,6 +145,19 @@ fn two_perline_spheres() -> Vec<Rc<dyn Hittable>> {
     world
 }
 
+fn earth() -> Vec<Rc<dyn Hittable>> {
+    let path = env::current_dir().unwrap().join("earthmap.jpg");
+    let earth_texture = Rc::new(ImageTexture::new(path));
+    let earth_surface = Rc::new(Lambertian::with_texture(earth_texture));
+    let globe = Rc::new(Sphere::steady(
+        Point::f32(0.0, 0.0, 0.0),
+        2.0,
+        earth_surface,
+    ));
+
+    vec![globe]
+}
+
 fn main() {
     // Image
     let aspect_ration = 16.0 / 9.0;
@@ -154,17 +167,24 @@ fn main() {
     let max_depth = 50;
 
     // World And Camera
-    let case = 2;
+    let case = 3;
     let (world, look_from, look_at, aperture, vfov) = match case {
         1 => (
             two_spheres(),
             Vec3::f32(13.0, 2.0, 3.0),
             Vec3::f32(0.0, 0.0, 0.0),
-            0.0,
+            0.1,
             20.0,
         ),
         2 => (
             two_perline_spheres(),
+            Vec3::f32(13.0, 2.0, 3.0),
+            Vec3::f32(0.0, 0.0, 0.0),
+            0.1,
+            20.0,
+        ),
+        3 => (
+            earth(),
             Vec3::f32(13.0, 2.0, 3.0),
             Vec3::f32(0.0, 0.0, 0.0),
             0.1,
