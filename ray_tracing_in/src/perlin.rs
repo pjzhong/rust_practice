@@ -35,7 +35,7 @@ impl Perlin {
         result
     }
 
-    pub fn noise(&self, p: &Point) -> Point {
+    pub fn noise(&self, p: &Point) -> f32 {
         let u = p.x - p.x.floor();
         let v = p.y - p.y.floor();
         let w = p.z - p.z.floor();
@@ -69,12 +69,12 @@ impl Perlin {
         Perlin::trilinear_interp(&c, u, v, w)
     }
 
-    fn trilinear_interp(c: &[[[Point; 2]; 2]; 2], u: f32, v: f32, w: f32) -> Point {
+    fn trilinear_interp(c: &[[[Point; 2]; 2]; 2], u: f32, v: f32, w: f32) -> f32 {
         let u = u * u * (3.0 - 2.0 * u);
         let v = v * v * (3.0 - 2.0 * v);
         let w = w * w * (3.0 - 2.0 * w);
 
-        let mut accum = Point::default();
+        let mut accum = 0.0;
 
         for (i, ic) in c.iter().enumerate() {
             for (j, jc) in ic.iter().enumerate() {
@@ -92,6 +92,20 @@ impl Perlin {
         }
 
         accum
+    }
+
+    pub fn turb(&self, p: &Point, depth: usize) ->f32 {
+        let mut accum = 0.0;
+        let mut temp_p = *p;
+        let mut weight = 1.0;
+
+        for _ in 0..depth {
+            accum += weight * self.noise(&temp_p);
+            weight *= 0.5;
+            temp_p *= 2.0;
+        }
+
+        accum.abs()
     }
 }
 
