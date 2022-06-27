@@ -41,10 +41,10 @@ impl BvhNode {
             let left = BvhNode::new(src_objects, start, mid, time0, time1);
             let right = BvhNode::new(src_objects, mid, end, time0, time1);
 
-            if left.is_some() && right.is_some() {
+            if let (Some(left), Some(right)) = (left, right) {
                 (
-                    Rc::new(left.unwrap()) as Rc<dyn Hittable>,
-                    Rc::new(right.unwrap()) as Rc<dyn Hittable>,
+                    Rc::new(left) as Rc<dyn Hittable>,
+                    Rc::new(right) as Rc<dyn Hittable>,
                 )
             } else {
                 return None;
@@ -55,8 +55,7 @@ impl BvhNode {
             left.bounding_box(time0, time1),
             right.bounding_box(time0, time1),
         );
-        if box_left.is_some() && box_right.is_some() {
-            let (box_left, box_right) = (box_left.unwrap(), box_right.unwrap());
+        if let (Some(box_left), Some(box_right)) = (box_left, box_right) {
             Some(Self {
                 left,
                 right,
@@ -70,8 +69,7 @@ impl BvhNode {
     fn box_compare(a: &Rc<dyn Hittable>, b: &Rc<dyn Hittable>, axis: usize) -> Option<Ordering> {
         let (box_a, box_b) = (a.bounding_box(0.0, 1.0), b.bounding_box(0.0, 1.0));
 
-        if box_a.is_some() && box_b.is_some() {
-            let (box_a, box_b) = (box_a.unwrap(), box_b.unwrap());
+        if let (Some(box_a), Some(box_b)) = (box_a, box_b) {
             box_a.min()[axis].partial_cmp(&box_b.min()[axis])
         } else if box_a.is_some() {
             Some(Ordering::Less)
