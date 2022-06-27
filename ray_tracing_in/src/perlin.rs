@@ -1,9 +1,8 @@
 use crate::Point;
 use rand::prelude::SliceRandom;
-use rand::Rng;
 
 pub struct Perlin {
-    ran_float: Vec<f32>,
+    ran_float: Vec<Point>,
     perm_x: Vec<usize>,
     perm_y: Vec<usize>,
     perm_z: Vec<usize>,
@@ -14,9 +13,8 @@ impl Perlin {
 
     pub fn new() -> Self {
         let mut ran_float = vec![];
-        let mut rang = rand::thread_rng();
         for _ in 0..Perlin::POINT_COUNT {
-            ran_float.push(rang.gen_range(0.0..1.0));
+            ran_float.push(Point::random_range(-1.0, 1.0));
         }
 
         Self {
@@ -37,19 +35,25 @@ impl Perlin {
         result
     }
 
-    pub fn noise(&self, p: &Point) -> f32 {
+    pub fn noise(&self, p: &Point) -> Point {
         let u = p.x - p.x.floor();
         let v = p.y - p.y.floor();
         let w = p.z - p.z.floor();
-        let u = u * u * (3.0 - 2.0 * u);
-        let v = v * v * (3.0 - 2.0 * v);
-        let w = w * w * (3.0 - 2.0 * w);
 
         let i = p.x.floor() as i32;
         let j = p.y.floor() as i32;
         let k = p.z.floor() as i32;
 
-        let mut c = [[[0.0, 0.0], [0.0, 0.0]], [[0.0, 0.0], [0.0, 0.0]]];
+        let mut c = [
+            [
+                [Point::default(), Point::default()],
+                [Point::default(), Point::default()],
+            ],
+            [
+                [Point::default(), Point::default()],
+                [Point::default(), Point::default()],
+            ],
+        ];
 
         for (di, di_c) in c.iter_mut().enumerate() {
             for (dj, dj_c) in di_c.iter_mut().enumerate() {
@@ -65,8 +69,12 @@ impl Perlin {
         Perlin::trilinear_interp(&c, u, v, w)
     }
 
-    fn trilinear_interp(c: &[[[f32; 2]; 2]; 2], u: f32, v: f32, w: f32) -> f32 {
-        let mut accum = 0.0;
+    fn trilinear_interp(c: &[[[Point; 2]; 2]; 2], u: f32, v: f32, w: f32) -> Point {
+        let u = u * u * (3.0 - 2.0 * u);
+        let v = v * v * (3.0 - 2.0 * v);
+        let w = w * w * (3.0 - 2.0 * w);
+
+        let mut accum = Point::default();
 
         for (i, ic) in c.iter().enumerate() {
             for (j, jc) in ic.iter().enumerate() {
@@ -74,10 +82,11 @@ impl Perlin {
                     let fi = i as f32;
                     let fj = j as f32;
                     let fk = k as f32;
+                    let weight_v = Point::f32(u - fi, v - fj, w - fk);
                     accum += (fi * u + (1.0 - fi) * (1.0 - u))
                         * (fj * v + (1.0 - fj) * (1.0 - v))
                         * (fk * w + (1.0 - fk) * (1.0 - w))
-                        * element;
+                        * element.dot_product(&weight_v);
                 }
             }
         }

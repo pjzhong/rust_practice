@@ -278,6 +278,30 @@ macro_rules! vec3_impl {
             }
         }
 
+        impl Add<Vec3<$t>> for $t {
+            type Output = Vec3<$t>;
+
+            fn add(self, rhs: Vec3<$t>) -> Self::Output {
+                Self::Output {
+                    x: rhs.x + self,
+                    y: rhs.y + self,
+                    z: rhs.z + self,
+                }
+            }
+        }
+
+        impl Add<&Vec3<$t>> for $t {
+            type Output = Vec3<$t>;
+
+            fn add(self, rhs: &Vec3<$t>) -> Self::Output {
+                Self::Output {
+                    x: rhs.x + self,
+                    y: rhs.y + self,
+                    z: rhs.z + self,
+                }
+            }
+        }
+
     )+)
 }
 
