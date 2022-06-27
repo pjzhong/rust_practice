@@ -128,7 +128,7 @@ fn two_spheres() -> Vec<Rc<dyn Hittable>> {
 }
 
 fn two_perline_spheres() -> Vec<Rc<dyn Hittable>> {
-    let material_ground = Rc::new(Lambertian::with_texture(Rc::new(NoiseTexture::default())));
+    let material_ground = Rc::new(Lambertian::with_texture(Rc::new(NoiseTexture::new(4.0))));
     let world: Vec<Rc<dyn Hittable>> = vec![
         Rc::new(Sphere::steady(
             Vec3::f32(0.0, -1000., 0.0),
