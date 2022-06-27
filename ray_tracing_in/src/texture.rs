@@ -73,6 +73,8 @@ impl NoiseTexture {
 
 impl Texture for NoiseTexture {
     fn value(&self, _: f32, _: f32, p: &Point) -> Color {
-        Color::f32(1.0, 1.0, 1.0) * self.noise.turb(&(self.scale * p), 7)
+        Color::f32(1.0, 1.0, 1.0)
+            * 0.5
+            * (1.0 + (self.scale * p.z + 10.0 * self.noise.turb(p, 7)).sin())
     }
 }

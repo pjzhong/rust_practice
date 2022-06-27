@@ -94,7 +94,7 @@ impl Perlin {
         accum
     }
 
-    pub fn turb(&self, p: &Point, depth: usize) ->f32 {
+    pub fn turb(&self, p: &Point, depth: usize) -> f32 {
         let mut accum = 0.0;
         let mut temp_p = *p;
         let mut weight = 1.0;
