@@ -3,9 +3,9 @@ use crate::{clamp, Color, Point};
 use stb_image::image::LoadResult::{Error, ImageF32, ImageU8};
 use std::fmt::Debug;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
-pub trait Texture {
+pub trait Texture: Sync + Send {
     fn value(&self, u: f32, v: f32, p: &Point) -> Color;
 }
 
@@ -26,19 +26,19 @@ impl Texture for SolidColor {
 }
 
 pub struct CheckerTexture {
-    odd: Rc<dyn Texture>,
-    even: Rc<dyn Texture>,
+    odd: Arc<dyn Texture>,
+    even: Arc<dyn Texture>,
 }
 
 impl CheckerTexture {
-    pub fn with_texture(odd: Rc<dyn Texture>, even: Rc<dyn Texture>) -> Self {
+    pub fn with_texture(odd: Arc<dyn Texture>, even: Arc<dyn Texture>) -> Self {
         Self { odd, even }
     }
 
     pub fn with_color(odd: Color, even: Color) -> Self {
         Self {
-            odd: Rc::new(SolidColor::new(odd)),
-            even: Rc::new(SolidColor::new(even)),
+            odd: Arc::new(SolidColor::new(odd)),
+            even: Arc::new(SolidColor::new(even)),
         }
     }
 }

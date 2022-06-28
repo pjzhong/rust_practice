@@ -2,17 +2,17 @@ use crate::hittable::{HitRecord, Hittable};
 use crate::{Ray, AABB};
 use rand::Rng;
 use std::cmp::Ordering;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct BvhNode {
-    left: Rc<dyn Hittable>,
-    right: Rc<dyn Hittable>,
+    left: Arc<dyn Hittable>,
+    right: Arc<dyn Hittable>,
     aabb: AABB,
 }
 
 impl BvhNode {
     pub fn new(
-        src_objects: &mut [Rc<dyn Hittable>],
+        src_objects: &mut [Arc<dyn Hittable>],
         start: usize,
         end: usize,
         time0: f32,
@@ -43,8 +43,8 @@ impl BvhNode {
 
             if let (Some(left), Some(right)) = (left, right) {
                 (
-                    Rc::new(left) as Rc<dyn Hittable>,
-                    Rc::new(right) as Rc<dyn Hittable>,
+                    Arc::new(left) as Arc<dyn Hittable>,
+                    Arc::new(right) as Arc<dyn Hittable>,
                 )
             } else {
                 return None;
@@ -66,7 +66,7 @@ impl BvhNode {
         }
     }
 
-    fn box_compare(a: &Rc<dyn Hittable>, b: &Rc<dyn Hittable>, axis: usize) -> Option<Ordering> {
+    fn box_compare(a: &Arc<dyn Hittable>, b: &Arc<dyn Hittable>, axis: usize) -> Option<Ordering> {
         let (box_a, box_b) = (a.bounding_box(0.0, 1.0), b.bounding_box(0.0, 1.0));
 
         if let (Some(box_a), Some(box_b)) = (box_a, box_b) {
@@ -78,7 +78,7 @@ impl BvhNode {
         }
     }
 
-    fn box_x_compare(a: &Rc<dyn Hittable>, b: &Rc<dyn Hittable>) -> Ordering {
+    fn box_x_compare(a: &Arc<dyn Hittable>, b: &Arc<dyn Hittable>) -> Ordering {
         if let Some(b) = BvhNode::box_compare(a, b, 0) {
             b
         } else {
@@ -86,7 +86,7 @@ impl BvhNode {
         }
     }
 
-    fn box_y_compare(a: &Rc<dyn Hittable>, b: &Rc<dyn Hittable>) -> Ordering {
+    fn box_y_compare(a: &Arc<dyn Hittable>, b: &Arc<dyn Hittable>) -> Ordering {
         if let Some(b) = BvhNode::box_compare(a, b, 1) {
             b
         } else {
@@ -94,7 +94,7 @@ impl BvhNode {
         }
     }
 
-    fn box_z_compare(a: &Rc<dyn Hittable>, b: &Rc<dyn Hittable>) -> Ordering {
+    fn box_z_compare(a: &Arc<dyn Hittable>, b: &Arc<dyn Hittable>) -> Ordering {
         if let Some(b) = BvhNode::box_compare(a, b, 2) {
             b
         } else {

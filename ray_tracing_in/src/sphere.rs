@@ -3,7 +3,7 @@ use crate::material::Material;
 use crate::ray::Ray;
 use crate::{Point, Vec3, AABB};
 use std::f32::consts::PI;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct Sphere {
     radius: f32,
@@ -11,11 +11,11 @@ pub struct Sphere {
     time2: f32,
     center1: Vec3<f32>,
     center2: Vec3<f32>,
-    material: Rc<dyn Material>,
+    material: Arc<dyn Material>,
 }
 
 impl Sphere {
-    pub fn steady(center1: Vec3<f32>, radius: f32, material: Rc<dyn Material>) -> Self {
+    pub fn steady(center1: Vec3<f32>, radius: f32, material: Arc<dyn Material>) -> Self {
         Self {
             center1,
             center2: center1,
@@ -32,7 +32,7 @@ impl Sphere {
         radius: f32,
         time1: f32,
         time2: f32,
-        material: Rc<dyn Material>,
+        material: Arc<dyn Material>,
     ) -> Self {
         Self {
             center1,

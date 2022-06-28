@@ -3,7 +3,7 @@ use ray_tracing_in::camera::Camera;
 use std::env;
 use std::fs::File;
 use std::io::Write;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use ray_tracing_in::hittable::Hittable;
 use ray_tracing_in::material::{Dielectric, DiffuseLight, Lambertian, Metal};
@@ -15,15 +15,15 @@ use ray_tracing_in::vec::Vec3;
 use ray_tracing_in::Color;
 use ray_tracing_in::{clamp, Point};
 
-fn ray_color(r: &Ray, background: &Color, world: &[Rc<dyn Hittable>], depth: i32) -> Color {
+fn ray_color(r: &Ray, background: &Color, world: &[Arc<dyn Hittable>], depth: i32) -> Color {
     if depth <= 0 {
         return *background;
     }
 
-    if let Some(mut rec) = world.hit(r, 0.001, f32::INFINITY) {
+    if let Some(rec) = world.hit(r, 0.001, f32::INFINITY) {
         let material = rec.material.clone();
         let emitted = material.emitted(rec.u, rec.v, &rec.p);
-        if let Some((color, scattered)) = material.scatter(r, &mut rec) {
+        if let Some((color, scattered)) = material.scatter(r, &rec) {
             emitted + color * ray_color(&scattered, background, world, depth - 1)
         } else {
             emitted
@@ -33,11 +33,11 @@ fn ray_color(r: &Ray, background: &Color, world: &[Rc<dyn Hittable>], depth: i32
     }
 }
 
-fn random_scene() -> Vec<Rc<dyn Hittable>> {
-    let mut world: Vec<Rc<dyn Hittable>> = vec![Rc::new(Sphere::steady(
+fn random_scene() -> Vec<Arc<dyn Hittable>> {
+    let mut world: Vec<Arc<dyn Hittable>> = vec![Arc::new(Sphere::steady(
         Vec3::f32(0.0, -1000., 0.0),
         1000.0,
-        Rc::new(Lambertian::with_texture(Rc::new(
+        Arc::new(Lambertian::with_texture(Box::new(
             CheckerTexture::with_color(Color::f32(0.2, 0.3, 0.1), Color::f32(0.9, 0.9, 0.9)),
         ))),
     ))];
@@ -58,63 +58,63 @@ fn random_scene() -> Vec<Rc<dyn Hittable>> {
                 if choose_mat < 0.8 {
                     let albedo = Color::random() * Color::random();
                     let center2 = center + Vec3::f32(0.0, rang.gen_range(0.0..0.5), 0.0);
-                    world.push(Rc::new(Sphere::motion(
+                    world.push(Arc::new(Sphere::motion(
                         center,
                         center2,
                         0.2,
                         0.0,
                         1.0,
-                        Rc::new(Lambertian::with_color(albedo)),
+                        Arc::new(Lambertian::with_color(albedo)),
                     )))
                 } else if choose_mat < 0.95 {
                     let albedo = Color::random_range(0.5, 1.0);
                     let fuzz = rang.gen_range(0.0..0.5);
-                    world.push(Rc::new(Sphere::steady(
+                    world.push(Arc::new(Sphere::steady(
                         center,
                         0.2,
-                        Rc::new(Metal::new(albedo, fuzz)),
+                        Arc::new(Metal::new(albedo, fuzz)),
                     )))
                 } else {
-                    world.push(Rc::new(Sphere::steady(
+                    world.push(Arc::new(Sphere::steady(
                         center,
                         0.2,
-                        Rc::new(Dielectric::new(1.5)),
+                        Arc::new(Dielectric::new(1.5)),
                     )))
                 }
             }
         }
     }
 
-    world.push(Rc::new(Sphere::steady(
+    world.push(Arc::new(Sphere::steady(
         Vec3::f32(0.0, 1.0, 0.0),
         1.0,
-        Rc::new(Dielectric::new(1.5)),
+        Arc::new(Dielectric::new(1.5)),
     )));
-    world.push(Rc::new(Sphere::steady(
+    world.push(Arc::new(Sphere::steady(
         Vec3::f32(-4.0, 1.0, 0.0),
         1.0,
-        Rc::new(Lambertian::with_color(Color::f32(0.4, 0.2, 0.1))),
+        Arc::new(Lambertian::with_color(Color::f32(0.4, 0.2, 0.1))),
     )));
-    world.push(Rc::new(Sphere::steady(
+    world.push(Arc::new(Sphere::steady(
         Vec3::f32(4.0, 1.0, 0.0),
         1.0,
-        Rc::new(Metal::new(Color::f32(0.7, 0.6, 0.5), 0.0)),
+        Arc::new(Metal::new(Color::f32(0.7, 0.6, 0.5), 0.0)),
     )));
 
     world
 }
 
-fn two_spheres() -> Vec<Rc<dyn Hittable>> {
-    let material_ground = Rc::new(Lambertian::with_texture(Rc::new(
+fn two_spheres() -> Vec<Arc<dyn Hittable>> {
+    let material_ground = Arc::new(Lambertian::with_texture(Box::new(
         CheckerTexture::with_color(Color::f32(0.2, 0.3, 0.1), Color::f32(0.9, 0.9, 0.9)),
     )));
-    let world: Vec<Rc<dyn Hittable>> = vec![
-        Rc::new(Sphere::steady(
+    let world: Vec<Arc<dyn Hittable>> = vec![
+        Arc::new(Sphere::steady(
             Vec3::f32(0.0, -10., 0.0),
             10.0,
             material_ground.clone(),
         )),
-        Rc::new(Sphere::steady(
+        Arc::new(Sphere::steady(
             Vec3::f32(0.0, 10., 0.0),
             10.0,
             material_ground,
@@ -124,15 +124,15 @@ fn two_spheres() -> Vec<Rc<dyn Hittable>> {
     world
 }
 
-fn two_perline_spheres() -> Vec<Rc<dyn Hittable>> {
-    let material_ground = Rc::new(Lambertian::with_texture(Rc::new(NoiseTexture::new(4.0))));
-    let world: Vec<Rc<dyn Hittable>> = vec![
-        Rc::new(Sphere::steady(
+fn two_perline_spheres() -> Vec<Arc<dyn Hittable>> {
+    let material_ground = Arc::new(Lambertian::with_texture(Box::new(NoiseTexture::new(4.0))));
+    let world: Vec<Arc<dyn Hittable>> = vec![
+        Arc::new(Sphere::steady(
             Vec3::f32(0.0, -1000., 0.0),
             1000.0,
             material_ground.clone(),
         )),
-        Rc::new(Sphere::steady(
+        Arc::new(Sphere::steady(
             Vec3::f32(0.0, 2., 0.0),
             2.0,
             material_ground,
@@ -142,11 +142,11 @@ fn two_perline_spheres() -> Vec<Rc<dyn Hittable>> {
     world
 }
 
-fn earth() -> Vec<Rc<dyn Hittable>> {
+fn earth() -> Vec<Arc<dyn Hittable>> {
     let path = env::current_dir().unwrap().join("earthmap.jpg");
-    let earth_texture = Rc::new(ImageTexture::new(path));
-    let earth_surface = Rc::new(Lambertian::with_texture(earth_texture));
-    let globe = Rc::new(Sphere::steady(
+    let earth_texture = Box::new(ImageTexture::new(path));
+    let earth_surface = Arc::new(Lambertian::with_texture(earth_texture));
+    let globe = Arc::new(Sphere::steady(
         Point::f32(0.0, 0.0, 0.0),
         2.0,
         earth_surface,
@@ -155,26 +155,26 @@ fn earth() -> Vec<Rc<dyn Hittable>> {
     vec![globe]
 }
 
-fn simple_light() -> Vec<Rc<dyn Hittable>> {
-    let material_ground = Rc::new(Lambertian::with_texture(Rc::new(NoiseTexture::new(4.0))));
-    let world: Vec<Rc<dyn Hittable>> = vec![
-        Rc::new(Sphere::steady(
+fn simple_light() -> Vec<Arc<dyn Hittable>> {
+    let material_ground = Arc::new(Lambertian::with_texture(Box::new(NoiseTexture::new(4.0))));
+    let world: Vec<Arc<dyn Hittable>> = vec![
+        Arc::new(Sphere::steady(
             Vec3::f32(0.0, -1000., 0.0),
             1000.0,
             material_ground.clone(),
         )),
-        Rc::new(Sphere::steady(
+        Arc::new(Sphere::steady(
             Vec3::f32(0.0, 2., 0.0),
             2.0,
             material_ground,
         )),
-        Rc::new(XyRectangle::new(
+        Arc::new(XyRectangle::new(
             3.0,
             5.0,
             1.0,
             3.0,
             -2.0,
-            Rc::new(DiffuseLight::new(Color::f32(4., 4., 4.))),
+            Arc::new(DiffuseLight::new(Color::f32(4., 4., 4.))),
         )),
     ];
 
@@ -275,6 +275,8 @@ fn main() {
                 let r = camera.get_ray(u, v);
                 pixel_color += ray_color(&r, &background, &world, max_depth);
             }
+
+            //let col: Vec3<f32> = (0..samples_per_pixel).map(|_| )
 
             write_color(&mut file, &pixel_color, samples_per_pixel)
         }

@@ -1,7 +1,7 @@
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
 use crate::{Ray, Vec3, AABB};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct XyRectangle {
     x0: f32,
@@ -9,11 +9,11 @@ pub struct XyRectangle {
     y0: f32,
     y1: f32,
     k: f32,
-    material: Rc<dyn Material>,
+    material: Arc<dyn Material>,
 }
 
 impl XyRectangle {
-    pub fn new(x0: f32, x1: f32, y0: f32, y1: f32, k: f32, material: Rc<dyn Material>) -> Self {
+    pub fn new(x0: f32, x1: f32, y0: f32, y1: f32, k: f32, material: Arc<dyn Material>) -> Self {
         Self {
             x0,
             x1,

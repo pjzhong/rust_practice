@@ -1,7 +1,7 @@
 use crate::material::Material;
 use crate::ray::Ray;
 use crate::{Vec3, AABB};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct HitRecord {
     pub t: f32,
@@ -9,7 +9,7 @@ pub struct HitRecord {
     pub v: f32,
     pub p: Vec3<f32>,
     pub normal: Vec3<f32>,
-    pub material: Rc<dyn Material>,
+    pub material: Arc<dyn Material>,
     pub front_face: bool,
 }
 
@@ -26,13 +26,13 @@ impl HitRecord {
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Sync + Send {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord>;
 
     fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB>;
 }
 
-impl Hittable for [Rc<dyn Hittable>] {
+impl Hittable for [Arc<dyn Hittable>] {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let mut closet_so_far = t_max;
         let mut record = None;

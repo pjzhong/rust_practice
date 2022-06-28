@@ -3,9 +3,9 @@ use crate::ray::Ray;
 use crate::texture::{SolidColor, Texture};
 use crate::{Color, Point, Vec3};
 use rand::{thread_rng, Rng};
-use std::rc::Rc;
+use std::sync::Arc;
 
-pub trait Material {
+pub trait Material: Sync + Send {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Color, Ray)>;
 
     fn emitted(&self, _: f32, _: f32, _: &Point) -> Color {
@@ -14,16 +14,16 @@ pub trait Material {
 }
 
 pub struct Lambertian {
-    albedo: Rc<dyn Texture>,
+    albedo: Box<dyn Texture>,
 }
 
 impl Lambertian {
     pub fn with_color(albedo: Color) -> Self {
-        let texture = Rc::new(SolidColor::new(albedo));
+        let texture = Box::new(SolidColor::new(albedo));
         Self { albedo: texture }
     }
 
-    pub fn with_texture(albedo: Rc<dyn Texture>) -> Self {
+    pub fn with_texture(albedo: Box<dyn Texture>) -> Self {
         Self { albedo }
     }
 }
@@ -119,13 +119,13 @@ impl Material for Dielectric {
 }
 
 pub struct DiffuseLight {
-    emit: Rc<dyn Texture>,
+    emit: Arc<dyn Texture>,
 }
 
 impl DiffuseLight {
     pub fn new(c: Color) -> Self {
         Self {
-            emit: Rc::new(SolidColor::new(c)),
+            emit: Arc::new(SolidColor::new(c)),
         }
     }
 }
