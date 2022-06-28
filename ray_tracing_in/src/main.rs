@@ -1,5 +1,6 @@
 use rand::{thread_rng, Rng};
 use ray_tracing_in::camera::Camera;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -190,7 +191,7 @@ fn main() {
     let max_depth = 50;
 
     // World And Camera
-    let case = 5;
+    let case = 4;
     let (world, look_from, look_at, aperture, vfov, background) = match case {
         1 => (
             two_spheres(),
@@ -264,19 +265,19 @@ fn main() {
     file.write_all(format!("P3\n{} {}\n255\n", image_width, image_height).as_bytes())
         .unwrap();
 
-    let mut range = thread_rng();
     for j in (0..=image_height - 1).rev() {
         println!("Scan lines remaining:{}", j);
         for i in 0..image_width {
-            let mut pixel_color = Vec3::f32(0.0, 0.0, 0.0);
-            for _ in 0..samples_per_pixel {
-                let u = (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
-                let v = (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
-                let r = camera.get_ray(u, v);
-                pixel_color += ray_color(&r, &background, &world, max_depth);
-            }
-
-            //let col: Vec3<f32> = (0..samples_per_pixel).map(|_| )
+            let pixel_color: Vec3<f32> = (0..samples_per_pixel)
+                .into_par_iter()
+                .map(|_| {
+                    let mut range = thread_rng();
+                    let u = (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
+                    let v = (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
+                    let r = camera.get_ray(u, v);
+                    ray_color(&r, &background, &world, max_depth)
+                })
+                .sum();
 
             write_color(&mut file, &pixel_color, samples_per_pixel)
         }
