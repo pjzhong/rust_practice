@@ -84,15 +84,19 @@ impl Hittable for Sphere {
             }
         }
 
-        let mut rec = HitRecord::default();
-
-        rec.t = root;
-        rec.p = r.at(rec.t);
-        let outward_normal = (rec.p - center) / self.radius;
-        rec.set_face_normal(r, &outward_normal);
-        rec.material = Some(self.material.clone());
-        (rec.u, rec.v) = Sphere::calc_sphere_uv(&outward_normal);
-        Some(rec)
+        let p = r.at(root);
+        let outward_normal = (p - center) / self.radius;
+        let (u, v) = Sphere::calc_sphere_uv(&outward_normal);
+        let (front_face, normal) = HitRecord::calc_face_normal(r, &outward_normal);
+        Some(HitRecord {
+            u,
+            v,
+            t: root,
+            front_face,
+            normal,
+            p,
+            material: self.material.clone(),
+        })
     }
 
     fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB> {

@@ -8,6 +8,7 @@ pub mod hittable;
 pub mod material;
 pub mod perlin;
 pub mod ray;
+pub mod rectangle;
 pub mod sphere;
 pub mod texture;
 pub mod vec;

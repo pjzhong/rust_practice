@@ -3,25 +3,26 @@ use crate::ray::Ray;
 use crate::{Vec3, AABB};
 use std::rc::Rc;
 
-#[derive(Default)]
 pub struct HitRecord {
     pub t: f32,
     pub u: f32,
     pub v: f32,
     pub p: Vec3<f32>,
     pub normal: Vec3<f32>,
-    pub material: Option<Rc<dyn Material>>,
+    pub material: Rc<dyn Material>,
     pub front_face: bool,
 }
 
 impl HitRecord {
-    pub fn set_face_normal(&mut self, r: &Ray, outward_normal: &Vec3<f32>) {
-        self.front_face = r.dir().dot_product(outward_normal) < 0.0;
-        self.normal = if self.front_face {
+    pub fn calc_face_normal(r: &Ray, outward_normal: &Vec3<f32>) -> (bool, Vec3<f32>) {
+        let front_face = r.dir().dot_product(outward_normal) < 0.0;
+        let normal = if front_face {
             *outward_normal
         } else {
             -outward_normal
         };
+
+        (front_face, normal)
     }
 }
 

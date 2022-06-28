@@ -6,7 +6,7 @@ use rand::{thread_rng, Rng};
 use std::rc::Rc;
 
 pub trait Material {
-    fn scatter(&self, r: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)>;
+    fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Color, Ray)>;
 
     fn emitted(&self, _: f32, _: f32, _: &Point) -> Color {
         Color::f32(0.0, 0.0, 0.0)
@@ -29,7 +29,7 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, ray_in: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, ray_in: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
         let scatter_direction = {
             let mut t = rec.normal + Vec3::<f32>::random_unit_vecotr();
             if t.near_zero() {
@@ -60,7 +60,7 @@ impl Metal {
 }
 
 impl Material for Metal {
-    fn scatter(&self, r_in: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
         let reflected = r_in.dir().normalize().reflect(&rec.normal);
         let scattered = Ray::new(
             rec.p,
@@ -93,7 +93,7 @@ impl Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, r_in: &Ray, rec: &mut HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
         let refraction_ration = if rec.front_face {
             1.0 / self.ir
         } else {
@@ -131,7 +131,7 @@ impl DiffuseLight {
 }
 
 impl Material for DiffuseLight {
-    fn scatter(&self, _: &Ray, _: &mut HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, _: &Ray, _: &HitRecord) -> Option<(Color, Ray)> {
         None
     }
 

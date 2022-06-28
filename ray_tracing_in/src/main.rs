@@ -6,8 +6,9 @@ use std::io::Write;
 use std::rc::Rc;
 
 use ray_tracing_in::hittable::Hittable;
-use ray_tracing_in::material::{Dielectric, Lambertian, Metal};
+use ray_tracing_in::material::{Dielectric, DiffuseLight, Lambertian, Metal};
 use ray_tracing_in::ray::Ray;
+use ray_tracing_in::rectangle::XyRectangle;
 use ray_tracing_in::sphere::Sphere;
 use ray_tracing_in::texture::{CheckerTexture, ImageTexture, NoiseTexture};
 use ray_tracing_in::vec::Vec3;
@@ -20,15 +21,12 @@ fn ray_color(r: &Ray, background: &Color, world: &[Rc<dyn Hittable>], depth: i32
     }
 
     if let Some(mut rec) = world.hit(r, 0.001, f32::INFINITY) {
-        if let Some(material) = rec.material.clone() {
-            let emitted =   material.emitted(rec.u, rec.v, &rec.p);
-            if let Some((color, scattered)) = material.scatter(r, &mut rec) {
-                emitted + color * ray_color(&scattered, background, world, depth - 1)
-            } else {
-                emitted
-            }
+        let material = rec.material.clone();
+        let emitted = material.emitted(rec.u, rec.v, &rec.p);
+        if let Some((color, scattered)) = material.scatter(r, &mut rec) {
+            emitted + color * ray_color(&scattered, background, world, depth - 1)
         } else {
-            *background
+            emitted
         }
     } else {
         *background
@@ -157,16 +155,42 @@ fn earth() -> Vec<Rc<dyn Hittable>> {
     vec![globe]
 }
 
+fn simple_light() -> Vec<Rc<dyn Hittable>> {
+    let material_ground = Rc::new(Lambertian::with_texture(Rc::new(NoiseTexture::new(4.0))));
+    let world: Vec<Rc<dyn Hittable>> = vec![
+        Rc::new(Sphere::steady(
+            Vec3::f32(0.0, -1000., 0.0),
+            1000.0,
+            material_ground.clone(),
+        )),
+        Rc::new(Sphere::steady(
+            Vec3::f32(0.0, 2., 0.0),
+            2.0,
+            material_ground,
+        )),
+        Rc::new(XyRectangle::new(
+            3.0,
+            5.0,
+            1.0,
+            3.0,
+            -2.0,
+            Rc::new(DiffuseLight::new(Color::f32(4., 4., 4.))),
+        )),
+    ];
+
+    world
+}
+
 fn main() {
     // Image
     let aspect_ration = 16.0 / 9.0;
     let image_width = 400;
     let image_height = (image_width as f32 / aspect_ration) as i32;
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 500;
     let max_depth = 50;
 
     // World And Camera
-    let case = 3;
+    let case = 5;
     let (world, look_from, look_at, aperture, vfov, background) = match case {
         1 => (
             two_spheres(),
@@ -199,6 +223,14 @@ fn main() {
             0.1,
             20.0,
             Color::f32(0.70, 0.80, 1.00),
+        ),
+        5 => (
+            simple_light(),
+            Vec3::f32(26.0, 3.0, 6.0),
+            Vec3::f32(0.0, 2.0, 0.0),
+            0.1,
+            20.0,
+            Color::f32(0.0, 0.0, 0.00),
         ),
         _ => (
             vec![],
