@@ -14,26 +14,25 @@ use ray_tracing_in::vec::Vec3;
 use ray_tracing_in::Color;
 use ray_tracing_in::{clamp, Point};
 
-fn ray_color(r: &Ray, world: &[Rc<dyn Hittable>], depth: i32) -> Color {
+fn ray_color(r: &Ray, background: &Color, world: &[Rc<dyn Hittable>], depth: i32) -> Color {
     if depth <= 0 {
-        return Color::f32(1.0, 1.0, 1.0);
+        return *background;
     }
 
     if let Some(mut rec) = world.hit(r, 0.001, f32::INFINITY) {
-        return if let Some(material) = rec.material.clone() {
+        if let Some(material) = rec.material.clone() {
+            let emitted =   material.emitted(rec.u, rec.v, &rec.p);
             if let Some((color, scattered)) = material.scatter(r, &mut rec) {
-                color * ray_color(&scattered, world, depth - 1)
+                emitted + color * ray_color(&scattered, background, world, depth - 1)
             } else {
-                Color::default()
+                emitted
             }
         } else {
-            Color::default()
-        };
+            *background
+        }
+    } else {
+        *background
     }
-
-    let unit_direction = r.dir().normalize();
-    let t = 0.5 * (unit_direction.y + 1.0);
-    (1.0 - t) * Color::f32(1.0, 1.0, 1.0) + t * Color::f32(0.5, 0.7, 1.0)
 }
 
 fn random_scene() -> Vec<Rc<dyn Hittable>> {
@@ -168,13 +167,14 @@ fn main() {
 
     // World And Camera
     let case = 3;
-    let (world, look_from, look_at, aperture, vfov) = match case {
+    let (world, look_from, look_at, aperture, vfov, background) = match case {
         1 => (
             two_spheres(),
             Vec3::f32(13.0, 2.0, 3.0),
             Vec3::f32(0.0, 0.0, 0.0),
             0.1,
             20.0,
+            Color::f32(0.70, 0.80, 1.00),
         ),
         2 => (
             two_perline_spheres(),
@@ -182,6 +182,7 @@ fn main() {
             Vec3::f32(0.0, 0.0, 0.0),
             0.1,
             20.0,
+            Color::f32(0.70, 0.80, 1.00),
         ),
         3 => (
             earth(),
@@ -189,13 +190,23 @@ fn main() {
             Vec3::f32(0.0, 0.0, 0.0),
             0.1,
             20.0,
+            Color::f32(0.70, 0.80, 1.00),
         ),
-        _ => (
+        4 => (
             random_scene(),
             Vec3::f32(13.0, 2.0, 3.0),
             Vec3::f32(0.0, 0.0, 0.0),
             0.1,
             20.0,
+            Color::f32(0.70, 0.80, 1.00),
+        ),
+        _ => (
+            vec![],
+            Vec3::default(),
+            Vec3::default(),
+            0.0,
+            0.0,
+            Color::default(),
         ),
     };
 
@@ -230,7 +241,7 @@ fn main() {
                 let u = (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
                 let v = (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
                 let r = camera.get_ray(u, v);
-                pixel_color += ray_color(&r, &world, max_depth);
+                pixel_color += ray_color(&r, &background, &world, max_depth);
             }
 
             write_color(&mut file, &pixel_color, samples_per_pixel)
