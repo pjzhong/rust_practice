@@ -15,6 +15,7 @@ pub mod vec;
 
 pub type Color = Vec3<f32>;
 pub type Point = Vec3<f32>;
+pub type Image = Vec<Vec<Vec3<f32>>>;
 
 pub fn clamp(x: f32, min: f32, max: f32) -> f32 {
     if x < min {

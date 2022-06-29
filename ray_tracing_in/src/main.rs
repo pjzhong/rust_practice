@@ -13,10 +13,10 @@ use ray_tracing_in::rectangle::XyRectangle;
 use ray_tracing_in::sphere::Sphere;
 use ray_tracing_in::texture::{CheckerTexture, ImageTexture, NoiseTexture};
 use ray_tracing_in::vec::Vec3;
-use ray_tracing_in::Color;
 use ray_tracing_in::{clamp, Point};
+use ray_tracing_in::{Color, Image};
 
-fn ray_color(r: &Ray, background: &Color, world: &[Arc<dyn Hittable>], depth: i32) -> Color {
+fn ray_color(r: &Ray, background: &Color, world: &[Box<dyn Hittable>], depth: i32) -> Color {
     if depth <= 0 {
         return *background;
     }
@@ -34,8 +34,8 @@ fn ray_color(r: &Ray, background: &Color, world: &[Arc<dyn Hittable>], depth: i3
     }
 }
 
-fn random_scene() -> Vec<Arc<dyn Hittable>> {
-    let mut world: Vec<Arc<dyn Hittable>> = vec![Arc::new(Sphere::steady(
+fn random_scene() -> Vec<Box<dyn Hittable>> {
+    let mut world: Vec<Box<dyn Hittable>> = vec![Box::new(Sphere::steady(
         Vec3::f32(0.0, -1000., 0.0),
         1000.0,
         Arc::new(Lambertian::with_texture(Box::new(
@@ -59,7 +59,7 @@ fn random_scene() -> Vec<Arc<dyn Hittable>> {
                 if choose_mat < 0.8 {
                     let albedo = Color::random() * Color::random();
                     let center2 = center + Vec3::f32(0.0, rang.gen_range(0.0..0.5), 0.0);
-                    world.push(Arc::new(Sphere::motion(
+                    world.push(Box::new(Sphere::motion(
                         center,
                         center2,
                         0.2,
@@ -70,13 +70,13 @@ fn random_scene() -> Vec<Arc<dyn Hittable>> {
                 } else if choose_mat < 0.95 {
                     let albedo = Color::random_range(0.5, 1.0);
                     let fuzz = rang.gen_range(0.0..0.5);
-                    world.push(Arc::new(Sphere::steady(
+                    world.push(Box::new(Sphere::steady(
                         center,
                         0.2,
                         Arc::new(Metal::new(albedo, fuzz)),
                     )))
                 } else {
-                    world.push(Arc::new(Sphere::steady(
+                    world.push(Box::new(Sphere::steady(
                         center,
                         0.2,
                         Arc::new(Dielectric::new(1.5)),
@@ -86,17 +86,17 @@ fn random_scene() -> Vec<Arc<dyn Hittable>> {
         }
     }
 
-    world.push(Arc::new(Sphere::steady(
+    world.push(Box::new(Sphere::steady(
         Vec3::f32(0.0, 1.0, 0.0),
         1.0,
         Arc::new(Dielectric::new(1.5)),
     )));
-    world.push(Arc::new(Sphere::steady(
+    world.push(Box::new(Sphere::steady(
         Vec3::f32(-4.0, 1.0, 0.0),
         1.0,
         Arc::new(Lambertian::with_color(Color::f32(0.4, 0.2, 0.1))),
     )));
-    world.push(Arc::new(Sphere::steady(
+    world.push(Box::new(Sphere::steady(
         Vec3::f32(4.0, 1.0, 0.0),
         1.0,
         Arc::new(Metal::new(Color::f32(0.7, 0.6, 0.5), 0.0)),
@@ -105,17 +105,17 @@ fn random_scene() -> Vec<Arc<dyn Hittable>> {
     world
 }
 
-fn two_spheres() -> Vec<Arc<dyn Hittable>> {
+fn two_spheres() -> Vec<Box<dyn Hittable>> {
     let material_ground = Arc::new(Lambertian::with_texture(Box::new(
         CheckerTexture::with_color(Color::f32(0.2, 0.3, 0.1), Color::f32(0.9, 0.9, 0.9)),
     )));
-    let world: Vec<Arc<dyn Hittable>> = vec![
-        Arc::new(Sphere::steady(
+    let world: Vec<Box<dyn Hittable>> = vec![
+        Box::new(Sphere::steady(
             Vec3::f32(0.0, -10., 0.0),
             10.0,
             material_ground.clone(),
         )),
-        Arc::new(Sphere::steady(
+        Box::new(Sphere::steady(
             Vec3::f32(0.0, 10., 0.0),
             10.0,
             material_ground,
@@ -125,15 +125,15 @@ fn two_spheres() -> Vec<Arc<dyn Hittable>> {
     world
 }
 
-fn two_perline_spheres() -> Vec<Arc<dyn Hittable>> {
+fn two_perline_spheres() -> Vec<Box<dyn Hittable>> {
     let material_ground = Arc::new(Lambertian::with_texture(Box::new(NoiseTexture::new(4.0))));
-    let world: Vec<Arc<dyn Hittable>> = vec![
-        Arc::new(Sphere::steady(
+    let world: Vec<Box<dyn Hittable>> = vec![
+        Box::new(Sphere::steady(
             Vec3::f32(0.0, -1000., 0.0),
             1000.0,
             material_ground.clone(),
         )),
-        Arc::new(Sphere::steady(
+        Box::new(Sphere::steady(
             Vec3::f32(0.0, 2., 0.0),
             2.0,
             material_ground,
@@ -143,11 +143,11 @@ fn two_perline_spheres() -> Vec<Arc<dyn Hittable>> {
     world
 }
 
-fn earth() -> Vec<Arc<dyn Hittable>> {
+fn earth() -> Vec<Box<dyn Hittable>> {
     let path = env::current_dir().unwrap().join("earthmap.jpg");
     let earth_texture = Box::new(ImageTexture::new(path));
     let earth_surface = Arc::new(Lambertian::with_texture(earth_texture));
-    let globe = Arc::new(Sphere::steady(
+    let globe = Box::new(Sphere::steady(
         Point::f32(0.0, 0.0, 0.0),
         2.0,
         earth_surface,
@@ -156,20 +156,20 @@ fn earth() -> Vec<Arc<dyn Hittable>> {
     vec![globe]
 }
 
-fn simple_light() -> Vec<Arc<dyn Hittable>> {
+fn simple_light() -> Vec<Box<dyn Hittable>> {
     let material_ground = Arc::new(Lambertian::with_texture(Box::new(NoiseTexture::new(4.0))));
-    let world: Vec<Arc<dyn Hittable>> = vec![
-        Arc::new(Sphere::steady(
+    let world: Vec<Box<dyn Hittable>> = vec![
+        Box::new(Sphere::steady(
             Vec3::f32(0.0, -1000., 0.0),
             1000.0,
             material_ground.clone(),
         )),
-        Arc::new(Sphere::steady(
+        Box::new(Sphere::steady(
             Vec3::f32(0.0, 2., 0.0),
             2.0,
             material_ground,
         )),
-        Arc::new(XyRectangle::new(
+        Box::new(XyRectangle::new(
             3.0,
             5.0,
             1.0,
@@ -188,10 +188,10 @@ fn main() {
     let image_width = 1280;
     let image_height = (image_width as f32 / aspect_ration) as i32;
     let samples_per_pixel = 500;
-    let max_depth = 50;
+    let max_depth = 16;
 
     // World And Camera
-    let case = 5;
+    let case = 4;
     let (world, look_from, look_at, aperture, vfov, background) = match case {
         1 => (
             two_spheres(),
@@ -258,13 +258,6 @@ fn main() {
         1.0,
     );
 
-    // Render
-    let current_dir = env::current_dir().unwrap();
-    let mut file = File::create(current_dir.join(format!("{}.ppm", case))).unwrap();
-
-    file.write_all(format!("P3\n{} {}\n255\n", image_width, image_height).as_bytes())
-        .unwrap();
-
     /*  let mut buffs = Vec::with_capacity(image_width);
     for j in (0..=image_height - 1).rev() {
         println!("Scan lines remaining:{}", j);
@@ -306,15 +299,21 @@ fn main() {
                             let r = camera.get_ray(u, v);
                             ray_color(&r, &background, &world, max_depth)
                         })
-                        .sum::<Vec3<f32>>()
+                        .sum()
                 })
-                .collect::<Vec<Vec3<f32>>>()
+                .collect()
         })
-        .collect::<Vec<Vec<Vec3<f32>>>>();
+        .collect::<Image>();
+    // Render
+    let current_dir = env::current_dir().unwrap();
+    let mut file = File::create(current_dir.join(format!("{}.ppm", case))).unwrap();
+
+    file.write_all(format!("P3\n{} {}\n255\n", image_width, image_height).as_bytes())
+        .unwrap();
     write_colors(&mut file, &colors, samples_per_pixel);
 }
 
-fn write_colors(f: &mut File, pixel_colors: &Vec<Vec<Vec3<f32>>>, samples_per_pixel: i32) {
+fn write_colors(f: &mut File, pixel_colors: &Image, samples_per_pixel: i32) {
     let scale = 1.0 / samples_per_pixel as f32;
     for pixel_colors in pixel_colors {
         for pixel_color in pixel_colors {

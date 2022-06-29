@@ -32,7 +32,7 @@ pub trait Hittable: Sync + Send {
     fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB>;
 }
 
-impl Hittable for [Arc<dyn Hittable>] {
+impl Hittable for [Box<dyn Hittable>] {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let mut closet_so_far = t_max;
         let mut record = None;
