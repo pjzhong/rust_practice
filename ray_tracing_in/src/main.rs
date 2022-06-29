@@ -1,6 +1,6 @@
 use rand::{thread_rng, Rng};
 use ray_tracing_in::camera::Camera;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -185,13 +185,13 @@ fn simple_light() -> Vec<Arc<dyn Hittable>> {
 fn main() {
     // Image
     let aspect_ration = 16.0 / 9.0;
-    let image_width = 400;
+    let image_width = 1280;
     let image_height = (image_width as f32 / aspect_ration) as i32;
     let samples_per_pixel = 500;
     let max_depth = 50;
 
     // World And Camera
-    let case = 4;
+    let case = 5;
     let (world, look_from, look_at, aperture, vfov, background) = match case {
         1 => (
             two_spheres(),
@@ -265,39 +265,73 @@ fn main() {
     file.write_all(format!("P3\n{} {}\n255\n", image_width, image_height).as_bytes())
         .unwrap();
 
+    /*  let mut buffs = Vec::with_capacity(image_width);
     for j in (0..=image_height - 1).rev() {
         println!("Scan lines remaining:{}", j);
-        for i in 0..image_width {
-            let pixel_color: Vec3<f32> = (0..samples_per_pixel)
-                .into_par_iter()
-                .map(|_| {
-                    let mut range = thread_rng();
-                    let u = (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
-                    let v = (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
-                    let r = camera.get_ray(u, v);
-                    ray_color(&r, &background, &world, max_depth)
-                })
-                .sum();
+        buffs.clear();
+        (0..image_width)
+            .into_par_iter()
+            .map(|i| {
+                (0..samples_per_pixel)
+                    .into_par_iter()
+                    .map(|_| {
+                        let mut range = thread_rng();
+                        let u = (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
+                        let v = (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
+                        let r = camera.get_ray(u, v);
+                        ray_color(&r, &background, &world, max_depth)
+                    })
+                    .sum()
+            })
+            .collect_into_vec(&mut buffs);
+        write_colors(&mut file, &buffs, samples_per_pixel)
+    }*/
 
-            write_color(&mut file, &pixel_color, samples_per_pixel)
-        }
-    }
+    let colors = (0..image_height + 1)
+        .into_par_iter()
+        .rev()
+        .map(|j| {
+            println!("Scan line:{}", j);
+            (0..image_width)
+                .into_par_iter()
+                .map(|i| {
+                    (0..samples_per_pixel)
+                        .into_par_iter()
+                        .map(|_| {
+                            let mut range = thread_rng();
+                            let u =
+                                (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
+                            let v =
+                                (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
+                            let r = camera.get_ray(u, v);
+                            ray_color(&r, &background, &world, max_depth)
+                        })
+                        .sum::<Vec3<f32>>()
+                })
+                .collect::<Vec<Vec3<f32>>>()
+        })
+        .collect::<Vec<Vec<Vec3<f32>>>>();
+    write_colors(&mut file, &colors, samples_per_pixel);
 }
 
-fn write_color(f: &mut File, pixel_color: &Vec3<f32>, samples_per_pixel: i32) {
+fn write_colors(f: &mut File, pixel_colors: &Vec<Vec<Vec3<f32>>>, samples_per_pixel: i32) {
     let scale = 1.0 / samples_per_pixel as f32;
-    let r = (pixel_color.x * scale).sqrt();
-    let g = (pixel_color.y * scale).sqrt();
-    let b = (pixel_color.z * scale).sqrt();
+    for pixel_colors in pixel_colors {
+        for pixel_color in pixel_colors {
+            let r = (pixel_color.x * scale).sqrt();
+            let g = (pixel_color.y * scale).sqrt();
+            let b = (pixel_color.z * scale).sqrt();
 
-    f.write_all(
-        format!(
-            "{} {} {}\n",
-            (256.0 * clamp(r, 0.0, 0.999)) as i32,
-            (256.0 * clamp(g, 0.0, 0.999)) as i32,
-            (256.0 * clamp(b, 0.0, 0.999)) as i32,
-        )
-        .as_bytes(),
-    )
-    .unwrap();
+            f.write_all(
+                format!(
+                    "{} {} {}\n",
+                    (256.0 * clamp(r, 0.0, 0.999)) as i32,
+                    (256.0 * clamp(g, 0.0, 0.999)) as i32,
+                    (256.0 * clamp(b, 0.0, 0.999)) as i32,
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        }
+    }
 }
