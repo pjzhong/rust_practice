@@ -1,6 +1,10 @@
+use crate::hittable::{HitRecord, Hittable};
+use crate::material::Material;
 use crate::ray::Ray;
+use crate::rectangle::{XyRectangle, XzRectangle, YzRectangle};
 use crate::vec::Vec3;
 use std::mem::swap;
+use std::sync::Arc;
 
 pub mod bvh;
 pub mod camera;
@@ -77,5 +81,80 @@ impl AABB {
         );
 
         Self { minimum, maximum }
+    }
+}
+
+pub struct Boxes {
+    box_min: Point,
+    box_max: Point,
+    sides: Vec<Box<dyn Hittable>>,
+}
+
+impl Boxes {
+    pub fn new(p0: &Point, p1: &Point, material: Arc<dyn Material>) -> Self {
+        Self {
+            sides: vec![
+                Box::new(XyRectangle::new(
+                    p0.x,
+                    p1.x,
+                    p0.y,
+                    p1.y,
+                    p1.z,
+                    material.clone(),
+                )),
+                Box::new(XyRectangle::new(
+                    p0.x,
+                    p1.x,
+                    p0.y,
+                    p1.y,
+                    p0.z,
+                    material.clone(),
+                )),
+                Box::new(XzRectangle::new(
+                    p0.x,
+                    p1.x,
+                    p0.z,
+                    p1.z,
+                    p1.y,
+                    material.clone(),
+                )),
+                Box::new(XzRectangle::new(
+                    p0.x,
+                    p1.x,
+                    p0.z,
+                    p1.z,
+                    p0.y,
+                    material.clone(),
+                )),
+                Box::new(YzRectangle::new(
+                    p0.y,
+                    p1.y,
+                    p0.z,
+                    p1.z,
+                    p1.x,
+                    material.clone(),
+                )),
+                Box::new(YzRectangle::new(
+                    p0.y,
+                    p1.y,
+                    p0.z,
+                    p1.z,
+                    p0.x,
+                    material.clone(),
+                )),
+            ],
+            box_min: *p0,
+            box_max: *p1,
+        }
+    }
+}
+
+impl Hittable for Boxes {
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        self.sides.hit(r, t_min, t_max)
+    }
+
+    fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
+        Some(AABB::new(self.box_min, self.box_max))
     }
 }

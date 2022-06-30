@@ -13,7 +13,7 @@ use ray_tracing_in::rectangle::{XyRectangle, XzRectangle, YzRectangle};
 use ray_tracing_in::sphere::Sphere;
 use ray_tracing_in::texture::{CheckerTexture, ImageTexture, NoiseTexture};
 use ray_tracing_in::vec::Vec3;
-use ray_tracing_in::{clamp, Point};
+use ray_tracing_in::{clamp, Boxes, Point};
 use ray_tracing_in::{Color, Image};
 
 fn ray_color(r: &Ray, background: &Color, world: &[Box<dyn Hittable>], depth: i32) -> Color {
@@ -183,10 +183,9 @@ fn simple_light() -> Vec<Box<dyn Hittable>> {
 }
 
 fn cornell_box() -> Vec<Box<dyn Hittable>> {
-
-    let red = Arc::new(Lambertian::with_color(Color::f32(0.65,0.05, 0.05)));
+    let red = Arc::new(Lambertian::with_color(Color::f32(0.65, 0.05, 0.05)));
     let white = Arc::new(Lambertian::with_color(Color::f32(0.73, 0.73, 0.73)));
-    let green = Arc::new(Lambertian::with_color(Color::f32(0.12,0.45, 0.15)));
+    let green = Arc::new(Lambertian::with_color(Color::f32(0.12, 0.45, 0.15)));
     let light = Arc::new(DiffuseLight::new(Color::f32(15.0, 15.0, 15.0)));
 
     vec![
@@ -194,10 +193,33 @@ fn cornell_box() -> Vec<Box<dyn Hittable>> {
         Box::new(YzRectangle::new(0.0, 555.0, 0.0, 555.0, 0.0, red)),
         Box::new(XzRectangle::new(213.0, 343.0, 227.0, 332.0, 554.0, light)),
         Box::new(XzRectangle::new(0.0, 555.0, 0.0, 555.0, 0.0, white.clone())),
-        Box::new(XzRectangle::new(0.0, 555.0, 0.0, 555.0, 555.0, white.clone())),
-        Box::new(XyRectangle::new(0.0, 555.0, 0.0, 555.0, 555.0, white)),
+        Box::new(XzRectangle::new(
+            0.0,
+            555.0,
+            0.0,
+            555.0,
+            555.0,
+            white.clone(),
+        )),
+        Box::new(XyRectangle::new(
+            0.0,
+            555.0,
+            0.0,
+            555.0,
+            555.0,
+            white.clone(),
+        )),
+        Box::new(Boxes::new(
+            &Point::f32(130.0, 0.0, 65.0),
+            &Point::f32(295.0, 165.0, 230.0),
+            white.clone(),
+        )),
+        Box::new(Boxes::new(
+            &Point::f32(265.0, 0.0, 295.0),
+            &Point::f32(430.0, 330.0, 460.0),
+            white,
+        )),
     ]
-
 }
 
 fn main() {
@@ -207,7 +229,6 @@ fn main() {
     let image_height = (image_width as f32 / aspect_ration) as i32;
     let samples_per_pixel = 300;
     let max_depth = 16;
-
 
     // World And Camera
     let case = 6;
