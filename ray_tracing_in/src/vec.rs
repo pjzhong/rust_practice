@@ -1,7 +1,7 @@
 use rand::{thread_rng, Rng};
 use std::fmt::Debug;
 use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Neg, Sub};
+use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul, MulAssign, Neg, Sub};
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct Vec3<T: Default + Debug + PartialEq + Copy> {
@@ -259,12 +259,14 @@ macro_rules! vec3_impl {
             type Output = $t;
 
             fn index(&self, index: usize) -> &Self::Output {
-                match index {
-                    0 => &self.x,
-                    1 => &self.y,
-                    2 => &self.z,
-                    _ => &0.0,
-                }
+               let index= index % 3;
+               if index == 0 {
+                   &self.x
+               } else if index == 1 {
+                   &self.y
+               } else {
+                   &self.z
+               }
             }
         }
 
@@ -302,6 +304,19 @@ macro_rules! vec3_impl {
             }
         }
 
+
+        impl IndexMut<usize> for Vec3<$t> {
+            fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+                let index= index % 3;
+                if index == 0 {
+                    &mut self.x
+                } else if index == 1 {
+                    &mut self.y
+                } else {
+                    &mut self.z
+                }
+            }
+        }
     )+)
 }
 

@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 
-use ray_tracing_in::hittable::Hittable;
+use ray_tracing_in::hittable::{Hittable, RotateY, Translate};
 use ray_tracing_in::material::{Dielectric, DiffuseLight, Lambertian, Metal};
 use ray_tracing_in::ray::Ray;
 use ray_tracing_in::rectangle::{XyRectangle, XzRectangle, YzRectangle};
@@ -209,30 +209,35 @@ fn cornell_box() -> Vec<Box<dyn Hittable>> {
             555.0,
             white.clone(),
         )),
-        Box::new(Boxes::new(
-            &Point::f32(130.0, 0.0, 65.0),
-            &Point::f32(295.0, 165.0, 230.0),
-            white.clone(),
+        Box::new(Translate::new(
+            Box::new(RotateY::new(
+                Box::new(Boxes::new(
+                    &Point::f32(0.0, 0.0, 0.0),
+                    &Point::f32(165.0, 330.0, 165.0),
+                    white.clone(),
+                )),
+                15.0,
+            )),
+            Vec3::f32(265.0, 0.0, 295.0),
         )),
-        Box::new(Boxes::new(
-            &Point::f32(265.0, 0.0, 295.0),
-            &Point::f32(430.0, 330.0, 460.0),
-            white,
+        Box::new(Translate::new(
+            Box::new(RotateY::new(
+                Box::new(Boxes::new(
+                    &Point::f32(0.0, 0.0, 0.0),
+                    &Point::f32(165.0, 165.0, 165.0),
+                    white,
+                )),
+                -18.0,
+            )),
+            Vec3::f32(130.0, 0.0, 65.0),
         )),
     ]
 }
 
 fn main() {
-    // Image
-    let aspect_ration = 16.0 / 9.0;
-    let image_width = 600;
-    let image_height = (image_width as f32 / aspect_ration) as i32;
-    let samples_per_pixel = 300;
-    let max_depth = 16;
-
     // World And Camera
     let case = 6;
-    let (world, look_from, look_at, aperture, vfov, background) = match case {
+    let (world, look_from, look_at, aperture, vfov, background, aspect_ration) = match case {
         1 => (
             two_spheres(),
             Vec3::f32(13.0, 2.0, 3.0),
@@ -240,6 +245,7 @@ fn main() {
             0.1,
             20.0,
             Color::f32(0.70, 0.80, 1.00),
+            16.0 / 9.0,
         ),
         2 => (
             two_perline_spheres(),
@@ -248,6 +254,7 @@ fn main() {
             0.1,
             20.0,
             Color::f32(0.70, 0.80, 1.00),
+            16.0 / 9.0,
         ),
         3 => (
             earth(),
@@ -256,6 +263,7 @@ fn main() {
             0.1,
             20.0,
             Color::f32(0.70, 0.80, 1.00),
+            16.0 / 9.0,
         ),
         4 => (
             random_scene(),
@@ -264,6 +272,7 @@ fn main() {
             0.1,
             20.0,
             Color::f32(0.70, 0.80, 1.00),
+            16.0 / 9.0,
         ),
         5 => (
             simple_light(),
@@ -272,6 +281,7 @@ fn main() {
             0.1,
             20.0,
             Color::f32(0.0, 0.0, 0.00),
+            16.0 / 9.0,
         ),
         6 => (
             cornell_box(),
@@ -280,6 +290,7 @@ fn main() {
             0.1,
             40.0,
             Color::f32(0.0, 0.0, 0.00),
+            1.0,
         ),
         _ => (
             vec![],
@@ -288,8 +299,14 @@ fn main() {
             0.0,
             0.0,
             Color::default(),
+            16.0 / 9.0,
         ),
     };
+
+    let image_width = 800;
+    let image_height = (image_width as f32 / aspect_ration) as i32;
+    let samples_per_pixel = 300;
+    let max_depth = 16;
 
     let vup = Vec3::f32(0.0, 1.0, 0.0);
     let dist_to_focus = 10.0;

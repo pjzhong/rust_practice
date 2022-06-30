@@ -66,3 +66,125 @@ impl Hittable for [Box<dyn Hittable>] {
         result
     }
 }
+
+pub struct Translate {
+    offset: Vec3<f32>,
+    hittable: Box<dyn Hittable>,
+}
+
+impl Translate {
+    pub fn new(hittable: Box<dyn Hittable>, offset: Vec3<f32>) -> Self {
+        Self { offset, hittable }
+    }
+}
+
+impl Hittable for Translate {
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let move_r = Ray::new(*r.origin() - self.offset, *r.dir(), r.time());
+        self.hittable.hit(&move_r, t_min, t_max).map(|mut rec| {
+            rec.p += self.offset;
+            (rec.front_face, rec.normal) = HitRecord::calc_face_normal(&move_r, &rec.normal);
+
+            rec
+        })
+    }
+
+    fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB> {
+        self.hittable
+            .bounding_box(time0, time1)
+            .map(|aabb| AABB::new(aabb.minimum + self.offset, aabb.maximum + self.offset))
+    }
+}
+
+pub struct RotateY {
+    sin_theta: f32,
+    cos_theta: f32,
+    aabb: Option<AABB>,
+    hittable: Box<dyn Hittable>,
+}
+
+impl RotateY {
+    pub fn new(hittable: Box<dyn Hittable>, angle: f32) -> Self {
+        let radians = angle.to_radians();
+        let sin_theta = radians.sin();
+        let cos_theta = radians.cos();
+        let aabb = hittable.bounding_box(0.0, 1.0);
+
+        let mut min = Vec3::f32(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let mut max = -Vec3::f32(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        if let Some(aabb) = &aabb {
+            for i in 0..2 {
+                for j in 0..2 {
+                    for k in 0..2 {
+                        let (i, j, k) = (i as f32, j as f32, k as f32);
+                        let x = i * aabb.max().x + (1.0 - i) * aabb.min().x;
+                        let y = j * aabb.max().y + (1.0 - j) * aabb.min().y;
+                        let z = k * aabb.max().z + (1.0 - k) * aabb.min().z;
+
+                        let newx = cos_theta * x + sin_theta * z;
+                        let newz = -sin_theta * x + cos_theta * z;
+
+                        let tester = Vec3::f32(newx, y, newz);
+
+                        for c in 0..3 {
+                            min[c] = min[c].min(tester[c]);
+                            max[c] = max[c].max(tester[c]);
+                        }
+                    }
+                }
+            }
+        }
+
+        Self {
+            sin_theta,
+            cos_theta,
+            aabb: Some(AABB::new(min, max)),
+            hittable,
+        }
+    }
+}
+
+impl Hittable for RotateY {
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let origin = Vec3::f32(
+            self.cos_theta * r.origin().x - self.sin_theta * r.origin().z,
+            r.origin().y,
+            self.sin_theta * r.origin().x + self.cos_theta * r.origin().z,
+        );
+        let direction = Vec3::f32(
+            self.cos_theta * r.dir().x - self.sin_theta * r.dir().z,
+            r.dir().y,
+            self.sin_theta * r.dir().x + self.cos_theta * r.dir().z,
+        );
+
+        let rotated_r = Ray::new(origin, direction, r.time());
+        if let Some(hit) = self.hittable.hit(&rotated_r, t_min, t_max) {
+            let p = Vec3::f32(
+                self.cos_theta * hit.p.x + self.sin_theta * hit.p.z,
+                hit.p.y,
+                -self.sin_theta * hit.p.x + self.cos_theta * hit.p.z,
+            );
+            let normal = Vec3::f32(
+                self.cos_theta * hit.normal.x + self.sin_theta * hit.normal.z,
+                hit.normal.y,
+                -self.sin_theta * hit.normal.x + self.cos_theta * hit.normal.z,
+            );
+            let (front_face, normal) = HitRecord::calc_face_normal(&rotated_r, &normal);
+            Some(HitRecord {
+                t: hit.t,
+                u: hit.u,
+                v: hit.v,
+                p,
+                normal,
+                front_face,
+                material: hit.material.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
+        self.aabb
+    }
+}
