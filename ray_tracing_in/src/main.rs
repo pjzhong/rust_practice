@@ -9,7 +9,7 @@ use std::sync::Arc;
 use ray_tracing_in::hittable::Hittable;
 use ray_tracing_in::material::{Dielectric, DiffuseLight, Lambertian, Metal};
 use ray_tracing_in::ray::Ray;
-use ray_tracing_in::rectangle::XyRectangle;
+use ray_tracing_in::rectangle::{XyRectangle, XzRectangle, YzRectangle};
 use ray_tracing_in::sphere::Sphere;
 use ray_tracing_in::texture::{CheckerTexture, ImageTexture, NoiseTexture};
 use ray_tracing_in::vec::Vec3;
@@ -182,16 +182,35 @@ fn simple_light() -> Vec<Box<dyn Hittable>> {
     world
 }
 
+fn cornell_box() -> Vec<Box<dyn Hittable>> {
+
+    let red = Arc::new(Lambertian::with_color(Color::f32(0.65,0.05, 0.05)));
+    let white = Arc::new(Lambertian::with_color(Color::f32(0.73, 0.73, 0.73)));
+    let green = Arc::new(Lambertian::with_color(Color::f32(0.12,0.45, 0.15)));
+    let light = Arc::new(DiffuseLight::new(Color::f32(15.0, 15.0, 15.0)));
+
+    vec![
+        Box::new(YzRectangle::new(0.0, 555.0, 0.0, 555.0, 555.0, green)),
+        Box::new(YzRectangle::new(0.0, 555.0, 0.0, 555.0, 0.0, red)),
+        Box::new(XzRectangle::new(213.0, 343.0, 227.0, 332.0, 554.0, light)),
+        Box::new(XzRectangle::new(0.0, 555.0, 0.0, 555.0, 0.0, white.clone())),
+        Box::new(XzRectangle::new(0.0, 555.0, 0.0, 555.0, 555.0, white.clone())),
+        Box::new(XyRectangle::new(0.0, 555.0, 0.0, 555.0, 555.0, white)),
+    ]
+
+}
+
 fn main() {
     // Image
     let aspect_ration = 16.0 / 9.0;
-    let image_width = 1280;
+    let image_width = 600;
     let image_height = (image_width as f32 / aspect_ration) as i32;
-    let samples_per_pixel = 500;
+    let samples_per_pixel = 300;
     let max_depth = 16;
 
+
     // World And Camera
-    let case = 4;
+    let case = 6;
     let (world, look_from, look_at, aperture, vfov, background) = match case {
         1 => (
             two_spheres(),
@@ -233,6 +252,14 @@ fn main() {
             20.0,
             Color::f32(0.0, 0.0, 0.00),
         ),
+        6 => (
+            cornell_box(),
+            Vec3::f32(278.0, 278.0, -800.0),
+            Vec3::f32(278.0, 278.0, 0.0),
+            0.1,
+            40.0,
+            Color::f32(0.0, 0.0, 0.00),
+        ),
         _ => (
             vec![],
             Vec3::default(),
@@ -257,28 +284,6 @@ fn main() {
         0.0,
         1.0,
     );
-
-    /*  let mut buffs = Vec::with_capacity(image_width);
-    for j in (0..=image_height - 1).rev() {
-        println!("Scan lines remaining:{}", j);
-        buffs.clear();
-        (0..image_width)
-            .into_par_iter()
-            .map(|i| {
-                (0..samples_per_pixel)
-                    .into_par_iter()
-                    .map(|_| {
-                        let mut range = thread_rng();
-                        let u = (i as f32 + range.gen_range(0.0..1.0)) / (image_width - 1) as f32;
-                        let v = (j as f32 + range.gen_range(0.0..1.0)) / (image_height - 1) as f32;
-                        let r = camera.get_ray(u, v);
-                        ray_color(&r, &background, &world, max_depth)
-                    })
-                    .sum()
-            })
-            .collect_into_vec(&mut buffs);
-        write_colors(&mut file, &buffs, samples_per_pixel)
-    }*/
 
     let colors = (0..image_height + 1)
         .into_par_iter()
