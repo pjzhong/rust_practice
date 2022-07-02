@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 
-use ray_tracing_in::hittable::{Hittable, RotateY, Translate};
+use ray_tracing_in::hittable::{ConstantMedium, Hittable, RotateY, Translate};
 use ray_tracing_in::material::{Dielectric, DiffuseLight, Lambertian, Metal};
 use ray_tracing_in::ray::Ray;
 use ray_tracing_in::rectangle::{XyRectangle, XzRectangle, YzRectangle};
@@ -234,78 +234,156 @@ fn cornell_box() -> Vec<Box<dyn Hittable>> {
     ]
 }
 
+fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
+    let red = Arc::new(Lambertian::with_color(Color::f32(0.65, 0.05, 0.05)));
+    let white = Arc::new(Lambertian::with_color(Color::f32(0.73, 0.73, 0.73)));
+    let green = Arc::new(Lambertian::with_color(Color::f32(0.12, 0.45, 0.15)));
+    let light = Arc::new(DiffuseLight::new(Color::f32(7.0, 7.0, 7.0)));
+
+    vec![
+        Box::new(YzRectangle::new(0.0, 555.0, 0.0, 555.0, 555.0, green)),
+        Box::new(YzRectangle::new(0.0, 555.0, 0.0, 555.0, 0.0, red)),
+        Box::new(XzRectangle::new(113.0, 443.0, 127.0, 432.0, 554.0, light)),
+        Box::new(XzRectangle::new(0.0, 555.0, 0.0, 555.0, 0.0, white.clone())),
+        Box::new(XzRectangle::new(
+            0.0,
+            555.0,
+            0.0,
+            555.0,
+            555.0,
+            white.clone(),
+        )),
+        Box::new(XyRectangle::new(
+            0.0,
+            555.0,
+            0.0,
+            555.0,
+            555.0,
+            white.clone(),
+        )),
+        Box::new(ConstantMedium::new(
+            Box::new(Translate::new(
+                Box::new(RotateY::new(
+                    Box::new(Boxes::new(
+                        &Point::f32(0.0, 0.0, 0.0),
+                        &Point::f32(165.0, 330.0, 165.0),
+                        white.clone(),
+                    )),
+                    15.0,
+                )),
+                Vec3::f32(265.0, 0.0, 295.0),
+            )),
+            0.01,
+            Color::f32(0.0, 0.0, 0.0),
+        )),
+        Box::new(ConstantMedium::new(
+            Box::new(Translate::new(
+                Box::new(RotateY::new(
+                    Box::new(Boxes::new(
+                        &Point::f32(0.0, 0.0, 0.0),
+                        &Point::f32(165.0, 165.0, 165.0),
+                        white,
+                    )),
+                    -18.0,
+                )),
+                Vec3::f32(130.0, 0.0, 65.0),
+            )),
+            0.01,
+            Color::f32(1.0, 1.0, 1.0),
+        )),
+    ]
+}
+
 fn main() {
     // World And Camera
-    let case = 6;
-    let (world, look_from, look_at, aperture, vfov, background, aspect_ration) = match case {
-        1 => (
-            two_spheres(),
-            Vec3::f32(13.0, 2.0, 3.0),
-            Vec3::f32(0.0, 0.0, 0.0),
-            0.1,
-            20.0,
-            Color::f32(0.70, 0.80, 1.00),
-            16.0 / 9.0,
-        ),
-        2 => (
-            two_perline_spheres(),
-            Vec3::f32(13.0, 2.0, 3.0),
-            Vec3::f32(0.0, 0.0, 0.0),
-            0.1,
-            20.0,
-            Color::f32(0.70, 0.80, 1.00),
-            16.0 / 9.0,
-        ),
-        3 => (
-            earth(),
-            Vec3::f32(13.0, 2.0, 3.0),
-            Vec3::f32(0.0, 0.0, 0.0),
-            0.1,
-            20.0,
-            Color::f32(0.70, 0.80, 1.00),
-            16.0 / 9.0,
-        ),
-        4 => (
-            random_scene(),
-            Vec3::f32(13.0, 2.0, 3.0),
-            Vec3::f32(0.0, 0.0, 0.0),
-            0.1,
-            20.0,
-            Color::f32(0.70, 0.80, 1.00),
-            16.0 / 9.0,
-        ),
-        5 => (
-            simple_light(),
-            Vec3::f32(26.0, 3.0, 6.0),
-            Vec3::f32(0.0, 2.0, 0.0),
-            0.1,
-            20.0,
-            Color::f32(0.0, 0.0, 0.00),
-            16.0 / 9.0,
-        ),
-        6 => (
-            cornell_box(),
-            Vec3::f32(278.0, 278.0, -800.0),
-            Vec3::f32(278.0, 278.0, 0.0),
-            0.1,
-            40.0,
-            Color::f32(0.0, 0.0, 0.00),
-            1.0,
-        ),
-        _ => (
-            vec![],
-            Vec3::default(),
-            Vec3::default(),
-            0.0,
-            0.0,
-            Color::default(),
-            16.0 / 9.0,
-        ),
-    };
+    let case = 7;
+    let (world, look_from, look_at, aperture, vfov, background, aspect_ration, samples_per_pixel) =
+        match case {
+            1 => (
+                two_spheres(),
+                Vec3::f32(13.0, 2.0, 3.0),
+                Vec3::f32(0.0, 0.0, 0.0),
+                0.1,
+                20.0,
+                Color::f32(0.70, 0.80, 1.00),
+                16.0 / 9.0,
+                300,
+            ),
+            2 => (
+                two_perline_spheres(),
+                Vec3::f32(13.0, 2.0, 3.0),
+                Vec3::f32(0.0, 0.0, 0.0),
+                0.1,
+                20.0,
+                Color::f32(0.70, 0.80, 1.00),
+                16.0 / 9.0,
+                300,
+            ),
+            3 => (
+                earth(),
+                Vec3::f32(13.0, 2.0, 3.0),
+                Vec3::f32(0.0, 0.0, 0.0),
+                0.1,
+                20.0,
+                Color::f32(0.70, 0.80, 1.00),
+                16.0 / 9.0,
+                300,
+            ),
+            4 => (
+                random_scene(),
+                Vec3::f32(13.0, 2.0, 3.0),
+                Vec3::f32(0.0, 0.0, 0.0),
+                0.1,
+                20.0,
+                Color::f32(0.70, 0.80, 1.00),
+                16.0 / 9.0,
+                300,
+            ),
+            5 => (
+                simple_light(),
+                Vec3::f32(26.0, 3.0, 6.0),
+                Vec3::f32(0.0, 2.0, 0.0),
+                0.1,
+                20.0,
+                Color::f32(0.0, 0.0, 0.00),
+                16.0 / 9.0,
+                300,
+            ),
+            6 => (
+                cornell_box(),
+                Vec3::f32(278.0, 278.0, -800.0),
+                Vec3::f32(278.0, 278.0, 0.0),
+                0.1,
+                40.0,
+                Color::f32(0.0, 0.0, 0.00),
+                1.0,
+                300,
+            ),
+            7 => (
+                cornell_smoke(),
+                Vec3::f32(278.0, 278.0, -800.0),
+                Vec3::f32(278.0, 278.0, 0.0),
+                0.1,
+                40.0,
+                Color::f32(0.0, 0.0, 0.00),
+                1.0,
+                300,
+            ),
+            _ => (
+                vec![],
+                Vec3::default(),
+                Vec3::default(),
+                0.0,
+                0.0,
+                Color::default(),
+                16.0 / 9.0,
+                1,
+            ),
+        };
 
-    let image_width = 800;
+    let image_width = 1280;
     let image_height = (image_width as f32 / aspect_ration) as i32;
-    let samples_per_pixel = 300;
+
     let max_depth = 16;
 
     let vup = Vec3::f32(0.0, 1.0, 0.0);
@@ -323,7 +401,8 @@ fn main() {
         1.0,
     );
 
-    let colors = (0..image_height + 1)
+    let mut buffers: Image = Vec::with_capacity(image_height as usize);
+    (0..image_height + 1)
         .into_par_iter()
         .rev()
         .map(|j| {
@@ -346,14 +425,14 @@ fn main() {
                 })
                 .collect()
         })
-        .collect::<Image>();
+        .collect_into_vec(&mut buffers);
     // Render
     let current_dir = env::current_dir().unwrap();
     let mut file = File::create(current_dir.join(format!("{}.ppm", case))).unwrap();
 
     file.write_all(format!("P3\n{} {}\n255\n", image_width, image_height).as_bytes())
         .unwrap();
-    write_colors(&mut file, &colors, samples_per_pixel);
+    write_colors(&mut file, &buffers, samples_per_pixel);
 }
 
 fn write_colors(f: &mut File, pixel_colors: &Image, samples_per_pixel: i32) {

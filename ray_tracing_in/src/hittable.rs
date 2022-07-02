@@ -1,6 +1,8 @@
 use crate::material::Material;
 use crate::ray::Ray;
-use crate::{Vec3, AABB};
+use crate::texture::{SolidColor, Texture};
+use crate::{Color, Vec3, AABB};
+use rand::Rng;
 use std::sync::Arc;
 
 pub struct HitRecord {
@@ -186,5 +188,94 @@ impl Hittable for RotateY {
 
     fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
         self.aabb
+    }
+}
+
+pub struct ConstantMedium {
+    neg_inv_density: f32,
+    boundary: Box<dyn Hittable>,
+    phase_function: Arc<dyn Material>,
+}
+
+impl ConstantMedium {
+    pub fn new(boundary: Box<dyn Hittable>, neg_inv_density: f32, c: Color) -> Self {
+        Self {
+            boundary,
+            neg_inv_density: -1.0 / neg_inv_density,
+            phase_function: Arc::new(Isotropic::new(c)),
+        }
+    }
+}
+
+impl Hittable for ConstantMedium {
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        if let Some(rec1) = self.boundary.hit(r, -f32::INFINITY, f32::INFINITY) {
+            if let Some(rec2) = self.boundary.hit(r, rec1.t + 0.001, f32::INFINITY) {
+                let (mut rec1_t, mut rec2_t) = (rec1.t, rec2.t);
+                if rec1_t < t_min {
+                    rec1_t = t_min;
+                }
+                if t_max < rec2_t {
+                    rec2_t = t_max
+                }
+
+                if rec2_t <= rec1_t {
+                    return None;
+                }
+
+                if rec1_t < 0.0 {
+                    rec1_t = 0.0;
+                }
+
+                let mut rang = rand::thread_rng();
+                let ray_length = r.dir().length();
+                let distance_inside_boundary = (rec2_t - rec1_t) * ray_length;
+                let hit_distance =
+                    self.neg_inv_density * rang.gen_range(0.0..1.0f32).log(std::f32::consts::E);
+
+                if distance_inside_boundary < hit_distance {
+                    return None;
+                }
+
+                let t = rec1_t + hit_distance / ray_length;
+                Some(HitRecord {
+                    t,
+                    u: rec1.u,
+                    v: rec1.v,
+                    p: r.at(t),
+                    front_face: true,
+                    material: self.phase_function.clone(),
+                    normal: Vec3::f32(1.0, 0.0, 0.0),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB> {
+        self.boundary.bounding_box(time0, time1)
+    }
+}
+pub struct Isotropic {
+    albedo: Box<dyn Texture>,
+}
+
+impl Isotropic {
+    pub fn new(c: Color) -> Self {
+        Self {
+            albedo: Box::new(SolidColor::new(c)),
+        }
+    }
+}
+
+impl Material for Isotropic {
+    fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
+        Some((
+            self.albedo.value(rec.u, rec.v, &rec.p),
+            Ray::new(rec.p, Vec3::<f32>::random_in_unit_sphere(), r.time()),
+        ))
     }
 }
