@@ -1,169 +1,75 @@
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
-use crate::{Point, Ray, Vec3, AABB};
-use std::sync::Arc;
+use crate::vec::Axis;
+use crate::{Ray, Vec3, AABB};
 
-pub struct XyRectangle {
-    x0: f32,
-    x1: f32,
-    y0: f32,
-    y1: f32,
-    k: f32,
-    material: Arc<dyn Material>,
+pub enum Plane {
+    YZ,
+    ZX,
+    XY,
 }
 
-impl XyRectangle {
-    pub fn new(x0: f32, x1: f32, y0: f32, y1: f32, k: f32, material: Arc<dyn Material>) -> Self {
+pub struct AARect<M: Material> {
+    plane: Plane,
+    a0: f32,
+    a1: f32,
+    b0: f32,
+    b1: f32,
+    k: f32,
+    material: M,
+}
+
+impl<M: Material> AARect<M> {
+    pub fn new(plane: Plane, a0: f32, a1: f32, b0: f32, b1: f32, k: f32, material: M) -> Self {
         Self {
-            x0,
-            x1,
-            y0,
-            y1,
+            a0,
+            a1,
+            b0,
+            b1,
             k,
+            plane,
             material,
         }
     }
 }
 
-impl Hittable for XyRectangle {
+impl<M: Material> Hittable for AARect<M> {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let (k_axis, a_axis, b_axis) = match self.plane {
+            Plane::YZ => (Axis::X, Axis::Y, Axis::Z),
+            Plane::ZX => (Axis::Y, Axis::Z, Axis::X),
+            Plane::XY => (Axis::Z, Axis::X, Axis::Y),
+        };
         let t = (self.k - r.origin().z) / r.dir().z;
-        if t < t_min || t_max < t {
-            return None;
-        }
+        if t < t_min || t_max <= t {
+            None
+        } else {
+            let a = r.origin()[a_axis] + t * r.dir()[a_axis];
+            let b = r.origin()[b_axis] + t * r.dir()[b_axis];
+            if a < self.a0 || self.a1 < a || b < self.b0 || self.b1 < b {
+                return None;
+            }
 
-        let x = r.origin().x + t * r.dir().x;
-        let y = r.origin().y + t * r.dir().y;
-        if x < self.x0 || self.x1 < x || y < self.y0 || self.y1 < y {
-            return None;
+            let normal = {
+                let mut v = Vec3::f32(0.0, 0.0, 0.0);
+                v[k_axis] = 1.0;
+                v
+            };
+            Some(HitRecord {
+                u: (a - self.a0) / (self.a1 - self.a0),
+                v: (b - self.b0) / (self.b1 - self.b0),
+                t,
+                normal,
+                p: r.at(t),
+                material: &self.material,
+            })
         }
-
-        let (front_face, normal) = HitRecord::calc_face_normal(r, &Vec3::f32(0.0, 0.0, 1.0));
-        Some(HitRecord {
-            u: (x - self.x0) / (self.x1 - self.x0),
-            v: (y - self.y0) / (self.y1 - self.y0),
-            t,
-            front_face,
-            normal,
-            p: r.at(t),
-            material: self.material.clone(),
-        })
     }
 
     fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
         Some(AABB::new(
-            Vec3::f32(self.x0, self.y0, self.k - 0.0001),
-            Vec3::f32(self.x1, self.y1, self.k + 0.0001),
-        ))
-    }
-}
-
-pub struct XzRectangle {
-    x0: f32,
-    x1: f32,
-    z0: f32,
-    z1: f32,
-    k: f32,
-    material: Arc<dyn Material>,
-}
-
-impl XzRectangle {
-    pub fn new(x0: f32, x1: f32, z0: f32, z1: f32, k: f32, material: Arc<dyn Material>) -> Self {
-        Self {
-            x0,
-            x1,
-            z0,
-            z1,
-            k,
-            material,
-        }
-    }
-}
-
-impl Hittable for XzRectangle {
-    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
-        let t = (self.k - r.origin().y) / r.dir().y;
-        if t < t_min || t_max < t {
-            return None;
-        }
-
-        let x = r.origin().x + t * r.dir().x;
-        let z = r.origin().z + t * r.dir().z;
-        if x < self.x0 || self.x1 < x || z < self.z0 || self.z1 < z {
-            return None;
-        }
-
-        let (front_face, normal) = HitRecord::calc_face_normal(r, &Vec3::f32(0.0, 1.0, 0.0));
-        Some(HitRecord {
-            u: (x - self.x0) / (self.x1 - self.x0),
-            v: (z - self.z0) / (self.z1 - self.z0),
-            t,
-            front_face,
-            normal,
-            p: r.at(t),
-            material: self.material.clone(),
-        })
-    }
-
-    fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
-        Some(AABB::new(
-            Vec3::f32(self.x0, self.k - 0.0001, self.z0),
-            Vec3::f32(self.x1, self.k + 0.0001, self.z1),
-        ))
-    }
-}
-
-pub struct YzRectangle {
-    y0: f32,
-    y1: f32,
-    z0: f32,
-    z1: f32,
-    k: f32,
-    material: Arc<dyn Material>,
-}
-
-impl YzRectangle {
-    pub fn new(y0: f32, y1: f32, z0: f32, z1: f32, k: f32, material: Arc<dyn Material>) -> Self {
-        Self {
-            y0,
-            y1,
-            z0,
-            z1,
-            k,
-            material,
-        }
-    }
-}
-
-impl Hittable for YzRectangle {
-    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
-        let t = (self.k - r.origin().x) / r.dir().x;
-        if t < t_min || t_max < t {
-            return None;
-        }
-
-        let y = r.origin().y + t * r.dir().y;
-        let z = r.origin().z + t * r.dir().z;
-        if y < self.y0 || self.y1 < y || z < self.z0 || self.z1 < z {
-            return None;
-        }
-
-        let (front_face, normal) = HitRecord::calc_face_normal(r, &Vec3::f32(1.0, 0.0, 0.0));
-        Some(HitRecord {
-            u: (y - self.y0) / (self.y1 - self.y0),
-            v: (z - self.z0) / (self.z1 - self.z0),
-            t,
-            front_face,
-            normal,
-            p: r.at(t),
-            material: self.material.clone(),
-        })
-    }
-
-    fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
-        Some(AABB::new(
-            Point::f32(self.k - 0.0001, self.y0, self.z0),
-            Point::f32(self.k + 0.0001, self.y1, self.z1),
+            Vec3::f32(self.a0, self.b0, self.k - 0.0001),
+            Vec3::f32(self.a1, self.b1, self.k + 0.0001),
         ))
     }
 }

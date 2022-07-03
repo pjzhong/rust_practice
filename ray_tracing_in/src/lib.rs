@@ -1,10 +1,11 @@
+extern crate core;
+
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
 use crate::ray::Ray;
-use crate::rectangle::{XyRectangle, XzRectangle, YzRectangle};
-use crate::vec::Vec3;
+use crate::rectangle::{AARect, Plane};
+use crate::vec::{Axis, Vec3};
 use std::mem::swap;
-use std::sync::Arc;
 
 pub mod bvh;
 pub mod camera;
@@ -31,7 +32,7 @@ pub fn clamp(x: f32, min: f32, max: f32) -> f32 {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct AABB {
     minimum: Vec3<f32>,
     maximum: Vec3<f32>,
@@ -51,16 +52,16 @@ impl AABB {
     }
 
     pub fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> bool {
-        for a in 0..3 {
+        for a in Axis::values() {
             let inv_d = 1.0 / r.dir()[a];
-            let mut t0 = (self.min()[a] - r.origin()[a]) * inv_d;
-            let mut t1 = (self.max()[a] - r.origin()[a]) * inv_d;
+            let mut t0 = (self.minimum[a] - r.origin()[a]) * inv_d;
+            let mut t1 = (self.maximum[a] - r.origin()[a]) * inv_d;
             if inv_d < 0.0 {
                 swap(&mut t0, &mut t1);
             }
 
             let t_min = t_min.max(t0);
-            let t_max = t_max.max(t1);
+            let t_max = t_max.min(t1);
             if t_max <= t_min {
                 return false;
             }
@@ -70,31 +71,32 @@ impl AABB {
 
     pub fn surrounding_box(box0: &AABB, box1: &AABB) -> Self {
         let minimum = Vec3::f32(
-            box0.min().x.min(box1.min().x),
-            box0.min().y.min(box1.min().y),
-            box0.min().z.min(box1.min().z),
+            box0.minimum.x.min(box1.minimum.x),
+            box0.minimum.y.min(box1.minimum.y),
+            box0.minimum.z.min(box1.minimum.z),
         );
         let maximum = Vec3::f32(
-            box0.max().x.max(box1.max().x),
-            box0.max().y.max(box1.max().y),
-            box0.max().z.max(box1.max().z),
+            box0.maximum.x.max(box1.maximum.x),
+            box0.maximum.y.max(box1.maximum.y),
+            box0.maximum.z.max(box1.maximum.z),
         );
 
         Self { minimum, maximum }
     }
 }
 
-pub struct Boxes {
+pub struct Cube {
     box_min: Point,
     box_max: Point,
     sides: Vec<Box<dyn Hittable>>,
 }
 
-impl Boxes {
-    pub fn new(p0: &Point, p1: &Point, material: Arc<dyn Material>) -> Self {
+impl Cube {
+    pub fn new<M: Material + Clone + 'static>(p0: &Point, p1: &Point, material: M) -> Self {
         Self {
             sides: vec![
-                Box::new(XyRectangle::new(
+                Box::new(AARect::new(
+                    Plane::YZ,
                     p0.x,
                     p1.x,
                     p0.y,
@@ -102,7 +104,8 @@ impl Boxes {
                     p1.z,
                     material.clone(),
                 )),
-                Box::new(XyRectangle::new(
+                Box::new(AARect::new(
+                    Plane::YZ,
                     p0.x,
                     p1.x,
                     p0.y,
@@ -110,7 +113,8 @@ impl Boxes {
                     p0.z,
                     material.clone(),
                 )),
-                Box::new(XzRectangle::new(
+                Box::new(AARect::new(
+                    Plane::ZX,
                     p0.x,
                     p1.x,
                     p0.z,
@@ -118,7 +122,8 @@ impl Boxes {
                     p1.y,
                     material.clone(),
                 )),
-                Box::new(XzRectangle::new(
+                Box::new(AARect::new(
+                    Plane::ZX,
                     p0.x,
                     p1.x,
                     p0.z,
@@ -126,7 +131,8 @@ impl Boxes {
                     p0.y,
                     material.clone(),
                 )),
-                Box::new(YzRectangle::new(
+                Box::new(AARect::new(
+                    Plane::XY,
                     p0.y,
                     p1.y,
                     p0.z,
@@ -134,13 +140,14 @@ impl Boxes {
                     p1.x,
                     material.clone(),
                 )),
-                Box::new(YzRectangle::new(
+                Box::new(AARect::new(
+                    Plane::XY,
                     p0.y,
                     p1.y,
                     p0.z,
                     p1.z,
                     p0.x,
-                    material.clone(),
+                    material,
                 )),
             ],
             box_min: *p0,
@@ -149,7 +156,7 @@ impl Boxes {
     }
 }
 
-impl Hittable for Boxes {
+impl Hittable for Cube {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         self.sides.hit(r, t_min, t_max)
     }

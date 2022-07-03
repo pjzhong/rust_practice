@@ -3,19 +3,20 @@ use crate::{clamp, Color, Point};
 use stb_image::image::LoadResult::{Error, ImageF32, ImageU8};
 use std::fmt::Debug;
 use std::path::Path;
-use std::sync::Arc;
 
 pub trait Texture: Sync + Send {
     fn value(&self, u: f32, v: f32, p: &Point) -> Color;
 }
-
+#[derive(Clone)]
 pub struct SolidColor {
-    color: Color,
+    pub color: Color,
 }
 
 impl SolidColor {
-    pub fn new(color: Color) -> Self {
-        Self { color }
+    pub fn new(r: f32, g: f32, b: f32) -> Self {
+        Self {
+            color: Color::f32(r, g, b),
+        }
     }
 }
 
@@ -25,25 +26,19 @@ impl Texture for SolidColor {
     }
 }
 
-pub struct CheckerTexture {
-    odd: Arc<dyn Texture>,
-    even: Arc<dyn Texture>,
+#[derive(Clone)]
+pub struct CheckerTexture<T: Texture> {
+    odd: T,
+    even: T,
 }
 
-impl CheckerTexture {
-    pub fn with_texture(odd: Arc<dyn Texture>, even: Arc<dyn Texture>) -> Self {
+impl<T: Texture> CheckerTexture<T> {
+    pub fn new(odd: T, even: T) -> Self {
         Self { odd, even }
     }
-
-    pub fn with_color(odd: Color, even: Color) -> Self {
-        Self {
-            odd: Arc::new(SolidColor::new(odd)),
-            even: Arc::new(SolidColor::new(even)),
-        }
-    }
 }
 
-impl Texture for CheckerTexture {
+impl<T: Texture> Texture for CheckerTexture<T> {
     fn value(&self, u: f32, v: f32, p: &Point) -> Color {
         let sines = (10.0 * p.x).sin() * (10.0 * p.y).sin() * (10.0 * p.z).sin();
         if sines < 0.0 {
@@ -53,7 +48,7 @@ impl Texture for CheckerTexture {
         }
     }
 }
-
+#[derive(Clone)]
 pub struct NoiseTexture {
     noise: Perlin,
     scale: f32,

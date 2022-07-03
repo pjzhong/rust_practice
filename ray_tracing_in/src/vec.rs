@@ -10,6 +10,20 @@ pub struct Vec3<T: Default + Debug + PartialEq + Copy> {
     pub z: T,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum Axis {
+    X,
+    Y,
+    Z,
+}
+
+impl Axis {
+    pub fn values() -> [Axis; 3] {
+        const VALUES: [Axis; 3] = [Axis::X, Axis::Y, Axis::Z];
+        VALUES
+    }
+}
+
 macro_rules! vec3_impl {
     ($($t:ty)+, $n:ident) => ($(
 
@@ -63,7 +77,7 @@ macro_rules! vec3_impl {
             }
 
             pub fn length(&self) -> $t {
-                (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+                self.dot_product(self).sqrt()
             }
 
             pub fn length_squared(&self) -> $t {
@@ -102,12 +116,18 @@ macro_rules! vec3_impl {
                 return self - &(2.0 * self.dot_product(n) * n) ;
             }
 
-            pub fn refract(&self, n: &Self, etai_over_eta: $t) -> Self {
-                let cos_theta = (-self).dot_product(n).min(1.0);
-                let r_out_perp = etai_over_eta * (*self + cos_theta * n);
-                let r_out_parallel = -((1.0 - r_out_perp.length_squared()).abs().sqrt()) * n;
-                r_out_perp + r_out_parallel
+            #[inline]
+            pub fn refract(&self, n: &Vec3<$t>, ni_over_nt: $t) -> Option<Vec3<$t>> {
+                let uv = self.normalize();
+                let dt = uv.dot_product(n);
+                let discriminant = 1.0 - ni_over_nt * ni_over_nt * (1. - dt * dt);
+                if discriminant > 0. {
+                    Some(ni_over_nt * (uv - dt * n) - discriminant.sqrt() * n)
+                } else {
+                    None
+                }
             }
+
          }
 
         impl Add for Vec3<$t> {
@@ -255,21 +275,6 @@ macro_rules! vec3_impl {
             }
         }
 
-        impl Index<usize> for Vec3<$t> {
-            type Output = $t;
-
-            fn index(&self, index: usize) -> &Self::Output {
-               let index= index % 3;
-               if index == 0 {
-                   &self.x
-               } else if index == 1 {
-                   &self.y
-               } else {
-                   &self.z
-               }
-            }
-        }
-
         impl Sum for Vec3<$t> {
             fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
                 let mut result = Vec3::default();
@@ -304,17 +309,25 @@ macro_rules! vec3_impl {
             }
         }
 
+        impl Index<Axis> for Vec3<$t> {
+            type Output = $t;
 
-        impl IndexMut<usize> for Vec3<$t> {
-            fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-                let index= index % 3;
-                if index == 0 {
-                    &mut self.x
-                } else if index == 1 {
-                    &mut self.y
-                } else {
-                    &mut self.z
-                }
+            fn index(&self, index: Axis) -> &Self::Output {
+                match index {
+                   Axis::X => &self.x,
+                   Axis::Y => &self.y,
+                   Axis::Z => &self.z,
+               }
+            }
+        }
+
+        impl IndexMut<Axis> for Vec3<$t> {
+            fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
+                  match index {
+                   Axis::X => &mut self.x,
+                   Axis::Y => &mut self.y,
+                   Axis::Z => &mut self.z,
+               }
             }
         }
     )+)

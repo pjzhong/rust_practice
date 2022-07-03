@@ -3,19 +3,18 @@ use crate::material::Material;
 use crate::ray::Ray;
 use crate::{Point, Vec3, AABB};
 use std::f32::consts::PI;
-use std::sync::Arc;
 
-pub struct Sphere {
+pub struct Sphere<M: Material> {
     radius: f32,
     time1: f32,
     time2: f32,
     center1: Vec3<f32>,
     center2: Vec3<f32>,
-    material: Arc<dyn Material>,
+    material: M,
 }
 
-impl Sphere {
-    pub fn steady(center1: Vec3<f32>, radius: f32, material: Arc<dyn Material>) -> Self {
+impl<M: Material> Sphere<M> {
+    pub fn steady(center1: Vec3<f32>, radius: f32, material: M) -> Self {
         Self {
             center1,
             center2: center1,
@@ -32,7 +31,7 @@ impl Sphere {
         radius: f32,
         time1: f32,
         time2: f32,
-        material: Arc<dyn Material>,
+        material: M,
     ) -> Self {
         Self {
             center1,
@@ -61,42 +60,40 @@ impl Sphere {
     }
 }
 
-impl Hittable for Sphere {
+impl<M: Material> Hittable for Sphere<M> {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let center = self.center(r.time());
         let oc = r.origin() - &center;
         let a = r.dir().length_squared();
-        let half_b = oc.dot_product(r.dir());
+        let b = oc.dot_product(r.dir());
         let c = oc.length_squared() - self.radius * self.radius;
 
-        let discriminant = half_b * half_b - a * c;
-        if discriminant < 0.0 {
-            return None;
-        }
+        let discriminant = b * b - a * c;
+        if 0.0 < discriminant {
+            let sqrtd = discriminant.sqrt();
 
-        let sqrtd = discriminant.sqrt();
-
-        let mut root = (-half_b - sqrtd) / a;
-        if root < t_min || t_max < root {
-            root = (-half_b + sqrtd) / a;
-            if root < t_min || t_max < root {
-                return None;
+            let mut t = (-b - sqrtd) / a;
+            if t < t_min || t_max < t {
+                t = (-b + sqrtd) / a;
+                if t < t_min || t_max < t {
+                    return None;
+                }
             }
-        }
 
-        let p = r.at(root);
-        let outward_normal = (p - center) / self.radius;
-        let (u, v) = Sphere::calc_sphere_uv(&outward_normal);
-        let (front_face, normal) = HitRecord::calc_face_normal(r, &outward_normal);
-        Some(HitRecord {
-            u,
-            v,
-            t: root,
-            front_face,
-            normal,
-            p,
-            material: self.material.clone(),
-        })
+            let p = r.at(t);
+            let normal = (p - center) / self.radius;
+            let (u, v) = Sphere::<M>::calc_sphere_uv(&normal);
+            Some(HitRecord {
+                u,
+                v,
+                t,
+                normal,
+                p,
+                material: &self.material,
+            })
+        } else {
+            None
+        }
     }
 
     fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB> {

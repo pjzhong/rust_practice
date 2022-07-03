@@ -1,9 +1,8 @@
 use crate::hittable::HitRecord;
 use crate::ray::Ray;
-use crate::texture::{SolidColor, Texture};
+use crate::texture::Texture;
 use crate::{Color, Point, Vec3};
 use rand::{thread_rng, Rng};
-use std::sync::Arc;
 
 pub trait Material: Sync + Send {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Color, Ray)>;
@@ -13,22 +12,18 @@ pub trait Material: Sync + Send {
     }
 }
 
-pub struct Lambertian {
-    albedo: Box<dyn Texture>,
+#[derive(Clone)]
+pub struct Lambertian<T: Texture> {
+    albedo: T,
 }
 
-impl Lambertian {
-    pub fn with_color(albedo: Color) -> Self {
-        let texture = Box::new(SolidColor::new(albedo));
-        Self { albedo: texture }
-    }
-
-    pub fn with_texture(albedo: Box<dyn Texture>) -> Self {
+impl<T: Texture> Lambertian<T> {
+    pub fn new(albedo: T) -> Self {
         Self { albedo }
     }
 }
 
-impl Material for Lambertian {
+impl<T: Texture> Material for Lambertian<T> {
     fn scatter(&self, ray_in: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
         let scatter_direction = {
             let mut t = rec.normal + Vec3::<f32>::random_unit_vecotr();
@@ -84,53 +79,47 @@ impl Dielectric {
     pub fn new(ir: f32) -> Self {
         Self { ir }
     }
-
-    fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
-        let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
-        r0 *= r0;
-        r0 + (1.0 - r0) * (1.0 - cosine).powf(5.0)
-    }
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
-        let refraction_ration = if rec.front_face {
-            1.0 / self.ir
+    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<(Color, Ray)> {
+        let (outward_normal, ni_over_nt, cosine) = if ray.dir().dot_product(&hit.normal) > 0. {
+            (
+                -hit.normal,
+                self.ir,
+                self.ir * ray.dir().dot_product(&hit.normal) / ray.dir().length(),
+            )
         } else {
-            self.ir
+            (
+                hit.normal,
+                1.0 / self.ir,
+                -ray.dir().dot_product(&hit.normal) / ray.dir().length(),
+            )
         };
 
-        let unit_direction = r_in.dir().normalize();
-        let cos_theta = (-unit_direction).dot_product(&rec.normal).min(1.0);
-        let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+        let direction = ray
+            .dir()
+            .refract(&outward_normal, ni_over_nt)
+            .filter(|_| thread_rng().gen::<f32>() >= schlick(cosine, self.ir))
+            .unwrap_or_else(|| ray.dir().reflect(&hit.normal));
 
-        let cannot_refract = refraction_ration * sin_theta > 1.0;
-        let direction = if cannot_refract
-            || Dielectric::reflectance(cos_theta, refraction_ration) > thread_rng().gen()
-        {
-            unit_direction.reflect(&rec.normal)
-        } else {
-            unit_direction.refract(&rec.normal, refraction_ration)
-        };
-
-        let scattered = Ray::new(rec.p, direction, r_in.time());
-        Some((Color::f32(1.0, 1.0, 1.0), scattered))
+        let attenuation = Vec3::f32(1., 1., 1.);
+        let ray = Ray::new(hit.p, direction, ray.time());
+        Some((attenuation, ray))
     }
 }
 
-pub struct DiffuseLight {
-    emit: Arc<dyn Texture>,
+pub struct DiffuseLight<T: Texture> {
+    emit: T,
 }
 
-impl DiffuseLight {
-    pub fn new(c: Color) -> Self {
-        Self {
-            emit: Arc::new(SolidColor::new(c)),
-        }
+impl<T: Texture> DiffuseLight<T> {
+    pub fn new(emit: T) -> Self {
+        Self { emit }
     }
 }
 
-impl Material for DiffuseLight {
+impl<T: Texture> Material for DiffuseLight<T> {
     fn scatter(&self, _: &Ray, _: &HitRecord) -> Option<(Color, Ray)> {
         None
     }
@@ -138,4 +127,15 @@ impl Material for DiffuseLight {
     fn emitted(&self, u: f32, v: f32, p: &Point) -> Color {
         self.emit.value(u, v, p)
     }
+}
+
+/// [Schlick's approximation][schlick] for computing reflection vs. refraction
+/// at a material surface.
+///
+/// [schlick]: https://en.wikipedia.org/wiki/Schlick%27s_approximation
+#[inline]
+fn schlick(cos: f32, ref_idx: f32) -> f32 {
+    let r0 = (1. - ref_idx) / (1. + ref_idx);
+    let r0 = r0 * r0;
+    r0 + (1. - r0) * f32::powf(1. - cos, 5.)
 }

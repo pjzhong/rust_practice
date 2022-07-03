@@ -1,21 +1,19 @@
 use crate::material::Material;
 use crate::ray::Ray;
-use crate::texture::{SolidColor, Texture};
-use crate::{Color, Vec3, AABB};
+use crate::texture::Texture;
+use crate::{Axis, Color, Vec3, AABB};
 use rand::Rng;
-use std::sync::Arc;
 
-pub struct HitRecord {
+pub struct HitRecord<'a> {
     pub t: f32,
     pub u: f32,
     pub v: f32,
     pub p: Vec3<f32>,
     pub normal: Vec3<f32>,
-    pub material: Arc<dyn Material>,
-    pub front_face: bool,
+    pub material: &'a dyn Material,
 }
 
-impl HitRecord {
+impl<'a> HitRecord<'a> {
     pub fn calc_face_normal(r: &Ray, outward_normal: &Vec3<f32>) -> (bool, Vec3<f32>) {
         let front_face = r.dir().dot_product(outward_normal) < 0.0;
         let normal = if front_face {
@@ -40,9 +38,9 @@ impl Hittable for [Box<dyn Hittable>] {
         let mut record = None;
 
         for hittable in self {
-            if let Some(rec) = hittable.hit(r, t_min, closet_so_far) {
-                closet_so_far = rec.t;
-                record.replace(rec);
+            if let Some(hit) = hittable.hit(r, t_min, closet_so_far) {
+                closet_so_far = hit.t;
+                record = Some(hit);
             }
         }
 
@@ -69,25 +67,23 @@ impl Hittable for [Box<dyn Hittable>] {
     }
 }
 
-pub struct Translate {
+pub struct Translate<H: Hittable> {
     offset: Vec3<f32>,
-    hittable: Box<dyn Hittable>,
+    hittable: H,
 }
 
-impl Translate {
-    pub fn new(hittable: Box<dyn Hittable>, offset: Vec3<f32>) -> Self {
+impl<H: Hittable> Translate<H> {
+    pub fn new(hittable: H, offset: Vec3<f32>) -> Self {
         Self { offset, hittable }
     }
 }
 
-impl Hittable for Translate {
+impl<H: Hittable> Hittable for Translate<H> {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let move_r = Ray::new(*r.origin() - self.offset, *r.dir(), r.time());
-        self.hittable.hit(&move_r, t_min, t_max).map(|mut rec| {
-            rec.p += self.offset;
-            (rec.front_face, rec.normal) = HitRecord::calc_face_normal(&move_r, &rec.normal);
-
-            rec
+        self.hittable.hit(&move_r, t_min, t_max).map(|mut hit| {
+            hit.p += self.offset;
+            hit
         })
     }
 
@@ -98,22 +94,22 @@ impl Hittable for Translate {
     }
 }
 
-pub struct RotateY {
+pub struct RotateY<H: Hittable> {
     sin_theta: f32,
     cos_theta: f32,
     aabb: Option<AABB>,
-    hittable: Box<dyn Hittable>,
+    hittable: H,
 }
 
-impl RotateY {
-    pub fn new(hittable: Box<dyn Hittable>, angle: f32) -> Self {
+impl<H: Hittable> RotateY<H> {
+    pub fn new(hittable: H, angle: f32) -> Self {
         let radians = angle.to_radians();
         let sin_theta = radians.sin();
         let cos_theta = radians.cos();
         let aabb = hittable.bounding_box(0.0, 1.0);
 
-        let mut min = Vec3::f32(f32::INFINITY, f32::INFINITY, f32::INFINITY);
-        let mut max = -Vec3::f32(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let mut min = Vec3::f32(f32::MAX, f32::MAX, f32::MAX);
+        let mut max = Vec3::f32(f32::MIN, f32::MIN, f32::MIN);
         if let Some(aabb) = &aabb {
             for i in 0..2 {
                 for j in 0..2 {
@@ -128,7 +124,7 @@ impl RotateY {
 
                         let tester = Vec3::f32(newx, y, newz);
 
-                        for c in 0..3 {
+                        for c in Axis::values() {
                             min[c] = min[c].min(tester[c]);
                             max[c] = max[c].max(tester[c]);
                         }
@@ -146,7 +142,7 @@ impl RotateY {
     }
 }
 
-impl Hittable for RotateY {
+impl<H: Hittable> Hittable for RotateY<H> {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let origin = Vec3::f32(
             self.cos_theta * r.origin().x - self.sin_theta * r.origin().z,
@@ -171,15 +167,13 @@ impl Hittable for RotateY {
                 hit.normal.y,
                 -self.sin_theta * hit.normal.x + self.cos_theta * hit.normal.z,
             );
-            let (front_face, normal) = HitRecord::calc_face_normal(&rotated_r, &normal);
             Some(HitRecord {
                 t: hit.t,
                 u: hit.u,
                 v: hit.v,
                 p,
                 normal,
-                front_face,
-                material: hit.material.clone(),
+                material: hit.material,
             })
         } else {
             None
@@ -191,87 +185,67 @@ impl Hittable for RotateY {
     }
 }
 
-pub struct ConstantMedium {
+pub struct ConstantMedium<H: Hittable, M: Material> {
     neg_inv_density: f32,
-    boundary: Box<dyn Hittable>,
-    phase_function: Arc<dyn Material>,
+    boundary: H,
+    material: M,
 }
 
-impl ConstantMedium {
-    pub fn new(boundary: Box<dyn Hittable>, neg_inv_density: f32, c: Color) -> Self {
+impl<H: Hittable, M: Material> ConstantMedium<H, M> {
+    pub fn new(boundary: H, neg_inv_density: f32, material: M) -> Self {
         Self {
             boundary,
-            neg_inv_density: -1.0 / neg_inv_density,
-            phase_function: Arc::new(Isotropic::new(c)),
+            neg_inv_density: -(1.0 / neg_inv_density),
+            material,
         }
     }
 }
 
-impl Hittable for ConstantMedium {
+impl<H: Hittable, M: Material> Hittable for ConstantMedium<H, M> {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
-        if let Some(rec1) = self.boundary.hit(r, -f32::INFINITY, f32::INFINITY) {
-            if let Some(rec2) = self.boundary.hit(r, rec1.t + 0.001, f32::INFINITY) {
-                let (mut rec1_t, mut rec2_t) = (rec1.t, rec2.t);
-                if rec1_t < t_min {
-                    rec1_t = t_min;
-                }
-                if t_max < rec2_t {
-                    rec2_t = t_max
-                }
-
-                if rec2_t <= rec1_t {
+        if let Some(hit1) = self.boundary.hit(r, f32::MIN, f32::MAX) {
+            if let Some(hit2) = self.boundary.hit(r, hit1.t + 0.001, f32::MAX) {
+                let (hit1t, hit2t) = (hit1.t.max(t_min), hit2.t.min(t_max));
+                if hit2t <= hit1t {
                     return None;
-                }
-
-                if rec1_t < 0.0 {
-                    rec1_t = 0.0;
                 }
 
                 let mut rang = rand::thread_rng();
                 let ray_length = r.dir().length();
-                let distance_inside_boundary = (rec2_t - rec1_t) * ray_length;
-                let hit_distance =
-                    self.neg_inv_density * rang.gen_range(0.0..1.0f32).log(std::f32::consts::E);
+                let distance_inside_boundary = (hit2t - hit1t) * ray_length;
+                let hit_distance = self.neg_inv_density * rang.gen::<f32>().ln();
 
-                if distance_inside_boundary < hit_distance {
-                    return None;
+                if hit_distance < distance_inside_boundary {
+                    let t = hit1t + hit_distance / ray_length;
+                    return Some(HitRecord {
+                        t,
+                        u: hit1.u,
+                        v: hit1.v,
+                        p: r.at(t),
+                        material: &self.material,
+                        normal: Vec3::f32(1.0, 0.0, 0.0),
+                    });
                 }
-
-                let t = rec1_t + hit_distance / ray_length;
-                Some(HitRecord {
-                    t,
-                    u: rec1.u,
-                    v: rec1.v,
-                    p: r.at(t),
-                    front_face: true,
-                    material: self.phase_function.clone(),
-                    normal: Vec3::f32(1.0, 0.0, 0.0),
-                })
-            } else {
-                None
             }
-        } else {
-            None
         }
+        None
     }
 
     fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB> {
         self.boundary.bounding_box(time0, time1)
     }
 }
-pub struct Isotropic {
-    albedo: Box<dyn Texture>,
+pub struct Isotropic<T: Texture> {
+    pub albedo: T,
 }
 
-impl Isotropic {
-    pub fn new(c: Color) -> Self {
-        Self {
-            albedo: Box::new(SolidColor::new(c)),
-        }
+impl<T: Texture> Isotropic<T> {
+    pub fn new(albedo: T) -> Self {
+        Self { albedo }
     }
 }
 
-impl Material for Isotropic {
+impl<T: Texture> Material for Isotropic<T> {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
         Some((
             self.albedo.value(rec.u, rec.v, &rec.p),

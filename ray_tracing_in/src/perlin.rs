@@ -1,6 +1,7 @@
 use crate::Point;
 use rand::prelude::SliceRandom;
 
+#[derive(Clone)]
 pub struct Perlin {
     ran_float: Vec<Point>,
     perm_x: Vec<usize>,
