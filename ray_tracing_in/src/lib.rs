@@ -1,5 +1,7 @@
 extern crate core;
 
+use hittable::FlipNormals;
+
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
 use crate::ray::Ray;
@@ -92,66 +94,66 @@ pub struct Cube {
 }
 
 impl Cube {
-    pub fn new<M: Material + Clone + 'static>(p0: &Point, p1: &Point, material: M) -> Self {
+    pub fn new<M: Material + Clone + 'static>(min: &Point, max: &Point, material: M) -> Self {
         Self {
             sides: vec![
                 Box::new(AARect::new(
-                    Plane::YZ,
-                    p0.x,
-                    p1.x,
-                    p0.y,
-                    p1.y,
-                    p1.z,
-                    material.clone(),
-                )),
-                Box::new(AARect::new(
-                    Plane::YZ,
-                    p0.x,
-                    p1.x,
-                    p0.y,
-                    p1.y,
-                    p0.z,
-                    material.clone(),
-                )),
-                Box::new(AARect::new(
-                    Plane::ZX,
-                    p0.x,
-                    p1.x,
-                    p0.z,
-                    p1.z,
-                    p1.y,
-                    material.clone(),
-                )),
-                Box::new(AARect::new(
-                    Plane::ZX,
-                    p0.x,
-                    p1.x,
-                    p0.z,
-                    p1.z,
-                    p0.y,
-                    material.clone(),
-                )),
-                Box::new(AARect::new(
                     Plane::XY,
-                    p0.y,
-                    p1.y,
-                    p0.z,
-                    p1.z,
-                    p1.x,
+                    min.x,
+                    max.x,
+                    min.y,
+                    max.y,
+                    max.z,
                     material.clone(),
                 )),
-                Box::new(AARect::new(
+                Box::new(FlipNormals(AARect::new(
                     Plane::XY,
-                    p0.y,
-                    p1.y,
-                    p0.z,
-                    p1.z,
-                    p0.x,
+                    min.x,
+                    max.x,
+                    min.y,
+                    max.y,
+                    min.z,
+                    material.clone(),
+                ))),
+                Box::new(AARect::new(
+                    Plane::XZ,
+                    min.x,
+                    max.x,
+                    min.z,
+                    max.z,
+                    max.y,
+                    material.clone(),
+                )),
+                Box::new(FlipNormals(AARect::new(
+                    Plane::XZ,
+                    min.x,
+                    max.x,
+                    min.z,
+                    max.z,
+                    min.y,
+                    material.clone(),
+                ))),
+                Box::new(AARect::new(
+                    Plane::YZ,
+                    min.y,
+                    max.y,
+                    min.z,
+                    max.z,
+                    max.x,
+                    material.clone(),
+                )),
+                Box::new(FlipNormals(AARect::new(
+                    Plane::YZ,
+                    min.y,
+                    max.y,
+                    min.z,
+                    max.z,
+                    min.x,
                     material,
-                )),
+                ))),
             ],
-            box_min: *p0,
-            box_max: *p1,
+            box_min: *min,
+            box_max: *max,
         }
     }
 }

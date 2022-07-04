@@ -1,6 +1,5 @@
 use crate::hittable::{HitRecord, Hittable};
 use crate::{Axis, Ray, AABB};
-use std::cmp::Ordering;
 use std::sync::Arc;
 
 pub struct BvhNode {
@@ -30,14 +29,12 @@ impl BvhNode {
 
         objects.sort_unstable_by(|a, b| {
             match (a.bounding_box(time0, time1), b.bounding_box(time0, time1)) {
-                (None, None) => Ordering::Equal,
-                (None, Some(_)) => Ordering::Greater,
-                (Some(_), None) => Ordering::Less,
                 (Some(a), Some(b)) => {
                     let av = a.minimum[axis] + a.maximum[axis];
                     let bv = b.minimum[axis] + b.maximum[axis];
                     av.partial_cmp(&bv).unwrap()
                 }
+                _ => panic!["no bounding box in bvh node"],
             }
         });
 
@@ -54,9 +51,8 @@ impl BvhNode {
 
                 BvhNode {
                     aabb: match (left.aabb, right.aabb) {
-                        (None, None) => None,
-                        (a, None) | (None, a) => a,
                         (Some(a), Some(b)) => Some(AABB::surrounding_box(&a, &b)),
+                        _ => panic!["no bounding box in bvh node"],
                     },
                     contents: BvhContent::Node { left, right },
                 }
@@ -65,17 +61,17 @@ impl BvhNode {
     }
 
     fn axis_range(objs: &[Arc<dyn Hittable>], time0: f32, time1: f32, axis: Axis) -> f32 {
-        let rang = objs.iter().fold(f32::MAX..f32::MIN, |rang, o| {
+        let (min, max) = objs.iter().fold((f32::MAX, f32::MAX), |(bmin, bmax), o| {
             if let Some(bb) = o.bounding_box(time0, time1) {
                 let min = bb.minimum[axis].min(bb.maximum[axis]);
                 let max = bb.minimum[axis].max(bb.maximum[axis]);
-                rang.start.min(min)..rang.end.max(max)
+                (bmin.min(min), bmax.max(max))
             } else {
-                rang
+                (bmin, bmax)
             }
         });
 
-        rang.end - rang.start
+        max - min
     }
 }
 
@@ -83,33 +79,29 @@ impl Hittable for BvhNode {
     fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         if let Some(aabb) = self.aabb {
             if aabb.hit(r, t_min, t_max) {
-                match &self.contents {
+                return match &self.contents {
                     BvhContent::Node { left, right } => {
                         let hit_left = left.hit(r, t_min, t_max);
 
-                        let t_max = if let Some(h) = &hit_left { h.t } else { t_max };
+                        let t_max = if let Some(hit_left) = &hit_left {
+                            hit_left.t
+                        } else {
+                            t_max
+                        };
 
                         let hit_right = right.hit(r, t_min, t_max);
-
-                        match (hit_left, hit_right) {
-                            (h, None) | (None, h) => h,
-                            (Some(l), Some(r)) => {
-                                if l.t < r.t {
-                                    Some(l)
-                                } else {
-                                    Some(r)
-                                }
-                            }
+                        if hit_right.is_some() {
+                            hit_right
+                        } else {
+                            hit_left
                         }
                     }
                     BvhContent::Leaf(obj) => obj.hit(r, t_min, t_max),
-                }
-            } else {
-                None
+                };
             }
-        } else {
-            None
         }
+
+        None
     }
 
     fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {

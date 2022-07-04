@@ -253,3 +253,18 @@ impl<T: Texture> Material for Isotropic<T> {
         ))
     }
 }
+
+pub struct FlipNormals<H>(pub H);
+
+impl<H: Hittable> Hittable for FlipNormals<H> {
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        self.0.hit(r, t_min, t_max).map(|hit| HitRecord {
+            normal: -hit.normal,
+            ..hit
+        })
+    }
+
+    fn bounding_box(&self, time0: f32, time1: f32) -> Option<AABB> {
+        self.0.bounding_box(time0, time1)
+    }
+}

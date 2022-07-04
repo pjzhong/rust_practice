@@ -5,9 +5,12 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
+use std::time::Instant;
 
 use ray_tracing_in::bvh::BvhNode;
-use ray_tracing_in::hittable::{ConstantMedium, Hittable, Isotropic, RotateY, Translate};
+use ray_tracing_in::hittable::{
+    ConstantMedium, FlipNormals, Hittable, Isotropic, RotateY, Translate,
+};
 use ray_tracing_in::material::{Dielectric, DiffuseLight, Lambertian, Metal};
 use ray_tracing_in::ray::Ray;
 use ray_tracing_in::rectangle::{AARect, Plane};
@@ -19,13 +22,12 @@ use ray_tracing_in::{Color, Image};
 
 fn ray_color(r: &Ray, background: &Color, world: &[Box<dyn Hittable>], depth: i32) -> Color {
     if depth <= 0 {
-        return *background;
+        return Color::default();
     }
 
-    if let Some(rec) = world.hit(r, 0.001, f32::INFINITY) {
-        let material = rec.material.clone();
-        let emitted = material.emitted(rec.u, rec.v, &rec.p);
-        if let Some((color, scattered)) = material.scatter(r, &rec) {
+    if let Some(rec) = world.hit(r, 0.001, f32::MAX) {
+        let emitted = rec.material.emitted(rec.u, rec.v, &rec.p);
+        if let Some((color, scattered)) = rec.material.scatter(r, &rec) {
             emitted + color * ray_color(&scattered, background, world, depth - 1)
         } else {
             emitted
@@ -189,19 +191,27 @@ fn cornell_box() -> Vec<Box<dyn Hittable>> {
     let light = DiffuseLight::new(SolidColor::new(15.0, 15.0, 15.0));
 
     vec![
-        Box::new(AARect::new(Plane::YZ, 0.0, 555.0, 0.0, 555.0, 555.0, green)),
+        Box::new(FlipNormals(AARect::new(
+            Plane::YZ,
+            0.0,
+            555.0,
+            0.0,
+            555.0,
+            555.0,
+            green,
+        ))),
         Box::new(AARect::new(Plane::YZ, 0.0, 555.0, 0.0, 555.0, 0.0, red)),
         Box::new(AARect::new(
-            Plane::ZX,
-            113.0,
-            443.0,
-            127.0,
-            432.0,
+            Plane::XZ,
+            213.0,
+            343.0,
+            227.0,
+            332.0,
             554.0,
             light,
         )),
         Box::new(AARect::new(
-            Plane::ZX,
+            Plane::XZ,
             0.0,
             555.0,
             0.0,
@@ -209,16 +219,16 @@ fn cornell_box() -> Vec<Box<dyn Hittable>> {
             0.0,
             white.clone(),
         )),
-        Box::new(AARect::new(
-            Plane::ZX,
+        Box::new(FlipNormals(AARect::new(
+            Plane::XZ,
             0.0,
             555.0,
             0.0,
             555.0,
             555.0,
             white.clone(),
-        )),
-        Box::new(AARect::new(
+        ))),
+        Box::new(FlipNormals(AARect::new(
             Plane::XY,
             0.0,
             555.0,
@@ -226,7 +236,7 @@ fn cornell_box() -> Vec<Box<dyn Hittable>> {
             555.0,
             555.0,
             white.clone(),
-        )),
+        ))),
         Box::new(Translate::new(
             RotateY::new(
                 Cube::new(
@@ -259,10 +269,18 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
     let light = DiffuseLight::new(SolidColor::new(7.0, 7.0, 7.0));
 
     vec![
-        Box::new(AARect::new(Plane::YZ, 0.0, 555.0, 0.0, 555.0, 555.0, green)),
+        Box::new(FlipNormals(AARect::new(
+            Plane::YZ,
+            0.0,
+            555.0,
+            0.0,
+            555.0,
+            555.0,
+            green,
+        ))),
         Box::new(AARect::new(Plane::YZ, 0.0, 555.0, 0.0, 555.0, 0.0, red)),
         Box::new(AARect::new(
-            Plane::ZX,
+            Plane::XZ,
             113.0,
             443.0,
             127.0,
@@ -271,7 +289,7 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
             light,
         )),
         Box::new(AARect::new(
-            Plane::ZX,
+            Plane::XZ,
             0.0,
             555.0,
             0.0,
@@ -279,16 +297,16 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
             0.0,
             white.clone(),
         )),
-        Box::new(AARect::new(
-            Plane::ZX,
+        Box::new(FlipNormals(AARect::new(
+            Plane::XZ,
             0.0,
             555.0,
             0.0,
             555.0,
             555.0,
             white.clone(),
-        )),
-        Box::new(AARect::new(
+        ))),
+        Box::new(FlipNormals(AARect::new(
             Plane::XY,
             0.0,
             555.0,
@@ -296,7 +314,7 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
             555.0,
             555.0,
             white.clone(),
-        )),
+        ))),
         Box::new(ConstantMedium::new(
             Translate::new(
                 RotateY::new(
@@ -333,15 +351,14 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
 fn final_scene() -> Vec<Box<dyn Hittable>> {
     let mut objects: Vec<Box<dyn Hittable>> = vec![];
 
-    let light = DiffuseLight::new(SolidColor::new(7.0, 7.0, 7.0));
     objects.push(Box::new(AARect::new(
-        Plane::ZX,
+        Plane::XZ,
         123.0,
         423.0,
         147.0,
         412.0,
         554.0,
-        light,
+        DiffuseLight::new(SolidColor::new(7.0, 7.0, 7.0)),
     )));
 
     let mut rang = rand::thread_rng();
@@ -355,7 +372,7 @@ fn final_scene() -> Vec<Box<dyn Hittable>> {
             let y0 = 0.0;
             let z0 = -1000.0 + j as f32 * W;
             let x1 = x0 + W;
-            let y1 = 100.0 * rang.gen::<f32>() + 0.01;
+            let y1 = 100.0 * (rang.gen::<f32>() + 0.01);
             let z1 = z0 + W;
 
             boxes1.push(Arc::new(Cube::new(
@@ -537,7 +554,7 @@ fn main() {
             ),
         };
 
-    let image_width = 400;
+    let image_width = 800;
     let image_height = (image_width as f32 / aspect_ration) as i32;
 
     let max_depth = 20;
@@ -558,11 +575,11 @@ fn main() {
     );
 
     let mut buffers: Image = Vec::with_capacity(image_height as usize);
+    let instant = Instant::now();
     (0..image_height + 1)
         .into_par_iter()
         .rev()
         .map(|j| {
-            println!("Scan line:{}", j);
             (0..image_width)
                 .into_par_iter()
                 .map(|i| {
@@ -581,10 +598,11 @@ fn main() {
                 .collect()
         })
         .collect_into_vec(&mut buffers);
+
+    println!("Took {:?} wall time", instant.elapsed());
     // Render
     let current_dir = env::current_dir().unwrap();
     let mut file = File::create(current_dir.join(format!("{}.ppm", case))).unwrap();
-
     file.write_all(format!("P3\n{} {}\n255\n", image_width, image_height).as_bytes())
         .unwrap();
     write_colors(&mut file, &buffers, samples_per_pixel);

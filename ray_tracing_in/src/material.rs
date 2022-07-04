@@ -24,19 +24,10 @@ impl<T: Texture> Lambertian<T> {
 }
 
 impl<T: Texture> Material for Lambertian<T> {
-    fn scatter(&self, ray_in: &Ray, rec: &HitRecord) -> Option<(Color, Ray)> {
-        let scatter_direction = {
-            let mut t = rec.normal + Vec3::<f32>::random_unit_vecotr();
-            if t.near_zero() {
-                t = rec.normal;
-            }
-            t
-        };
-
-        Some((
-            self.albedo.value(rec.u, rec.v, &rec.p),
-            Ray::new(rec.p, scatter_direction, ray_in.time()),
-        ))
+    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<(Color, Ray)> {
+        let target = hit.p + hit.normal + Vec3::<f32>::random_in_unit_sphere();
+        let scattered = Ray::new(hit.p, target - hit.p, ray.time());
+        Some((self.albedo.value(hit.u, hit.v, &hit.p), scattered))
     }
 }
 
