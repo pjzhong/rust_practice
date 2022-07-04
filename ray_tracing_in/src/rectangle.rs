@@ -1,7 +1,8 @@
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
-use crate::vec::Axis;
-use crate::{Ray, Vec3, AABB};
+use crate::ray::Ray;
+use crate::vec::{Axis, Vec3};
+use crate::AABB;
 
 pub enum Plane {
     YZ,
@@ -21,68 +22,67 @@ pub struct AARect<M: Material> {
 
 impl<M: Material> AARect<M> {
     pub fn new(plane: Plane, a0: f32, a1: f32, b0: f32, b1: f32, k: f32, material: M) -> Self {
-        Self {
+        AARect {
+            plane,
             a0,
             a1,
             b0,
             b1,
             k,
-            plane,
             material,
         }
     }
 }
 
 impl<M: Material> Hittable for AARect<M> {
-    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
-        let (k_axis, a_axis, b_axis) = match self.plane {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let (k_axis, a_axis, b_axis) = match &self.plane {
             Plane::YZ => (Axis::X, Axis::Y, Axis::Z),
             Plane::XZ => (Axis::Y, Axis::X, Axis::Z),
             Plane::XY => (Axis::Z, Axis::X, Axis::Y),
         };
-        let t = (self.k - r.origin()[k_axis]) / r.dir()[k_axis];
-        if t < t_min || t_max < t {
+        let t = (self.k - ray.origin()[k_axis]) / ray.dir()[k_axis];
+        if t < t_min || t > t_max {
             None
         } else {
-            let a = r.origin()[a_axis] + t * r.dir()[a_axis];
-            let b = r.origin()[b_axis] + t * r.dir()[b_axis];
-            if a < self.a0 || self.a1 < a || b < self.b0 || self.b1 < b {
+            let a = ray.origin()[a_axis] + t * ray.dir()[a_axis];
+            let b = ray.origin()[b_axis] + t * ray.dir()[b_axis];
+            if a < self.a0 || a > self.a1 || b < self.b0 || b > self.b1 {
                 None
             } else {
+                let u = (a - self.a0) / (self.a1 - self.a0);
+                let v = (b - self.b0) / (self.b1 - self.b0);
+                let p = ray.at(t);
+                let mut normal = Vec3::<f32>::default();
+                normal[k_axis] = 1.0;
                 Some(HitRecord {
-                    u: (a - self.a0) / (self.a1 - self.a0),
-                    v: (b - self.b0) / (self.b1 - self.b0),
                     t,
-                    normal: {
-                        let mut v = Vec3::f32(0.0, 0.0, 0.0);
-                        v[k_axis] = 1.0;
-                        v
-                    },
-                    p: r.at(t),
+                    u,
+                    v,
+                    p,
+                    normal,
                     material: &self.material,
                 })
             }
         }
     }
 
-    fn bounding_box(&self, _: f32, _: f32) -> Option<AABB> {
-        let (k_axis, a_axis, b_axis) = match self.plane {
+    fn bounding_box(&self, _t0: f32, _t1: f32) -> Option<AABB> {
+        let (k_axis, a_axis, b_axis) = match &self.plane {
             Plane::YZ => (Axis::X, Axis::Y, Axis::Z),
             Plane::XZ => (Axis::Y, Axis::X, Axis::Z),
             Plane::XY => (Axis::Z, Axis::X, Axis::Y),
         };
+        let mut minimum = Vec3::default();
+        let mut maximum = Vec3::default();
 
-        let mut min = Vec3::<f32>::default();
-        let mut max = Vec3::<f32>::default();
+        minimum[k_axis] = self.k - 0.0001;
+        minimum[a_axis] = self.a0;
+        minimum[b_axis] = self.b0;
 
-        min[k_axis] = self.k - 0.0001;
-        min[a_axis] = self.a0;
-        min[b_axis] = self.b0;
-
-        max[k_axis] = self.k + 0.0001;
-        max[a_axis] = self.a1;
-        max[b_axis] = self.b1;
-
-        Some(AABB::new(min, max))
+        maximum[k_axis] = self.k + 0.0001;
+        maximum[a_axis] = self.a0;
+        maximum[b_axis] = self.a1;
+        Some(AABB::new(minimum, maximum))
     }
 }

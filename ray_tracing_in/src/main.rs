@@ -21,17 +21,14 @@ use ray_tracing_in::{clamp, Cube, Point};
 use ray_tracing_in::{Color, Image};
 
 fn ray_color(r: &Ray, background: &Color, world: &[Box<dyn Hittable>], depth: i32) -> Color {
-    if depth <= 0 {
-        return Color::default();
-    }
-
     if let Some(rec) = world.hit(r, 0.001, f32::MAX) {
         let emitted = rec.material.emitted(rec.u, rec.v, &rec.p);
-        if let Some((color, scattered)) = rec.material.scatter(r, &rec) {
-            emitted + color * ray_color(&scattered, background, world, depth - 1)
-        } else {
-            emitted
+        if 1 < depth {
+            if let Some((color, scattered)) = rec.material.scatter(r, &rec) {
+                return emitted + color * ray_color(&scattered, background, world, depth - 1);
+            }
         }
+        emitted
     } else {
         *background
     }
@@ -281,10 +278,10 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
         Box::new(AARect::new(Plane::YZ, 0.0, 555.0, 0.0, 555.0, 0.0, red)),
         Box::new(AARect::new(
             Plane::XZ,
-            113.0,
-            443.0,
             127.0,
             432.0,
+            113.0,
+            443.0,
             554.0,
             light,
         )),
@@ -384,75 +381,74 @@ fn final_scene() -> Vec<Box<dyn Hittable>> {
     }
     objects.push(Box::new(BvhNode::new(&mut boxes1, 0.0, 1.0)));
 
-    // let path = env::current_dir().unwrap().join("earthmap.jpg");
-    // let earth_surface = Arc::new(Lambertian::with_texture(Box::new(ImageTexture::new(path))));
-    // objects.push(Box::new(Sphere::steady(
-    //     Point::f32(400.0, 200.0, 400.0),
-    //     100.0,
-    //     earth_surface,
-    // )));
+    let path = env::current_dir().unwrap().join("earthmap.jpg");
+    let earth_surface = Lambertian::new(ImageTexture::new(path));
+    objects.push(Box::new(Sphere::steady(
+        Point::f32(400.0, 200.0, 400.0),
+        100.0,
+        earth_surface,
+    )));
 
-    // objects.push(Box::new(Sphere::steady(
-    //     Point::f32(220.0, 280.0, 300.0),
-    //     80.0,
-    //     Arc::new(Lambertian::with_texture(Box::new(NoiseTexture::new(0.1)))),
-    // )));
+    objects.push(Box::new(Sphere::steady(
+        Point::f32(220.0, 280.0, 300.0),
+        80.0,
+        Lambertian::new(NoiseTexture::new(0.1)),
+    )));
 
-    // let center1 = Point::f32(400.0, 400.0, 200.0);
-    // let center2 = center1 + Vec3::f32(30.0, 0.0, 0.0);
-    // let moving_sphere_material = Lambertian::with_color(Color::f32(0.7, 0.3, 0.1));
-    // objects.push(Box::new(Sphere::motion(
-    //     center1,
-    //     center2,
-    //     50.0,
-    //     0.0,
-    //     1.0,
-    //     Arc::new(moving_sphere_material),
-    // )));
+    let center1 = Point::f32(400.0, 400.0, 200.0);
+    let center2 = center1 + Vec3::f32(30.0, 0.0, 0.0);
+    let moving_sphere_material = Lambertian::new(SolidColor::new(0.7, 0.3, 0.1));
+    objects.push(Box::new(Sphere::motion(
+        center1,
+        center2,
+        50.0,
+        0.0,
+        1.0,
+        moving_sphere_material,
+    )));
 
-    // objects.push(Box::new(Sphere::steady(
-    //     Point::f32(260.0, 150.0, 45.0),
-    //     50.0,
-    //     Arc::new(Dielectric::new(1.5)),
-    // )));
-    // objects.push(Box::new(Sphere::steady(
-    //     Point::f32(0.0, 150.0, 145.0),
-    //     50.0,
-    //     Arc::new(Metal::new(Color::f32(0.8, 0.8, 0.9), 1.0)),
-    // )));
+    objects.push(Box::new(Sphere::steady(
+        Point::f32(260.0, 150.0, 45.0),
+        50.0,
+        Dielectric::new(1.5),
+    )));
+    objects.push(Box::new(Sphere::steady(
+        Point::f32(0.0, 150.0, 145.0),
+        50.0,
+        Metal::new(Color::f32(0.8, 0.8, 0.9), 1.0),
+    )));
 
-    // objects.push(Box::new(Sphere::steady(
-    //     Point::f32(360.0, 150.0, 145.0),
-    //     70.0,
-    //     Arc::new(Dielectric::new(1.5)),
-    // )));
-    // objects.push(Box::new(ConstantMedium::new(
-    //     Box::new(Sphere::steady(
-    //         Point::f32(360.0, 150.0, 145.0),
-    //         70.0,
-    //         Arc::new(Dielectric::new(1.5)),
-    //     )),
-    //     0.2,
-    //     Color::f32(0.2, 0.4, 0.9),
-    // )));
+    objects.push(Box::new(Sphere::steady(
+        Point::f32(360.0, 150.0, 145.0),
+        70.0,
+        Dielectric::new(1.5),
+    )));
+    objects.push(Box::new(ConstantMedium::new(
+        Sphere::steady(Point::f32(360.0, 150.0, 145.0), 70.0, Dielectric::new(1.5)),
+        0.2,
+        Isotropic::new(SolidColor::new(0.2, 0.4, 0.9)),
+    )));
 
-    // let mut boxes: Vec<Arc<dyn Hittable>> = vec![];
-    // let white = Arc::new(Lambertian::with_color(Color::f32(0.73, 0.732, 0.73)));
-    // for _ in 0..1000 {
-    //     boxes.push(Arc::new(Sphere::steady(
-    //         Point::random_range(0.0, 165.0),
-    //         10.0,
-    //         white.clone(),
-    //     )));
-    // }
+    let mut boxes: Vec<Arc<dyn Hittable>> = vec![];
+    let white = Lambertian::new(SolidColor::new(0.73, 0.732, 0.73));
+    for _ in 0..1000 {
+        boxes.push(Arc::new(Sphere::steady(
+            Point::random_range(0.0, 165.0),
+            10.0,
+            white.clone(),
+        )));
+    }
 
-    // objects.push(Box::new(Translate::new(
-    //     Box::new(RotateY::new(
-    //         Box::new(BvhNode::new(&mut boxes, 0.0, 1.0)),
-    //         15.0,
-    //     )),
-    //     Vec3::f32(-100.0, 270.0, 395.0),
-    // )));
+    objects.push(Box::new(Translate::new(
+        RotateY::new(BvhNode::new(&mut boxes, 0.0, 1.0), 15.0),
+        Vec3::f32(-100.0, 270.0, 395.0),
+    )));
+
+    objects.push(Box::new(ConstantMedium::new(
+        Sphere::steady(Point::f32(0.0, 0.0, 0.0), 5000.0, Dielectric::new(1.5)),
+        0.0001,
+        Isotropic::new(SolidColor::new(1.0, 1.0, 1.0)),
+    )));
 
     objects
 }
@@ -540,7 +536,7 @@ fn main() {
                 40.0,
                 Color::f32(0.0, 0.0, 0.00),
                 1.0,
-                400,
+                800,
             ),
             _ => (
                 vec![],
@@ -557,7 +553,7 @@ fn main() {
     let image_width = 800;
     let image_height = (image_width as f32 / aspect_ration) as i32;
 
-    let max_depth = 20;
+    let max_depth = 50;
 
     let vup = Vec3::f32(0.0, 1.0, 0.0);
     let dist_to_focus = 10.0;
@@ -574,8 +570,9 @@ fn main() {
         1.0,
     );
 
-    let mut buffers: Image = Vec::with_capacity(image_height as usize);
     let instant = Instant::now();
+    let mut buffers: Image = Vec::with_capacity(image_height as usize);
+
     (0..image_height + 1)
         .into_par_iter()
         .rev()
@@ -584,12 +581,12 @@ fn main() {
                 .into_par_iter()
                 .map(|i| {
                     (0..samples_per_pixel)
-                        .into_par_iter()
+                        .into_iter()
                         .map(|_| {
-                            let u = (i as f32 + thread_rng().gen_range(0.0..1.0))
-                                / (image_width - 1) as f32;
-                            let v = (j as f32 + thread_rng().gen_range(0.0..1.0))
-                                / (image_height - 1) as f32;
+                            let u =
+                                (i as f32 + thread_rng().gen::<f32>()) / (image_width - 1) as f32;
+                            let v =
+                                (j as f32 + thread_rng().gen::<f32>()) / (image_height - 1) as f32;
                             let r = camera.get_ray(u, v);
                             ray_color(&r, &background, &world, max_depth)
                         })

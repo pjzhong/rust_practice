@@ -115,9 +115,9 @@ impl<H: Hittable> RotateY<H> {
                 for j in 0..2 {
                     for k in 0..2 {
                         let (i, j, k) = (i as f32, j as f32, k as f32);
-                        let x = i * aabb.max().x + (1.0 - i) * aabb.min().x;
-                        let y = j * aabb.max().y + (1.0 - j) * aabb.min().y;
-                        let z = k * aabb.max().z + (1.0 - k) * aabb.min().z;
+                        let x = i * aabb.maximum.x + (1.0 - i) * aabb.minimum.x;
+                        let y = j * aabb.maximum.y + (1.0 - j) * aabb.minimum.y;
+                        let z = k * aabb.maximum.z + (1.0 - k) * aabb.minimum.z;
 
                         let newx = cos_theta * x + sin_theta * z;
                         let newz = -sin_theta * x + cos_theta * z;
