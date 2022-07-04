@@ -31,6 +31,7 @@ impl<T: Texture> Material for Lambertian<T> {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Metal {
     albedo: Color,
     fuzz: f32,
@@ -62,6 +63,7 @@ impl Material for Metal {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Dielectric {
     ir: f32,
 }

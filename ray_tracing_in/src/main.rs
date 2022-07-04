@@ -21,11 +21,12 @@ use ray_tracing_in::{clamp, Cube, Point};
 use ray_tracing_in::{Color, Image};
 
 fn ray_color(r: &Ray, background: &Color, world: &[Box<dyn Hittable>], depth: i32) -> Color {
-    if let Some(rec) = world.hit(r, 0.001, f32::MAX) {
-        let emitted = rec.material.emitted(rec.u, rec.v, &rec.p);
-        if 1 < depth {
-            if let Some((color, scattered)) = rec.material.scatter(r, &rec) {
-                return emitted + color * ray_color(&scattered, background, world, depth - 1);
+    if let Some(hit) = world.hit(r, 0.001, f32::MAX) {
+        let emitted = hit.material.emitted(hit.u, hit.v, &hit.p);
+        if depth < 50 {
+            if let Some((attenuation, scattered)) = hit.material.scatter(&r, &hit) {
+                return emitted
+                    + attenuation * ray_color(&scattered, background, &world, depth + 1);
             }
         }
         emitted
@@ -46,6 +47,7 @@ fn random_scene() -> Vec<Box<dyn Hittable>> {
 
     let mut rang = thread_rng();
     let point = Vec3::f32(4.0, 0.2, 0.0);
+    let mut smalls: Vec<Arc<dyn Hittable>> = vec![];
     for a in -11..11 {
         for b in -11..11 {
             let choose_mat = rang.gen_range(0.0..1.0f32);
@@ -60,28 +62,30 @@ fn random_scene() -> Vec<Box<dyn Hittable>> {
                 if choose_mat < 0.8 {
                     let albedo = Color::random() * Color::random();
                     let center2 = center + Vec3::f32(0.0, rang.gen_range(0.0..0.5), 0.0);
-                    world.push(Box::new(Sphere::motion(
+                    smalls.push(Arc::new(Sphere::motion(
                         center,
                         center2,
                         0.2,
                         0.0,
                         1.0,
                         Lambertian::new(SolidColor { color: albedo }),
-                    )))
+                    )));
                 } else if choose_mat < 0.95 {
                     let albedo = Color::random_range(0.5, 1.0);
                     let fuzz = rang.gen_range(0.0..0.5);
-                    world.push(Box::new(Sphere::steady(
+                    smalls.push(Arc::new(Sphere::steady(
                         center,
                         0.2,
                         Metal::new(albedo, fuzz),
-                    )))
+                    )));
                 } else {
-                    world.push(Box::new(Sphere::steady(center, 0.2, Dielectric::new(1.5))))
+                    smalls.push(Arc::new(Sphere::steady(center, 0.2, Dielectric::new(1.5))));
                 }
             }
         }
     }
+
+    world.push(Box::new(BvhNode::new(&mut smalls, 0.0, 1.0)));
 
     world.push(Box::new(Sphere::steady(
         Vec3::f32(0.0, 1.0, 0.0),
@@ -155,7 +159,10 @@ fn earth() -> Vec<Box<dyn Hittable>> {
 }
 
 fn simple_light() -> Vec<Box<dyn Hittable>> {
-    let material_ground = Lambertian::new(NoiseTexture::new(4.0));
+    let material_ground = Lambertian::new(CheckerTexture::new(
+        SolidColor::new(0.0, 0.0, 0.0),
+        SolidColor::new(1.0, 1.0, 1.0),
+    ));
     let world: Vec<Box<dyn Hittable>> = vec![
         Box::new(Sphere::steady(
             Vec3::f32(0.0, -1000., 0.0),
@@ -167,15 +174,15 @@ fn simple_light() -> Vec<Box<dyn Hittable>> {
             2.0,
             material_ground,
         )),
-        Box::new(AARect::new(
-            Plane::XY,
-            3.0,
-            5.0,
-            1.0,
-            3.0,
-            -2.0,
-            DiffuseLight::new(SolidColor::new(4., 4., 4.)),
-        )),
+        // Box::new(AARect::new(
+        //     Plane::XY,
+        //     3.0,
+        //     5.0,
+        //     1.0,
+        //     3.0,
+        //     -2.0,
+        //     DiffuseLight::new(SolidColor::new(4., 4., 4.)),
+        // )),
     ];
 
     world
@@ -504,9 +511,9 @@ fn main() {
                 Vec3::f32(0.0, 2.0, 0.0),
                 0.1,
                 20.0,
-                Color::f32(0.0, 0.0, 0.00),
+                Color::f32(0.70, 0.80, 1.00),
                 16.0 / 9.0,
-                300,
+                800,
             ),
             6 => (
                 cornell_box(),
@@ -532,11 +539,11 @@ fn main() {
                 final_scene(),
                 Vec3::f32(478.0, 278.0, -600.0),
                 Vec3::f32(278.0, 278.0, 0.0),
-                0.1,
+                0.0,
                 40.0,
                 Color::f32(0.0, 0.0, 0.00),
-                1.0,
-                800,
+                16.0 / 9.0,
+                1280,
             ),
             _ => (
                 vec![],
@@ -550,10 +557,8 @@ fn main() {
             ),
         };
 
-    let image_width = 800;
+    let image_width = 1280;
     let image_height = (image_width as f32 / aspect_ration) as i32;
-
-    let max_depth = 50;
 
     let vup = Vec3::f32(0.0, 1.0, 0.0);
     let dist_to_focus = 10.0;
@@ -588,7 +593,7 @@ fn main() {
                             let v =
                                 (j as f32 + thread_rng().gen::<f32>()) / (image_height - 1) as f32;
                             let r = camera.get_ray(u, v);
-                            ray_color(&r, &background, &world, max_depth)
+                            ray_color(&r, &background, &world, 0)
                         })
                         .sum()
                 })
@@ -616,9 +621,9 @@ fn write_colors(f: &mut File, pixel_colors: &Image, samples_per_pixel: i32) {
             f.write_all(
                 format!(
                     "{} {} {}\n",
-                    (256.0 * clamp(r, 0.0, 0.999)) as i32,
-                    (256.0 * clamp(g, 0.0, 0.999)) as i32,
-                    (256.0 * clamp(b, 0.0, 0.999)) as i32,
+                    (256.0 * clamp(r, 0.0, 0.999)) as u8,
+                    (256.0 * clamp(g, 0.0, 0.999)) as u8,
+                    (256.0 * clamp(b, 0.0, 0.999)) as u8,
                 )
                 .as_bytes(),
             )
