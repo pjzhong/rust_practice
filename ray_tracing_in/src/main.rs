@@ -459,7 +459,7 @@ fn final_scene() -> Vec<Box<dyn Hittable>> {
 
 fn main() {
     // World And Camera
-    let case = 4;
+    let case = 8;
     let (world, look_from, look_at, aperture, vfov, background, aspect_ration, samples_per_pixel) =
         match case {
             1 => (
