@@ -24,9 +24,8 @@ fn ray_color(r: &Ray, background: &Color, world: &[Box<dyn Hittable>], depth: i3
     if let Some(hit) = world.hit(r, 0.001, f32::MAX) {
         let emitted = hit.material.emitted(hit.u, hit.v, &hit.p);
         if depth < 50 {
-            if let Some((attenuation, scattered)) = hit.material.scatter(&r, &hit) {
-                return emitted
-                    + attenuation * ray_color(&scattered, background, &world, depth + 1);
+            if let Some((attenuation, scattered)) = hit.material.scatter(r, &hit) {
+                return emitted + attenuation * ray_color(&scattered, background, world, depth + 1);
             }
         }
         emitted
@@ -353,9 +352,7 @@ fn cornell_smoke() -> Vec<Box<dyn Hittable>> {
 }
 
 fn final_scene() -> Vec<Box<dyn Hittable>> {
-    let mut objects: Vec<Box<dyn Hittable>> = vec![];
-
-    objects.push(Box::new(AARect::new(
+    let mut objects: Vec<Box<dyn Hittable>> = vec![Box::new(AARect::new(
         Plane::XZ,
         123.0,
         423.0,
@@ -363,7 +360,7 @@ fn final_scene() -> Vec<Box<dyn Hittable>> {
         412.0,
         554.0,
         DiffuseLight::new(SolidColor::new(7.0, 7.0, 7.0)),
-    )));
+    ))];
 
     let mut rang = rand::thread_rng();
     let ground = Lambertian::new(SolidColor::new(0.48, 0.83, 0.53));
@@ -462,7 +459,7 @@ fn final_scene() -> Vec<Box<dyn Hittable>> {
 
 fn main() {
     // World And Camera
-    let case = 8;
+    let case = 4;
     let (world, look_from, look_at, aperture, vfov, background, aspect_ration, samples_per_pixel) =
         match case {
             1 => (
@@ -503,7 +500,7 @@ fn main() {
                 20.0,
                 Color::f32(0.70, 0.80, 1.00),
                 16.0 / 9.0,
-                300,
+                500,
             ),
             5 => (
                 simple_light(),
@@ -586,7 +583,7 @@ fn main() {
                 .into_par_iter()
                 .map(|i| {
                     (0..samples_per_pixel)
-                        .into_iter()
+                        .into_par_iter()
                         .map(|_| {
                             let u =
                                 (i as f32 + thread_rng().gen::<f32>()) / (image_width - 1) as f32;

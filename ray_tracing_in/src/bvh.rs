@@ -46,8 +46,8 @@ impl BvhNode {
             },
             _ => {
                 let mid = objects.len() / 2;
-                let right = Box::new(BvhNode::new(&mut objects[0..mid], time0, time1));
-                let left = Box::new(BvhNode::new(&mut objects[mid..], time0, time1));
+                let right = Box::new(BvhNode::new(&mut objects[mid..], time0, time1));
+                let left = Box::new(BvhNode::new(&mut objects[0..mid], time0, time1));
 
                 BvhNode {
                     aabb: match (left.aabb, right.aabb) {
