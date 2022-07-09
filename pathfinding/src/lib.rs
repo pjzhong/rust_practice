@@ -4,50 +4,28 @@ use std::{
     hash::Hash,
 };
 
-pub struct SimpleGraph {
-    edage: HashMap<i32, Vec<i32>>,
-}
-
-impl SimpleGraph {
-    pub fn neighbors(&self, id: i32) -> Option<&Vec<i32>> {
-        self.edage.get(&id)
-    }
-}
-
-fn breadth_first_search(graph: SimpleGraph, start: i32) {
-    let mut queue = vec![start];
-    let mut set = HashSet::from([start]);
-
-    while let Some(idx) = queue.pop() {
-        println!("Visiting {:?}", idx);
-        if let Some(nexts) = graph.neighbors(idx) {
-            for next in nexts {
-                if set.insert(*next) {
-                    queue.push(*next);
-                }
-            }
-        }
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord, Debug)]
-struct GridLocation {
-    x: i32,
-    y: i32,
+pub struct GridLocation {
+    pub x: i32,
+    pub y: i32,
 }
 
-const GRID_DIR: [GridLocation; 4] = [
+const GRID_DIR: [GridLocation; 8] = [
     GridLocation { x: 1, y: 0 },
     GridLocation { x: -1, y: 0 },
     GridLocation { x: 0, y: -1 },
     GridLocation { x: 0, y: 1 },
+    GridLocation { x: 1, y: 1 },
+    GridLocation { x: 1, y: -1 },
+    GridLocation { x: -1, y: 1 },
+    GridLocation { x: -1, y: -1 },
 ];
 
-struct SquareGrid {
-    width: i32,
-    height: i32,
-    walls: HashSet<GridLocation>,
-    forest: HashSet<GridLocation>,
+pub struct SquareGrid {
+    pub width: i32,
+    pub height: i32,
+    pub walls: HashSet<GridLocation>,
+    pub forest: HashSet<GridLocation>,
 }
 
 impl SquareGrid {
@@ -65,11 +43,7 @@ impl SquareGrid {
     }
 
     pub fn cost(&self, to_node: &GridLocation) -> i32 {
-        if self.forest.contains(&to_node) {
-            5
-        } else {
-            1
-        }
+        1
     }
 
     pub fn is_bounds(&self, id: &GridLocation) -> bool {
@@ -89,20 +63,23 @@ impl SquareGrid {
                 result.push(next);
             }
         }
-
-        if (id.x + id.y) % 2 == 0 {
-            result.reverse();
-        }
-
         result
     }
 
-    pub fn add_rect(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
+    pub fn add_rects(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
         for x in x1..x2 {
             for y in y1..y2 {
                 self.walls.insert(GridLocation { x, y });
             }
         }
+    }
+
+    pub fn add_rect(&mut self, x: i32, y: i32) {
+        self.walls.insert(GridLocation { x, y });
+    }
+
+    pub fn rm_rect(&mut self, x: i32, y: i32) {
+        self.walls.remove(&GridLocation { x, y });
     }
 
     pub fn add_forst(&mut self, x: i32, y: i32) {
@@ -111,17 +88,17 @@ impl SquareGrid {
 
     pub fn make_diagram1() -> SquareGrid {
         let mut grid = SquareGrid::new(30, 15);
-        grid.add_rect(3, 3, 5, 12);
-        grid.add_rect(13, 4, 15, 15);
-        grid.add_rect(21, 0, 23, 7);
-        grid.add_rect(23, 5, 26, 7);
+        grid.add_rects(3, 3, 5, 12);
+        grid.add_rects(13, 4, 15, 15);
+        grid.add_rects(21, 0, 23, 7);
+        grid.add_rects(23, 5, 26, 7);
 
         grid
     }
 
     pub fn make_diagram2() -> SquareGrid {
         let mut grid = SquareGrid::new(10, 10);
-        grid.add_rect(1, 7, 4, 9);
+        grid.add_rects(1, 7, 4, 9);
 
         grid.add_forst(3, 4);
         grid.add_forst(3, 5);
@@ -154,16 +131,15 @@ impl SquareGrid {
         grid
     }
 
-
     pub fn make_diagram3() -> SquareGrid {
         let mut grid = SquareGrid::new(30, 30);
-        grid.add_rect(3, 3, 5, 12);
-        grid.add_rect(13, 4, 15, 15);
-        grid.add_rect(21, 0, 23, 7);
-        grid.add_rect(23, 5, 26, 7);
+        grid.add_rects(3, 3, 5, 12);
+        grid.add_rects(13, 4, 15, 15);
+        grid.add_rects(21, 0, 23, 7);
+        grid.add_rects(23, 5, 26, 7);
 
-        grid.add_rect(25, 10, 29, 20);
-        grid.add_rect(15, 3, 20, 8);
+        grid.add_rects(25, 10, 29, 20);
+        grid.add_rects(15, 3, 20, 8);
         grid
     }
 
@@ -246,7 +222,7 @@ impl SquareGrid {
         path
     }
 
-    fn a_star_search(
+    pub fn a_star_search(
         &self,
         start: &GridLocation,
         goal: &GridLocation,
@@ -283,13 +259,14 @@ impl SquareGrid {
         (came_from, cost_so_far)
     }
 
-    fn heuristic(a: &GridLocation, b: &GridLocation) -> i32 {
-        (a.x - b.x).abs() + (a.y - b.y).abs()
+    pub fn heuristic(a: &GridLocation, b: &GridLocation) -> i32 {
+        let res = ((a.x - b.x).abs().pow(2) + (a.y - b.y).abs().pow(2)) as f64;
+        res.sqrt() as i32
     }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct Pair<A, B>(A, B);
+pub struct Pair<A, B>(pub A, pub B);
 
 fn draw_grid(
     graph: &SquareGrid,
@@ -342,27 +319,6 @@ fn draw_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn example_graph() -> SimpleGraph {
-        SimpleGraph {
-            edage: HashMap::from([
-                (1, vec![2]),
-                (2, vec![3]),
-                (3, vec![2, 4, 5]),
-                (4, vec![3, 5]),
-                (5, vec![6]),
-                (6, vec![]),
-            ]),
-        }
-    }
-
-    #[test]
-    fn breadth_first_search() {
-        println!("Reachable from {:?}", 1);
-        super::breadth_first_search(example_graph(), 1);
-        println!("Reachable from {:?}", 5);
-        super::breadth_first_search(example_graph(), 5);
-    }
 
     #[test]
     fn draw_diagram1() {

@@ -6,3 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[dev-dependencies]
+bevy = {version = "0.7", default-features = false, features = ["png", "bevy_winit", "render"]}
+bevy_ascii_terminal = "0.9.1"
+bevy_tiled_camera = "0.3.1"
+noise = "0.7.0"
