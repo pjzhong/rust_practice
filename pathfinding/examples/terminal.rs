@@ -107,7 +107,7 @@ fn builds(map: &mut SquareGrid) {
             let v = plane.get_value(x as usize, y as usize);
 
             if threshold <= v {
-              //  map.add_rect(x, y);
+                map.add_rect(x, y);
             }
         }
     }
@@ -134,8 +134,8 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<SquareGrid>, finding: Res<Pat
         let fmt = CharFormat::new(Color::RED, Color::BLACK);
         for (p, _) in visited {
             let c = match map.passable(p) {
-                true => WALL_TILE.glyph,
-                false => '.',
+                false => WALL_TILE.glyph,
+                true => '.',
             };
             term.put_char_formatted([p.x, p.y], c, fmt);
         }
@@ -161,8 +161,8 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<SquareGrid>, finding: Res<Pat
         let fmt = CharFormat::new(Color::RED, Color::BLACK);
         for (p, _) in visited {
             let c = match map.passable(p) {
-                true => WALL_TILE.glyph,
-                false => '.',
+                false => WALL_TILE.glyph,
+                true => '.',
             };
             term.put_char_formatted([p.x, p.y], c, fmt);
         }
@@ -174,7 +174,7 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<SquareGrid>, finding: Res<Pat
     }
 
     if let Some(end) = finding.goal {
-        let fmt = CharFormat::new(Color::BLUE, Color::BLACK);
+        let fmt = CharFormat::new(Color::GREEN, Color::BLACK);
         term.put_char_formatted(end.into(), 'E', fmt);
     }
 }
@@ -297,8 +297,7 @@ pub fn a_star_search(
         }
 
         for next in map.neighbors(&current) {
-            let cost_current = cost_so_far.get(&current).unwrap_or(&0);
-            let new_cost = cost_current + map.cost(&next);
+            let new_cost = cost_so_far.get(&current).unwrap_or(&0) + map.cost(&next);
             let prev_next_cost = cost_so_far.get(&next);
             if prev_next_cost.is_none() || &new_cost < prev_next_cost.unwrap_or(&0) {
                 cost_so_far.insert(next, new_cost);

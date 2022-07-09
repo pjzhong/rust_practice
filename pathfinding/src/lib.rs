@@ -260,8 +260,7 @@ impl SquareGrid {
     }
 
     pub fn heuristic(a: &GridLocation, b: &GridLocation) -> i32 {
-        let res = ((a.x - b.x).abs().pow(2) + (a.y - b.y).abs().pow(2)) as f64;
-        res.sqrt() as i32
+        (a.x - b.x).abs() + (a.y - b.y).abs()
     }
 }
 
