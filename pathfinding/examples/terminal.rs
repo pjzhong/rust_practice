@@ -268,48 +268,13 @@ fn update_path(map: Res<SquareGrid>, mut finding: ResMut<PathingState>) {
             x: goal.x,
             y: goal.y,
         };
-        let (path, visited) = a_star_search(&map, &start, &goal);
+        let (path, visited) = SquareGrid::a_star_search(&map, &start, &goal);
         if path.contains_key(&goal) {
             finding.path = Some(SquareGrid::reconstruct_path(&start, &goal, &path));
         }
         finding.visited = Some(visited);
         finding.time = times.elapsed();
     }
-}
-
-pub fn a_star_search(
-    map: &SquareGrid,
-    start: &GridLocation,
-    goal: &GridLocation,
-) -> (
-    HashMap<GridLocation, GridLocation>,
-    HashMap<GridLocation, i32>,
-) {
-    let mut frontier = BinaryHeap::new();
-    frontier.push(Reverse(Pair(0, start.clone())));
-
-    let mut came_from = HashMap::from([(start.clone(), start.clone())]);
-    let mut cost_so_far = HashMap::from([(start.clone(), 0)]);
-
-    while let Some(Reverse(Pair(_, current))) = frontier.pop() {
-        if &current == goal {
-            break;
-        }
-
-        for next in map.neighbors(&current) {
-            let new_cost = cost_so_far.get(&current).unwrap_or(&0) + map.cost(&next);
-            let prev_next_cost = cost_so_far.get(&next);
-            if prev_next_cost.is_none() || &new_cost < prev_next_cost.unwrap_or(&0) {
-                cost_so_far.insert(next, new_cost);
-                came_from.insert(next, current);
-                frontier.push(Reverse(Pair(
-                    new_cost + SquareGrid::heuristic(&next, goal),
-                    next,
-                )));
-            }
-        }
-    }
-    (came_from, cost_so_far)
 }
 
 fn main() {
