@@ -29,6 +29,7 @@ fn main() {
         .add_system(movement)
         .add_system_set(
             SystemSet::new()
+                //控制下光环的刷新频率
                 .with_run_criteria(FixedTimestep::step(3.0 / 60.0))
                 .with_system(movement_halo),
         )
