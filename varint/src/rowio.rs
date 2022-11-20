@@ -6,7 +6,7 @@ use crate::zigzag::ZigZag;
 
 pub trait VarintRead: Read {
     fn read_varint_i32(&mut self) -> Result<i32, Error> {
-        match self.read_raw_var_u64_slow_path() {
+        match self.read_varint_u64() {
             Ok(value) => {
                 Ok((value as u32).zigzag())
             }
@@ -17,7 +17,7 @@ pub trait VarintRead: Read {
     }
 
     fn read_varint_u32(&mut self) -> Result<u32, Error> {
-        match self.read_raw_var_u64_slow_path() {
+        match self.read_varint_u64() {
             Ok(value) => {
                 Ok(value as u32)
             }
@@ -28,7 +28,7 @@ pub trait VarintRead: Read {
     }
 
     fn read_varint_i64(&mut self) -> Result<i64, Error> {
-        match self.read_raw_var_u64_slow_path() {
+        match self.read_varint_u64() {
             Ok(value) => {
                 Ok(value.zigzag())
             }
@@ -38,19 +38,7 @@ pub trait VarintRead: Read {
         }
     }
 
-    
     fn read_varint_u64(&mut self) -> Result<u64, Error> {
-        match self.read_raw_var_u64_slow_path() {
-            Ok(value) => {
-                Ok(value)
-            }
-            Err(err) => {
-                Err(err)
-            }
-        }
-    }
-
-    fn read_raw_var_u64_slow_path(&mut self) -> Result<u64, Error> {
         let mut decoded_value: u64 = 0;
         let mut raw_buffer = vec![0u8; 1];
 
@@ -215,7 +203,7 @@ mod test {
         assert!(vec.write_varint_i64(0).is_ok());
         assert_eq!(2, vec.position());
         assert!(vec.write_varint_i64(123412341).is_ok());
-        assert_eq!(, vec.position());
+        assert_eq!(6, vec.position());
         assert!(vec.write_varint_i64(123412341234123441).is_ok());
         assert!(vec.write_varint_i64(-5545453).is_ok());
         assert!(vec.write_varint_i64(-55454534562345233).is_ok());
