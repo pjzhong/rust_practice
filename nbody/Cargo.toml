@@ -1,0 +1,36 @@
+[package]
+name = "nbody"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+path = "src/main.rs"
+name = "nbody_run"
+
+[dependencies]
+rand = "*"
+bevy_prototype_lyon = "0.4"
+bevy_fly_camera = "0.8"
+bevy_pancam = "*"
+bevy_egui = "0.12"
+bevy-web-resizer = "1.0.0"
+wasm-bindgen = "0.2.79"
+wee_alloc = { version = "0.4.5", optional = true }
+derive_more = "0.99.17"
+
+[dependencies.bevy]
+#features = ["dynamic"]
+version = "0.6.1"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.2"
+
+[target.profile.release]
+lto = true
+opt-level = 3
+
