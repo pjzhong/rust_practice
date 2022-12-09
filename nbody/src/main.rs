@@ -1,19 +1,25 @@
 use std::{
     collections::{HashMap, HashSet},
     f32::consts::PI,
-    hash::Hash,
 };
 
-use bevy::{prelude::*, reflect::erased_serde::__private::serde::__private::de};
+use bevy::{
+    diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
+    prelude::*,
+};
+use bevy_egui::{egui, EguiContext, EguiPlugin};
 use bevy_prototype_lyon::{
     prelude::{DrawMode, FillMode, GeometryBuilder, ShapePlugin, StrokeMode},
     shapes,
 };
 use derive_more::Deref;
+use nbody::pancam::{PanCam, PanCamPlugin};
 use rand::Rng;
 
 //Events
 struct Reset;
+
+struct ClearTraces;
 
 #[derive(Component, Debug, Clone)]
 struct Planet {
@@ -67,48 +73,84 @@ impl Default for Settings {
     }
 }
 
+#[derive(Component)]
+struct Trace {
+    live_until: f64,
+}
+
+#[derive(Default)]
+struct Stats {
+    frame_number: usize,
+    n_objects: usize,
+    center_on_largest: bool,
+    draw_traces: bool,
+    largest_position: Vec2,
+}
+
 pub fn game() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .insert_resource(Settings::default())
+        .insert_resource(Stats::default())
         .add_event::<Reset>()
+        .add_event::<ClearTraces>()
         .add_plugins(DefaultPlugins)
         .add_plugin(ShapePlugin)
+        .add_plugin(PanCamPlugin)
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(EguiPlugin)
         .add_startup_system(setup)
         .add_system(setup_many_orbits)
         .add_system(gravity)
+        .add_system(despawn_traces)
+        .add_system(ui_box)
         .run();
 }
 
 fn setup(mut commands: Commands, mut ev_reset: EventWriter<Reset>) {
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands
+        .spawn_bundle(OrthographicCameraBundle::new_2d())
+        .insert(PanCam::default());
     ev_reset.send(Reset);
 }
 
 fn gravity(
     mut commands: Commands,
     mut planet_query: Query<(Entity, &mut Planet, &mut Velocity, &mut Transform)>,
+    mut stats: ResMut<Stats>,
     settings: Res<Settings>,
+    time: Res<Time>,
 ) {
     let mut accel_map: HashMap<u32, Vec2> = HashMap::new();
     let mut despawned: HashSet<u32> = HashSet::new();
+    stats.frame_number += 1;
+    stats.n_objects = 0;
 
     for (ent_1, planet_1, vel_1, trans_1) in planet_query.iter() {
-     
+        if stats.draw_traces && stats.frame_number % 5 == 0 {
+            let transform = *trans_1;
+            spawn_trace(
+                &mut commands,
+                transform,
+                time.seconds_since_startup() + 10.0,
+            );
+        }
         let id1 = ent_1.id();
         let mut accel_cum = Vec2::new(0.0, 0.0);
+        stats.n_objects += 1;
         for (ent_2, planet_2, vel_2, trans_2) in planet_query.iter() {
             if despawned.contains(&id1) {
                 break;
             }
             let id2 = ent_2.id();
-            if id1 == id2 ||  despawned.contains(&id2){
+            if id1 == id2 || despawned.contains(&id2) {
                 continue;
             }
 
             let r_vector = trans_1.translation.truncate() - trans_2.translation.truncate();
-            if settings.collisions && r_vector.length() < planet_1.radius + planet_2.radius {
+            let range = planet_1.radius + planet_2.radius;
+            if settings.collisions && r_vector.length() < range {
                 let sum_mass = planet_1.mass() + planet_2.mass();
                 let final_velocity = Velocity(
                     vel_1.0 * planet_1.mass() / sum_mass + vel_2.0 * planet_2.mass() / sum_mass,
@@ -135,8 +177,8 @@ fn gravity(
                 }
             } else {
                 let r_mag = r_vector.length();
-                let r_mag = if !settings.collisions && r_mag < planet_1.radius + planet_2.radius {
-                    planet_1.radius + planet_2.radius
+                let r_mag = if !settings.collisions && r_mag < range {
+                    range
                 } else {
                     r_mag
                 };
@@ -160,6 +202,35 @@ fn gravity(
             vel.0 += *acc * (1.0 / settings.time_step);
             trans.translation.x += vel.x * (1.0 / settings.time_step);
             trans.translation.y += vel.y * (1.0 / settings.time_step);
+        }
+    }
+}
+
+fn spawn_trace(commands: &mut Commands, transform: Transform, live_until: f64) {
+    commands
+        .spawn_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::GRAY,
+                custom_size: Some(Vec2::new(1.0, 1.0)),
+                ..Default::default()
+            },
+            transform,
+            ..Default::default()
+        })
+        .insert(Trace { live_until });
+}
+
+fn despawn_traces(
+    mut commands: Commands,
+    mut ev_clear: EventReader<ClearTraces>,
+    traces: Query<(Entity, &Trace)>,
+    time: Res<Time>,
+) {
+    let now = time.seconds_since_startup();
+    let clear = ev_clear.iter().next().is_some();
+    for (entity, trace) in traces.iter() {
+        if trace.live_until < now || clear {
+            commands.entity(entity).despawn();
         }
     }
 }
@@ -220,6 +291,72 @@ fn setup_many_orbits(
             );
         }
     }
+}
+
+fn ui_box(
+    mut ev_clear_traces: EventWriter<ClearTraces>,
+    mut ev_reset: EventWriter<Reset>,
+    mut settings: ResMut<Settings>,
+    mut egui_context: ResMut<EguiContext>,
+    mut stats: ResMut<Stats>,
+    time: Res<Time>,
+    diagnostics: Res<Diagnostics>,
+) {
+    egui::Window::new("Moon creator").show(egui_context.ctx_mut(), |ui| {
+        if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+            if let Some(average) = fps.average() {
+                // Update the value of the second section
+                ui.label("WASD to move, drag to move,\nscrool wheel to zoom in/out");
+                ui.label(format!("Time {:.2}", time.seconds_since_startup()));
+                ui.label(format!("FPS {:.2}", average));
+                ui.label(format!("Number of objects {:}", stats.n_objects));
+                ui.checkbox(&mut stats.draw_traces, "Draw traces");
+                ui.add(egui::Slider::new(&mut settings.g, 0.5..=100.0).text("G constant"));
+                ui.add(egui::Slider::new(&mut settings.time_step, 1.0..=1000.0).text("Time step"));
+                ui.label("Higher value means slower, but more precise simulation");
+                ui.checkbox(&mut settings.collisions, "Enable colissions");
+                if ui.button("Clear traces").clicked() {
+                    ev_clear_traces.send(ClearTraces);
+                };
+                ui.label("Simulation settings (need restart)");
+                ui.add(
+                    egui::Slider::new(&mut settings.n_objects, 10..=10000).text("Number of planets"),
+                );
+                ui.checkbox(&mut settings.collisions, "Enable colissions");
+                ui.add(
+                    egui::Slider::new(&mut settings.min_planet_size, 0.5..=3.0)
+                        .text("Minimum planet radius"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut settings.max_planet_size, 3.0..=10.0)
+                        .text("Maximum planet radius"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut settings.min_planet_density, 0.5..=5.0)
+                        .text("Minimum planet density"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut settings.max_planet_density, 0.5..=50.0)
+                        .text("Maximum planet density"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut settings.min_planet_orbit_radius, 100.0..=500.0)
+                        .text("Minimum planet orbit radius"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut settings.max_planet_orbit_radius, 500.0..=2000.0)
+                        .text("Maximum planet orbit radius"),
+                );
+                ui.add(egui::Slider::new(&mut settings.sun_size, 30.0..=100.0).text("Sun radius"));
+                ui.add(
+                    egui::Slider::new(&mut settings.sun_density, 5.0..=100.0).text("Sun density"),
+                );
+                if ui.button("Start").clicked() {
+                    ev_reset.send(Reset);
+                }
+            }
+        }
+    });
 }
 
 fn spawn_planet(commands: &mut Commands, planet: Planet, velocity: Velocity, transform: Transform) {
