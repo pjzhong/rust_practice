@@ -4,8 +4,6 @@ fn image_transfer(mut argv: env::Args) -> Result<i32, String> {
     let source_dir = argv.nth(1).ok_or_else(|| "What is the source".to_owned())?;
     let target_dir = argv.next().ok_or_else(|| "What is the target".to_owned())?;
 
-
-
     let mut count = 0;
     if let Ok(entry) = fs::read_dir(&source_dir).map_err(|_| source_dir + " is not exists") {
         count = 1;
