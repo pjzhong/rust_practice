@@ -50,7 +50,7 @@ fn run_prompt(mut lox: Lox) {
     }
 }
 
-fn run(code: &String, lox: &mut Lox) {
+fn run(code: &str, lox: &mut Lox) {
     let mut scanner = Scanner::new(code);
     let tokens = scanner.scan_tokens(lox);
     for token in tokens {
