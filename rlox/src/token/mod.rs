@@ -1,22 +1,22 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 pub struct Token {
     pub toke_type: TokenType,
     pub lexeme: String,
-    pub value: Option<TokenValue>,
+    pub value: Option<Literal>,
     pub line: usize,
 }
 
 impl Token {
-    pub fn new(
+    pub fn new<Str: Into<String>>(
         toke_type: TokenType,
-        lexeme: String,
-        value: Option<TokenValue>,
+        lexeme: Str,
+        value: Option<Literal>,
         line: usize,
     ) -> Self {
         Self {
             toke_type,
-            lexeme,
+            lexeme: lexeme.into(),
             value,
             line,
         }
@@ -85,9 +85,31 @@ pub enum TokenType {
 }
 
 #[derive(Debug)]
-pub enum TokenValue {
-    Literal(String),
+pub enum Literal {
+    String(String),
     Number(f64),
+}
+
+///简化代码编写，不然这种包装写法太长了
+impl From<f64> for Literal {
+    fn from(a: f64) -> Self {
+        Literal::Number(a)
+    }
+}
+
+impl From<String> for Literal {
+    fn from(a: String) -> Self {
+        Literal::String(a)
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::String(str) => write!(f, "{}", str),
+            Literal::Number(num) => write!(f, "{}", num),
+        }
+    }
 }
 
 impl TokenType {

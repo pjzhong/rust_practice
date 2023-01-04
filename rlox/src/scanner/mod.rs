@@ -1,5 +1,5 @@
 use crate::{
-    token::{Token, TokenType, TokenValue},
+    token::{Literal, Token, TokenType},
     Lox,
 };
 
@@ -29,7 +29,7 @@ impl Scanner {
         }
 
         self.tokens
-            .push(Token::new(TokenType::Eof, String::new(), None, self.line));
+            .push(Token::new(TokenType::Eof, "", None, self.line));
         &self.tokens
     }
 
@@ -114,7 +114,7 @@ impl Scanner {
         let value = self.source[(self.start + 1)..(self.current - 1)]
             .iter()
             .collect::<String>();
-        self.add_token_value(TokenType::String, Some(TokenValue::Literal(value)));
+        self.add_token_value(TokenType::String, Some(Literal::String(value)));
     }
 
     fn number(&mut self, lox: &mut Lox) {
@@ -142,7 +142,7 @@ impl Scanner {
             }
         };
 
-        self.add_token_value(TokenType::Number, Some(TokenValue::Number(val)));
+        self.add_token_value(TokenType::Number, Some(Literal::Number(val)));
     }
 
     fn identifier(&mut self) {
@@ -214,7 +214,7 @@ impl Scanner {
         self.add_token_value(ty, None);
     }
 
-    fn add_token_value(&mut self, ty: TokenType, literal: Option<TokenValue>) {
+    fn add_token_value(&mut self, ty: TokenType, literal: Option<Literal>) {
         let text = self.source[self.start..self.current]
             .iter()
             .collect::<String>();
