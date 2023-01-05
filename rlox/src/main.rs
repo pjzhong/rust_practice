@@ -8,7 +8,7 @@ use rlox::{Lox, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
-    let lox = Lox::default();
+    let lox = Arc::new(Lox::default());
 
     match args.len() {
         a if a > 2 => {
@@ -22,7 +22,7 @@ fn main() {
     }
 }
 
-fn run_file(mut lox: Lox, file: &String) {
+fn run_file(lox: Arc<Lox>, file: &String) {
     match fs::read_to_string(file) {
         Ok(file) => {
             run(&file, &mut lox);
@@ -34,7 +34,7 @@ fn run_file(mut lox: Lox, file: &String) {
     }
 }
 
-fn run_prompt(mut lox: Lox) {
+fn run_prompt(lox: Arc<Lox>) {
     let mut string = String::new();
     let stdio = io::stdin();
     loop {
@@ -50,9 +50,9 @@ fn run_prompt(mut lox: Lox) {
     }
 }
 
-fn run(code: &str, lox: &mut Lox) {
-    let mut scanner = Scanner::new(code);
-    let tokens = scanner.scan_tokens(lox);
+fn run(code: &str, lox: Arc<Lox>) {
+    let mut scanner = Scanner::new(code, lox);
+    let tokens = scanner.scan_tokens();
     for token in tokens {
         println!("{:?}", token);
     }

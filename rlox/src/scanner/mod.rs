@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     token::{Literal, Token, TokenType},
     Lox,
@@ -9,31 +11,33 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+    lox: Arc<Lox>,
 }
 
 impl Scanner {
-    pub fn new(source: &str) -> Self {
+    pub fn new(source: &str, lox: Arc<Lox>) -> Self {
         Self {
             source: source.chars().collect(),
             tokens: vec![],
             start: 0,
             current: 0,
             line: 1,
+            lox,
         }
     }
 
-    pub fn scan_tokens(&mut self, lox: &mut Lox) -> &Vec<Token> {
+    pub fn scan_tokens(&mut self) -> &Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
-            self.do_scan_tokens(lox);
+            self.do_scan_tokens();
         }
 
         self.tokens
-            .push(Token::new(TokenType::Eof, "", None, self.line));
+            .push(Token::new(TokenType::Eof, "", Literal::Nil, self.line));
         &self.tokens
     }
 
-    fn do_scan_tokens(&mut self, lox: &mut Lox) {
+    fn do_scan_tokens(&mut self) {
         match self.advance() {
             '(' => self.add_token(TokenType::LeftParen),
             ')' => self.add_token(TokenType::RightParen),
@@ -86,16 +90,16 @@ impl Scanner {
                     self.add_token(TokenType::Slash);
                 }
             }
-            '"' => self.string(lox),
+            '"' => self.string(),
             '\n' => self.line += 1,
             ' ' | '\r' | '\t' => {}
-            c if Scanner::is_digit(c) => self.number(lox),
+            c if Scanner::is_digit(c) => self.number(),
             c if Scanner::is_alpha(c) => self.identifier(),
-            _ => lox.error(self.line, "Unexpected character."),
+            _ => self.lox.error(self.line, "Unexpected character."),
         }
     }
 
-    fn string(&mut self, lox: &mut Lox) {
+    fn string(&mut self) {
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
@@ -104,7 +108,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            lox.error(self.line, "Unterminated string.");
+            self.lox.error(self.line, "Unterminated string.");
             return;
         }
 
@@ -114,10 +118,10 @@ impl Scanner {
         let value = self.source[(self.start + 1)..(self.current - 1)]
             .iter()
             .collect::<String>();
-        self.add_token_value(TokenType::String, Some(Literal::String(value)));
+        self.add_token_value(TokenType::String, Literal::String(value));
     }
 
-    fn number(&mut self, lox: &mut Lox) {
+    fn number(&mut self) {
         while Scanner::is_digit(self.peek()) {
             self.advance();
         }
@@ -137,12 +141,12 @@ impl Scanner {
         let val = match value.parse::<f64>() {
             Ok(v) => v,
             Err(e) => {
-                lox.error(self.line, &format!("{:?}", e));
+                self.lox.error(self.line, &format!("{:?}", e));
                 return;
             }
         };
 
-        self.add_token_value(TokenType::Number, Some(Literal::Number(val)));
+        self.add_token_value(TokenType::Number, Literal::Number(val));
     }
 
     fn identifier(&mut self) {
@@ -211,13 +215,14 @@ impl Scanner {
     }
 
     fn add_token(&mut self, ty: TokenType) {
-        self.add_token_value(ty, None);
+        self.add_token_value(ty, Literal::Nil);
     }
 
-    fn add_token_value(&mut self, ty: TokenType, literal: Option<Literal>) {
+    fn add_token_value(&mut self, ty: TokenType, literal: Literal) {
         let text = self.source[self.start..self.current]
             .iter()
             .collect::<String>();
-        self.tokens.push(Token::new(ty, text, literal, self.line))
+        self.tokens
+            .push(Token::new(ty, text, Literal::Nil, self.line))
     }
 }

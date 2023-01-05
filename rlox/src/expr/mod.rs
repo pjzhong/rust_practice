@@ -3,26 +3,32 @@ use crate::token::{Literal, Token};
 pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
-    Literal(Option<Literal>),
+    Literal(Literal),
     Unary(Token, Box<Expr>),
 }
 
 ///简化代码编写，不然这种包装写法太长了
-impl From<f64> for Box<Expr> {
+impl From<f64> for Expr {
     fn from(a: f64) -> Self {
-        Box::new(Expr::Literal(Some(a.into())))
+        a.into()
     }
 }
 
-impl From<String> for Box<Expr> {
+impl From<String> for Expr {
     fn from(a: String) -> Self {
-        Box::new(Expr::Literal(Some(a.into())))
+        a.into()
     }
 }
 
-impl From<bool> for Box<Expr> {
+impl From<bool> for Expr {
     fn from(a: bool) -> Self {
-        Box::new(Expr::Literal(Some(a.into())))
+        a.into()
+    }
+}
+
+impl From<Literal> for Expr {
+    fn from(l: Literal) -> Self {
+        Expr::Literal(l)
     }
 }
 
@@ -62,10 +68,7 @@ mod tests {
                     self.parenthesize(&operator.lexeme, &[&left, &right])
                 }
                 Expr::Grouping(expr) => self.parenthesize("group", &[&expr]),
-                Expr::Literal(val) => match val {
-                    Some(val) => format!("{}", val),
-                    None => "nil".to_string(),
-                },
+                Expr::Literal(val) => format!("{}", val),
                 Expr::Unary(operator, right) => self.parenthesize(&operator.lexeme, &[&right]),
             }
         }
@@ -74,9 +77,13 @@ mod tests {
     #[test]
     fn print() {
         let expression = Expr::Binary(
-            Expr::Unary(Token::new(TokenType::Minus, "-", None, 1), 123.0.into()).into(),
-            Token::new(TokenType::Star, "*", None, 1),
-            Expr::Grouping(45.67.into()).into(),
+            Expr::Unary(
+                Token::new(TokenType::Minus, "-", Literal::Nil, 1),
+                Box::new(123.0.into()),
+            )
+            .into(),
+            Token::new(TokenType::Star, "*", Literal::Nil, 1),
+            Expr::Grouping(Box::new(45.67.into())).into(),
         );
 
         let printer = AstPrinter;

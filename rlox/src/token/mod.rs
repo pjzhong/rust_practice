@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 pub struct Token {
     pub toke_type: TokenType,
     pub lexeme: String,
-    pub value: Option<Literal>,
+    pub value: Literal,
     pub line: usize,
 }
 
@@ -11,7 +11,7 @@ impl Token {
     pub fn new<Str: Into<String>>(
         toke_type: TokenType,
         lexeme: Str,
-        value: Option<Literal>,
+        value: Literal,
         line: usize,
     ) -> Self {
         Self {
@@ -33,7 +33,7 @@ impl Debug for Token {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -89,6 +89,7 @@ pub enum Literal {
     String(String),
     Number(f64),
     Bool(bool),
+    Nil,
 }
 
 ///简化代码编写，不然这种包装写法太长了
@@ -116,6 +117,7 @@ impl Display for Literal {
             Literal::String(str) => write!(f, "{}", str),
             Literal::Number(num) => write!(f, "{}", num),
             Literal::Bool(bol) => write!(f, "{}", bol),
+            Literal::Nil => write!(f, "null"),
         }
     }
 }
