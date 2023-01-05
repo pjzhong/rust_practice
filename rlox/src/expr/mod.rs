@@ -20,6 +20,11 @@ impl From<String> for Box<Expr> {
     }
 }
 
+impl From<bool> for Box<Expr> {
+    fn from(a: bool) -> Self {
+        Box::new(Expr::Literal(Some(a.into())))
+    }
+}
 
 trait Visitor<T> {
     fn visit_expr(&self, expr: &Expr) -> T;

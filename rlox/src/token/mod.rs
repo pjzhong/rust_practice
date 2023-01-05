@@ -33,7 +33,7 @@ impl Debug for Token {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -88,6 +88,7 @@ pub enum TokenType {
 pub enum Literal {
     String(String),
     Number(f64),
+    Bool(bool),
 }
 
 ///简化代码编写，不然这种包装写法太长了
@@ -103,11 +104,18 @@ impl From<String> for Literal {
     }
 }
 
+impl From<bool> for Literal {
+    fn from(a: bool) -> Self {
+        Literal::Bool(a)
+    }
+}
+
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Literal::String(str) => write!(f, "{}", str),
             Literal::Number(num) => write!(f, "{}", num),
+            Literal::Bool(bol) => write!(f, "{}", bol),
         }
     }
 }

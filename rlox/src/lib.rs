@@ -1,6 +1,7 @@
 mod expr;
 mod scanner;
 mod token;
+mod parser;
 
 pub use scanner::Scanner;
 
