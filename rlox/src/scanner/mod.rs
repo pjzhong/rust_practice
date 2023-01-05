@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::{
     token::{Literal, Token, TokenType},
@@ -11,11 +11,11 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    lox: Arc<Lox>,
+    lox: Arc<Mutex<Lox>>,
 }
 
 impl Scanner {
-    pub fn new(source: &str, lox: Arc<Lox>) -> Self {
+    pub fn new(source: &str, lox: Arc<Mutex<Lox>>) -> Self {
         Self {
             source: source.chars().collect(),
             tokens: vec![],
@@ -95,7 +95,7 @@ impl Scanner {
             ' ' | '\r' | '\t' => {}
             c if Scanner::is_digit(c) => self.number(),
             c if Scanner::is_alpha(c) => self.identifier(),
-            _ => self.lox.error(self.line, "Unexpected character."),
+            _ => self.error(self.line, "Unexpected character."),
         }
     }
 
@@ -108,7 +108,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            self.lox.error(self.line, "Unterminated string.");
+            self.error(self.line,  "Unterminated string.");
             return;
         }
 
@@ -141,12 +141,18 @@ impl Scanner {
         let val = match value.parse::<f64>() {
             Ok(v) => v,
             Err(e) => {
-                self.lox.error(self.line, &format!("{:?}", e));
+                self.error(self.line, &format!("{:?}", e));
                 return;
             }
         };
 
         self.add_token_value(TokenType::Number, Literal::Number(val));
+    }
+
+    fn error(&mut self, line:usize, message: &str) {
+        if let Ok(mut lox) = self.lox.lock() {
+            lox.error(self.line,  message);
+        }
     }
 
     fn identifier(&mut self) {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::{
     expr::Expr,
@@ -9,7 +9,7 @@ use crate::{
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
-    lox: Arc<Lox>,
+    lox: Arc<Mutex<Lox>>,
 }
 
 pub struct ParseErr;
@@ -111,8 +111,10 @@ impl Parser {
     }
 
     fn error(&mut self, message: &str) -> ParseErr {
-        let token = self.peek();
-        self.lox.error_token(token, message);
+        if let Ok(mut lox) = self.lox.lock() {
+            let token = self.peek();
+            lox.error_token(token, message)
+        }
         ParseErr
     }
 }
