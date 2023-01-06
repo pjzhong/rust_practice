@@ -1,7 +1,8 @@
 use std::{
     env, fs,
     io::{self, Write},
-    process::exit, sync::{Mutex, Arc},
+    process::exit,
+    sync::{Arc, Mutex},
 };
 
 use rlox::{Lox, Scanner};

@@ -108,7 +108,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            self.error(self.line,  "Unterminated string.");
+            self.error(self.line, "Unterminated string.");
             return;
         }
 
@@ -149,9 +149,9 @@ impl Scanner {
         self.add_token_value(TokenType::Number, Literal::Number(val));
     }
 
-    fn error(&mut self, line:usize, message: &str) {
+    fn error(&mut self, line: usize, message: &str) {
         if let Ok(mut lox) = self.lox.lock() {
-            lox.error(self.line,  message);
+            lox.error(line, message);
         }
     }
 

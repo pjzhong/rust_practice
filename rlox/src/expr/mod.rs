@@ -10,19 +10,19 @@ pub enum Expr {
 ///简化代码编写，不然这种包装写法太长了
 impl From<f64> for Expr {
     fn from(a: f64) -> Self {
-        a.into()
+        Expr::Literal(a.into())
     }
 }
 
 impl From<String> for Expr {
     fn from(a: String) -> Self {
-        a.into()
+        Expr::Literal(a.into())
     }
 }
 
 impl From<bool> for Expr {
     fn from(a: bool) -> Self {
-        a.into()
+        Expr::Literal(a.into())
     }
 }
 

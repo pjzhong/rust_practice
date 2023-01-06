@@ -12,7 +12,7 @@ pub struct Parser {
     lox: Arc<Mutex<Lox>>,
 }
 
-pub struct ParseErr;
+pub struct ParseErr(String);
 
 impl<T> From<ParseErr> for Result<T, ParseErr> {
     fn from(e: ParseErr) -> Self {
@@ -21,6 +21,11 @@ impl<T> From<ParseErr> for Result<T, ParseErr> {
 }
 
 impl Parser {
+
+    pub fn parse(&mut self) -> Result<Expr, ParseErr> {
+        self.expression()
+    }
+
     fn expression(&mut self) -> Result<Expr, ParseErr> {
         self.equality()
     }
@@ -37,8 +42,48 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&self) -> Result<Expr, ParseErr> {
-        Err(ParseErr)
+    fn comparison(&mut self) -> Result<Expr, ParseErr> {
+        let mut expr = self.term()?;
+        while let Some(operator) = self.match_types(&[
+            TokenType::Greater,
+            TokenType::GreaterEqual,
+            TokenType::Less,
+            TokenType::LessEqual,
+        ]) {
+            let right = self.factor()?;
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+        }
+
+        Ok(expr)
+    }
+
+    fn term(&mut self) -> Result<Expr, ParseErr> {
+        let mut expr = self.factor()?;
+
+        while let Some(operator) = self.match_types(&[TokenType::Minus, TokenType::Plus]) {
+            let right = self.factor()?;
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+        }
+
+        Ok(expr)
+    }
+
+    fn factor(&mut self) -> Result<Expr, ParseErr> {
+        let mut expr = self.unary()?;
+        while let Some(operator) = self.match_types(&[TokenType::Slash, TokenType::Star]) {
+            let right = self.unary()?;
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+        }
+        Ok(expr)
+    }
+
+    fn unary(&mut self) -> Result<Expr, ParseErr> {
+        if let Some(operator) = self.match_types(&[TokenType::Bang, TokenType::Minus]) {
+            let right = self.unary()?;
+            return Ok(Expr::Unary(operator, Box::new(right)));
+        }
+
+        self.primary()
     }
 
     fn primary(&mut self) -> Result<Expr, ParseErr> {
@@ -64,7 +109,6 @@ impl Parser {
             self.advance();
             Ok(())
         } else {
-
             Err(self.error(message))
         }
     }
@@ -115,6 +159,28 @@ impl Parser {
             let token = self.peek();
             lox.error_token(token, message)
         }
-        ParseErr
+        ParseErr(message.to_string())
+    }
+
+    fn synchronize(&mut self) {
+        while let Some(oper) = self.advance() {
+            if oper.toke_type == TokenType::Semicolon {
+                return;
+            }
+            if self.is_at_end() {
+                return;
+            }
+            match self.peek().toke_type {
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => return,
+                _ => {}
+            }
+        }
     }
 }
