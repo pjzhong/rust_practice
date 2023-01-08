@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 
+#[derive(Clone)]
 pub struct Token {
     pub toke_type: TokenType,
     pub lexeme: String,
@@ -84,7 +85,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     String(String),
     Number(f64),

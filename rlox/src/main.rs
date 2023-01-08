@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use rlox::{Lox, Scanner};
+use rlox::{AstPrinter, Interpreter, Lox, Parser, Scanner, Visitor};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
@@ -26,7 +26,17 @@ fn main() {
 fn run_file(lox: Arc<Mutex<Lox>>, file: &String) {
     match fs::read_to_string(file) {
         Ok(file) => {
-            run(&file, lox);
+            run(&file, lox.clone());
+
+            if let Ok(lox) = lox.lock() {
+                if lox.has_error {
+                    exit(65);
+                }
+
+                if lox.had_runtime_error {
+                    exit(70);
+                }
+            }
         }
         Err(e) => {
             eprintln!("{:?}", e);
@@ -54,9 +64,22 @@ fn run_prompt(lox: Arc<Mutex<Lox>>) {
 }
 
 fn run(code: &str, lox: Arc<Mutex<Lox>>) {
-    let mut scanner = Scanner::new(code, lox);
+    let scanner = Scanner::new(code, lox.clone());
     let tokens = scanner.scan_tokens();
-    for token in tokens {
-        println!("{:?}", token);
+    println!("{:?}", tokens);
+    let mut parser = Parser::new(tokens, lox.clone());
+
+    match parser.parse() {
+        Ok(expr) => {
+            let printer = AstPrinter;
+            println!("{:?}", expr);
+            println!("{:?}", printer.visit_expr(&expr));
+
+            let mut interpreter = Interpreter::new(lox);
+            interpreter.interpret(&expr);
+        }
+        Err(e) => {
+            eprintln!("{:?}", e);
+        }
     }
 }

@@ -1,36 +1,44 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     expr::Expr,
     token::{Literal, Token, TokenType},
-    Lox,
+    Lox, LoxErr,
 };
 
 pub struct Parser {
-    tokens: Vec<Token>,
+    tokens: VecDeque<Token>,
     current: usize,
     lox: Arc<Mutex<Lox>>,
 }
 
-pub struct ParseErr(String);
-
-impl<T> From<ParseErr> for Result<T, ParseErr> {
-    fn from(e: ParseErr) -> Self {
+impl<T> From<LoxErr> for Result<T, LoxErr> {
+    fn from(e: LoxErr) -> Self {
         Err(e)
     }
 }
 
 impl Parser {
+    pub fn new(tokens: Vec<Token>, lox: Arc<Mutex<Lox>>) -> Self {
+        Self {
+            tokens: tokens.into(),
+            lox,
+            current: 0,
+        }
+    }
 
-    pub fn parse(&mut self) -> Result<Expr, ParseErr> {
+    pub fn parse(&mut self) -> Result<Expr, LoxErr> {
         self.expression()
     }
 
-    fn expression(&mut self) -> Result<Expr, ParseErr> {
+    fn expression(&mut self) -> Result<Expr, LoxErr> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Result<Expr, ParseErr> {
+    fn equality(&mut self) -> Result<Expr, LoxErr> {
         let mut expr = self.comparison()?;
 
         while let Some(operator) = self.match_types(&[TokenType::BangEqual, TokenType::EqualEqual])
@@ -42,7 +50,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expr, ParseErr> {
+    fn comparison(&mut self) -> Result<Expr, LoxErr> {
         let mut expr = self.term()?;
         while let Some(operator) = self.match_types(&[
             TokenType::Greater,
@@ -57,7 +65,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expr, ParseErr> {
+    fn term(&mut self) -> Result<Expr, LoxErr> {
         let mut expr = self.factor()?;
 
         while let Some(operator) = self.match_types(&[TokenType::Minus, TokenType::Plus]) {
@@ -68,7 +76,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expr, ParseErr> {
+    fn factor(&mut self) -> Result<Expr, LoxErr> {
         let mut expr = self.unary()?;
         while let Some(operator) = self.match_types(&[TokenType::Slash, TokenType::Star]) {
             let right = self.unary()?;
@@ -77,7 +85,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expr, ParseErr> {
+    fn unary(&mut self) -> Result<Expr, LoxErr> {
         if let Some(operator) = self.match_types(&[TokenType::Bang, TokenType::Minus]) {
             let right = self.unary()?;
             return Ok(Expr::Unary(operator, Box::new(right)));
@@ -86,7 +94,7 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&mut self) -> Result<Expr, ParseErr> {
+    fn primary(&mut self) -> Result<Expr, LoxErr> {
         if self.match_type(TokenType::False).is_some() {
             Ok(false.into())
         } else if self.match_type(TokenType::Ture).is_some() {
@@ -104,7 +112,7 @@ impl Parser {
         }
     }
 
-    fn consume(&mut self, ty: TokenType, message: &str) -> Result<(), ParseErr> {
+    fn consume(&mut self, ty: TokenType, message: &str) -> Result<(), LoxErr> {
         if self.check(ty) {
             self.advance();
             Ok(())
@@ -117,7 +125,7 @@ impl Parser {
         if self.is_at_end() {
             None
         } else {
-            self.tokens.pop()
+            self.tokens.pop_front()
         }
     }
 
@@ -154,12 +162,12 @@ impl Parser {
         self.peek().toke_type == ty
     }
 
-    fn error(&mut self, message: &str) -> ParseErr {
+    fn error(&mut self, message: &str) -> LoxErr {
         if let Ok(mut lox) = self.lox.lock() {
             let token = self.peek();
             lox.error_token(token, message)
         }
-        ParseErr(message.to_string())
+        LoxErr::ParseErr(message.to_string())
     }
 
     fn synchronize(&mut self) {

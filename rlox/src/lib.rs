@@ -1,17 +1,37 @@
+mod error;
 mod expr;
+mod interpreter;
 mod parser;
 mod scanner;
 mod token;
 
+pub use error::LoxErr;
+pub use expr::{AstPrinter, Visitor};
+pub use interpreter::Interpreter;
+pub use parser::Parser;
 pub use scanner::Scanner;
 use token::{Token, TokenType};
 
 #[derive(Default)]
 pub struct Lox {
     pub has_error: bool,
+    pub had_runtime_error: bool,
 }
 
 impl Lox {
+    pub fn runtimne_error(&mut self, err: LoxErr) {
+        match err {
+            LoxErr::ParseErr(str) => eprintln!("{}", str),
+            LoxErr::RunTimeErr(line, message) => {
+                eprintln!("{}", message);
+                if let Some(line) = line {
+                    eprintln!("[line {}]", line);
+                }
+            }
+        }
+        self.had_runtime_error = true;
+    }
+
     pub fn error(&mut self, line: usize, message: &str) {
         self.report(line, "", message)
     }

@@ -1,5 +1,6 @@
 use crate::token::{Literal, Token};
 
+#[derive(Debug)]
 pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
@@ -32,8 +33,40 @@ impl From<Literal> for Expr {
     }
 }
 
-trait Visitor<T> {
+pub trait Visitor<T> {
     fn visit_expr(&self, expr: &Expr) -> T;
+}
+
+pub struct AstPrinter;
+
+impl AstPrinter {
+    fn parenthesize(&self, name: &str, exprs: &[&Expr]) -> String {
+        let mut builder = String::new();
+
+        builder.push('(');
+        builder.push_str(name);
+
+        for expr in exprs {
+            builder.push(' ');
+            builder.push_str(&self.visit_expr(expr));
+        }
+
+        builder.push(')');
+        builder
+    }
+}
+
+impl Visitor<String> for AstPrinter {
+    fn visit_expr(&self, expr: &Expr) -> String {
+        match expr {
+            Expr::Binary(left, operator, right) => {
+                self.parenthesize(&operator.lexeme, &[left, right])
+            }
+            Expr::Grouping(expr) => self.parenthesize("group", &[expr]),
+            Expr::Literal(val) => format!("{}", val),
+            Expr::Unary(operator, right) => self.parenthesize(&operator.lexeme, &[right]),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -41,38 +74,6 @@ mod tests {
 
     use super::*;
     use crate::token::*;
-
-    struct AstPrinter;
-
-    impl AstPrinter {
-        fn parenthesize(&self, name: &str, exprs: &[&Expr]) -> String {
-            let mut builder = String::new();
-
-            builder.push('(');
-            builder.push_str(name);
-
-            for expr in exprs {
-                builder.push(' ');
-                builder.push_str(&self.visit_expr(expr));
-            }
-
-            builder.push(')');
-            builder
-        }
-    }
-
-    impl Visitor<String> for AstPrinter {
-        fn visit_expr(&self, expr: &Expr) -> String {
-            match expr {
-                Expr::Binary(left, operator, right) => {
-                    self.parenthesize(&operator.lexeme, &[&left, &right])
-                }
-                Expr::Grouping(expr) => self.parenthesize("group", &[&expr]),
-                Expr::Literal(val) => format!("{}", val),
-                Expr::Unary(operator, right) => self.parenthesize(&operator.lexeme, &[&right]),
-            }
-        }
-    }
 
     #[test]
     fn print() {

@@ -26,7 +26,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> &Vec<Token> {
+    pub fn scan_tokens(mut self) -> Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
             self.do_scan_tokens();
@@ -34,7 +34,7 @@ impl Scanner {
 
         self.tokens
             .push(Token::new(TokenType::Eof, "", Literal::Nil, self.line));
-        &self.tokens
+        self.tokens
     }
 
     fn do_scan_tokens(&mut self) {
@@ -228,7 +228,6 @@ impl Scanner {
         let text = self.source[self.start..self.current]
             .iter()
             .collect::<String>();
-        self.tokens
-            .push(Token::new(ty, text, Literal::Nil, self.line))
+        self.tokens.push(Token::new(ty, text, literal, self.line))
     }
 }
