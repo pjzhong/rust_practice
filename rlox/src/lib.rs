@@ -1,12 +1,12 @@
 mod error;
-mod expr;
+mod ast;
 mod interpreter;
 mod parser;
 mod scanner;
 mod token;
 
 pub use error::LoxErr;
-pub use expr::{AstPrinter, Visitor};
+pub use ast::{Visitor, AstPrinter};
 pub use interpreter::Interpreter;
 pub use parser::Parser;
 pub use scanner::Scanner;

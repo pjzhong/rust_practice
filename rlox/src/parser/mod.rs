@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    expr::Expr,
+    ast::Expr,
     token::{Literal, Token, TokenType},
     Lox, LoxErr,
 };

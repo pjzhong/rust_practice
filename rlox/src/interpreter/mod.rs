@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    expr::Expr,
+    ast::Expr,
     token::{Literal, Token, TokenType},
     Lox, LoxErr, Visitor,
 };
@@ -106,7 +106,7 @@ impl Interpreter {
             TokenType::Bang => Ok((!self.is_truthy(&Some(right))).into()),
             _ => self.error(
                 token,
-                format!("unsupoort unary expr:{:?},{:?}", token.toke_type, right),
+                format!("unsupoort unary operation:{:?},{:?}", token.toke_type, right),
             ),
         }
     }
