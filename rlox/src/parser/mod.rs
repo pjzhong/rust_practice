@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    ast::Expr,
+    ast::{Expr, Stmt},
     token::{Literal, Token, TokenType},
     Lox, LoxErr,
 };
@@ -30,8 +30,32 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, LoxErr> {
-        self.expression()
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, LoxErr> {
+        let mut statements = vec![];
+        while !self.is_at_end() {
+            let stmt = self.statement()?;
+            statements.push(stmt);
+        }
+        Ok(statements)
+    }
+
+    fn statement(&mut self) -> Result<Stmt, LoxErr> {
+        match self.match_type(TokenType::Print) {
+            Some(_) => self.print_statment(),
+            None => self.expression_statment(),
+        }
+    }
+
+    fn print_statment(&mut self) -> Result<Stmt, LoxErr> {
+        let value = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Print(value))
+    }
+
+    fn expression_statment(&mut self) -> Result<Stmt, LoxErr> {
+        let value = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Expression(value))
     }
 
     fn expression(&mut self) -> Result<Expr, LoxErr> {

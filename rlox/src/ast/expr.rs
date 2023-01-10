@@ -1,4 +1,7 @@
-use crate::token::{Literal, Token};
+use crate::{
+    token::{Literal, Token},
+    Visitor,
+};
 
 #[derive(Debug)]
 pub enum Expr {
@@ -33,10 +36,6 @@ impl From<Literal> for Expr {
     }
 }
 
-pub trait Visitor<T> {
-    fn visit_expr(&self, expr: &Expr) -> T;
-}
-
 pub struct AstPrinter;
 
 impl AstPrinter {
@@ -48,7 +47,7 @@ impl AstPrinter {
 
         for expr in exprs {
             builder.push(' ');
-            builder.push_str(&self.visit_expr(expr));
+            builder.push_str(&self.visit(expr));
         }
 
         builder.push(')');
@@ -56,8 +55,8 @@ impl AstPrinter {
     }
 }
 
-impl Visitor<String> for AstPrinter {
-    fn visit_expr(&self, expr: &Expr) -> String {
+impl Visitor<&Expr, String> for AstPrinter {
+    fn visit(&self, expr: &Expr) -> String {
         match expr {
             Expr::Binary(left, operator, right) => {
                 self.parenthesize(&operator.lexeme, &[left, right])
@@ -89,6 +88,6 @@ mod tests {
 
         let printer = AstPrinter;
 
-        assert_eq!("(* (- 123) (group 45.67))", printer.visit_expr(&expression))
+        assert_eq!("(* (- 123) (group 45.67))", printer.visit(&expression))
     }
 }

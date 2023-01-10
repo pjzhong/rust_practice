@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use rlox::{AstPrinter, Interpreter, Lox, Parser, Scanner, Visitor};
+use rlox::{Interpreter, Lox, Parser, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
@@ -66,14 +66,13 @@ fn run_prompt(lox: Arc<Mutex<Lox>>) {
 fn run(code: &str, lox: Arc<Mutex<Lox>>) {
     let scanner = Scanner::new(code, lox.clone());
     let tokens = scanner.scan_tokens();
-    println!("{:?}", tokens);
     let mut parser = Parser::new(tokens, lox.clone());
 
     match parser.parse() {
         Ok(expr) => {
-            let printer = AstPrinter;
-            println!("{:?}", expr);
-            println!("{:?}", printer.visit_expr(&expr));
+            // let printer = AstPrinter;
+            // println!("{:?}", expr);
+            // println!("{:?}", printer.visit_expr(&expr));
 
             let mut interpreter = Interpreter::new(lox);
             interpreter.interpret(&expr);

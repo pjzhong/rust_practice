@@ -1,10 +1,11 @@
 use std::{
     any::Any,
+    fmt::Display,
     sync::{Arc, Mutex},
 };
 
 use crate::{
-    ast::Expr,
+    ast::{Expr, Stmt},
     token::{Literal, Token, TokenType},
     Lox, LoxErr, Visitor,
 };
@@ -16,6 +17,18 @@ pub enum LoxValue {
     String(String),
     Any(Box<dyn Any>),
     Nil,
+}
+
+impl Display for LoxValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoxValue::Number(a) => write!(f, "{}", a),
+            LoxValue::Boolean(a) => write!(f, "{}", a),
+            LoxValue::String(a) => write!(f, "{}", a),
+            LoxValue::Any(_) => write!(f, "any value"),
+            LoxValue::Nil => write!(f, "nil"),
+        }
+    }
 }
 
 impl From<String> for LoxValue {
@@ -60,13 +73,31 @@ pub struct Interpreter {
     lox: Arc<Mutex<Lox>>,
 }
 
-impl Visitor<LoxResult<LoxValue>> for Interpreter {
-    fn visit_expr(&self, expr: &Expr) -> Result<LoxValue, LoxErr> {
+impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
+    fn visit(&self, expr: &Expr) -> Result<LoxValue, LoxErr> {
         match expr {
             Expr::Literal(a) => self.literal(a),
             Expr::Unary(token, expr) => self.unary(expr, token),
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
-            Expr::Grouping(expr) => self.visit_expr(expr),
+            Expr::Grouping(expr) => self.visit(expr.as_ref()),
+        }
+    }
+}
+
+impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
+    fn visit(&self, stmt: &Stmt) -> Result<(), LoxErr> {
+        match stmt {
+            Stmt::Expression(expr) => match self.visit(expr) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            },
+            Stmt::Print(expr) => match self.visit(expr) {
+                Ok(val) => {
+                    println!("{}", val);
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            },
         }
     }
 }
@@ -76,12 +107,14 @@ impl Interpreter {
         Self { lox }
     }
 
-    pub fn interpret(&mut self, expr: &Expr) {
-        match self.visit_expr(expr) {
-            Ok(val) => println!("{:?}", val),
-            Err(e) => {
-                if let Ok(mut lox) = self.lox.lock() {
-                    lox.runtimne_error(e);
+    pub fn interpret(&mut self, stmts: &[Stmt]) {
+        for stmt in stmts {
+            match self.visit(stmt) {
+                Ok(_) => {}
+                Err(e) => {
+                    if let Ok(mut lox) = self.lox.lock() {
+                        lox.runtimne_error(e);
+                    }
                 }
             }
         }
@@ -97,7 +130,7 @@ impl Interpreter {
     }
 
     fn unary(&self, expr: &Expr, token: &Token) -> LoxResult<LoxValue> {
-        let right = self.visit_expr(expr)?;
+        let right = self.visit(expr)?;
         match token.toke_type {
             TokenType::Minus => match right {
                 LoxValue::Number(right) => Ok((-right).into()),
@@ -106,14 +139,17 @@ impl Interpreter {
             TokenType::Bang => Ok((!self.is_truthy(&Some(right))).into()),
             _ => self.error(
                 token,
-                format!("unsupoort unary operation:{:?},{:?}", token.toke_type, right),
+                format!(
+                    "unsupoort unary operation:{:?},{:?}",
+                    token.toke_type, right
+                ),
             ),
         }
     }
 
     fn binary(&self, left: &Expr, operator: &Token, right: &Expr) -> LoxResult<LoxValue> {
-        let left = self.visit_expr(left)?;
-        let right = self.visit_expr(right)?;
+        let left = self.visit(left)?;
+        let right = self.visit(right)?;
 
         match (left, right) {
             (LoxValue::Number(left), LoxValue::Number(right)) => match operator.toke_type {
@@ -144,7 +180,7 @@ impl Interpreter {
                     let mut str = String::new();
                     str.push_str(&left);
                     str.push_str(&right);
-                     Ok(str.into())
+                    Ok(str.into())
                 }
                 TokenType::BangEqual => Ok((left != right).into()),
                 TokenType::EqualEqual => Ok((left == right).into()),
