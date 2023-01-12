@@ -113,7 +113,7 @@ impl Interpreter {
                 Ok(_) => {}
                 Err(e) => {
                     if let Ok(mut lox) = self.lox.lock() {
-                        lox.runtimne_error(e);
+                        lox.lox_error(e);
                     }
                 }
             }

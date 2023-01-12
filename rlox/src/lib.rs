@@ -19,17 +19,24 @@ pub struct Lox {
 }
 
 impl Lox {
-    pub fn runtimne_error(&mut self, err: LoxErr) {
+    pub fn lox_error(&mut self, err: LoxErr) {
         match err {
-            LoxErr::ParseErr(str) => eprintln!("{}", str),
-            LoxErr::RunTimeErr(line, message) => {
-                eprintln!("{}", message);
-                if let Some(line) = line {
-                    eprintln!("[line {}]", line);
+            LoxErr::ParseErr(line, ty, lexme, message) => {
+                if ty == TokenType::Eof {
+                    self.report(line, " at end", &message)
+                } else {
+                    self.report(line, &format!("at '{};", lexme), &message)
                 }
             }
+            LoxErr::RunTimeErr(line, message) => {
+                if let Some(line) = line {
+                    eprintln!("[line {}] {}", line, message);
+                } else {
+                    eprintln!("{}", message);
+                }
+                self.had_runtime_error = true;
+            }
         }
-        self.had_runtime_error = true;
     }
 
     pub fn error(&mut self, line: usize, message: &str) {

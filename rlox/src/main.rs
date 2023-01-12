@@ -78,7 +78,9 @@ fn run(code: &str, lox: Arc<Mutex<Lox>>) {
             interpreter.interpret(&expr);
         }
         Err(e) => {
-            eprintln!("{:?}", e);
+            if let Ok(mut lox) = lox.lock() {
+                lox.lox_error(e);
+            }
         }
     }
 }

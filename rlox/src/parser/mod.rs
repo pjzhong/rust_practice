@@ -39,6 +39,19 @@ impl Parser {
         Ok(statements)
     }
 
+    fn var_declaration(&mut self) -> Result<Stmt, LoxErr> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
+
+        let initlaizer = if self.match_type(TokenType::Equal).is_some() {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after variable")?;
+        Ok(Stmt::Var(name, initlaizer))
+    }
+
     fn statement(&mut self) -> Result<Stmt, LoxErr> {
         match self.match_type(TokenType::Print) {
             Some(_) => self.print_statment(),
@@ -136,13 +149,14 @@ impl Parser {
         }
     }
 
-    fn consume(&mut self, ty: TokenType, message: &str) -> Result<(), LoxErr> {
-        if self.check(ty) {
-            self.advance();
-            Ok(())
-        } else {
-            Err(self.error(message))
+    fn consume(&mut self, ty: TokenType, message: &str) -> Result<Token, LoxErr> {
+        if self.is_at_end() || self.peek().toke_type != ty {
+            return Err(self.error(message));
         }
+
+        self.tokens
+            .pop_front()
+            .map_or_else(|| Err(self.error(message)), Result::Ok)
     }
 
     fn advance(&mut self) -> Option<Token> {
@@ -187,11 +201,13 @@ impl Parser {
     }
 
     fn error(&mut self, message: &str) -> LoxErr {
-        if let Ok(mut lox) = self.lox.lock() {
-            let token = self.peek();
-            lox.error_token(token, message)
-        }
-        LoxErr::ParseErr(message.to_string())
+        let token = self.peek();
+        LoxErr::ParseErr(
+            token.line,
+            token.toke_type,
+            token.lexeme.clone(),
+            message.to_string(),
+        )
     }
 
     fn synchronize(&mut self) {

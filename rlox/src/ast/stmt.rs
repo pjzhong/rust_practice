@@ -1,3 +1,5 @@
+use crate::token::Token;
+
 use super::Expr;
 
 pub trait Visitor<T> {
@@ -7,4 +9,5 @@ pub trait Visitor<T> {
 pub enum Stmt {
     Print(Expr),
     Expression(Expr),
+    Var(Token, Option<Expr>),
 }
