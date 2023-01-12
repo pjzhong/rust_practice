@@ -8,6 +8,7 @@ pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
     Literal(Literal),
+    Variable(Token),
     Unary(Token, Box<Expr>),
 }
 
@@ -64,6 +65,7 @@ impl Visitor<&Expr, String> for AstPrinter {
             Expr::Grouping(expr) => self.parenthesize("group", &[expr]),
             Expr::Literal(val) => format!("{}", val),
             Expr::Unary(operator, right) => self.parenthesize(&operator.lexeme, &[right]),
+            _ => todo!()
         }
     }
 }

@@ -1,3 +1,5 @@
+mod environment;
+
 use std::{
     any::Any,
     fmt::Display,
@@ -69,8 +71,11 @@ impl From<Box<dyn Any>> for LoxValue {
 
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
+
+
 pub struct Interpreter {
     lox: Arc<Mutex<Lox>>,
+
 }
 
 impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
@@ -80,6 +85,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             Expr::Unary(token, expr) => self.unary(expr, token),
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
             Expr::Grouping(expr) => self.visit(expr.as_ref()),
+            _ => todo!()
         }
     }
 }
@@ -98,6 +104,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 }
                 Err(e) => Err(e),
             },
+            _ => todo!(),
         }
     }
 }

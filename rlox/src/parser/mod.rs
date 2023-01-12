@@ -11,7 +11,7 @@ use crate::{
 
 pub struct Parser {
     tokens: VecDeque<Token>,
-    current: usize,
+
     lox: Arc<Mutex<Lox>>,
 }
 
@@ -26,17 +26,36 @@ impl Parser {
         Self {
             tokens: tokens.into(),
             lox,
-            current: 0,
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, LoxErr> {
+    pub fn parse(&mut self) -> Vec<Stmt> {
         let mut statements = vec![];
         while !self.is_at_end() {
-            let stmt = self.statement()?;
-            statements.push(stmt);
+            if let Some(stmt) = self.declaration() {
+                statements.push(stmt);
+            }
         }
-        Ok(statements)
+        statements
+    }
+
+    fn declaration(&mut self) -> Option<Stmt> {
+        let stmt = if self.match_type(TokenType::Var).is_some() {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+
+        match stmt {
+            Ok(stmt) => Some(stmt),
+            Err(e) => {
+                if let Ok(mut lox) = self.lox.lock() {
+                    lox.lox_error(e);
+                }
+                self.synchronize();
+                None
+            }
+        }
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, LoxErr> {
@@ -132,47 +151,64 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr, LoxErr> {
-        if self.match_type(TokenType::False).is_some() {
-            Ok(false.into())
-        } else if self.match_type(TokenType::Ture).is_some() {
-            Ok(true.into())
-        } else if self.match_type(TokenType::Nil).is_some() {
-            Ok(Literal::Nil.into())
-        } else if let Some(token) = self.match_types(&[TokenType::Number, TokenType::String]) {
-            Ok(Expr::Literal(token.value))
-        } else if self.match_type(TokenType::LeftParen).is_some() {
-            let expr = self.expression()?;
-            self.consume(TokenType::RightParen, "Expect ')' after expression")?;
-            Ok(Expr::Grouping(Box::new(expr)))
-        } else {
-            self.error("Expect expression.").into()
+        match self.advance() {
+            Some(token) => match token.toke_type {
+                TokenType::False => Ok(false.into()),
+                TokenType::Ture => Ok(true.into()),
+                TokenType::Nil => Ok(Literal::Nil.into()),
+                TokenType::Identifier => Ok(Expr::Variable(token)),
+                TokenType::Number | TokenType::String => Ok(Expr::Literal(token.value)),
+                TokenType::LeftParen => {
+                    let expr = self.expression()?;
+                    self.consume(TokenType::RightParen, "Expect ')' after expression")?;
+                    Ok(Expr::Grouping(Box::new(expr)))
+                }
+                _ => {
+                    let err = Err(self.error(&token, "Expect expression."));
+                    self.tokens.push_front(token);
+                    return err;
+                }
+            },
+            None => {
+                return Err(LoxErr::ParseErr(
+                    0,
+                    TokenType::Eof,
+                    "unknown".to_string(),
+                    "Unexpected end, Expect expression.".to_string(),
+                ));
+            }
         }
     }
 
     fn consume(&mut self, ty: TokenType, message: &str) -> Result<Token, LoxErr> {
-        if self.is_at_end() || self.peek().toke_type != ty {
-            return Err(self.error(message));
+        if let Some(token) = self.advance() {
+            if token.toke_type == ty {
+                return Ok(token);
+            } else {
+                let err = Err(self.error(&token, message));
+                self.tokens.push_front(token);
+                return err;
+            }
+        } else {
+            return Err(LoxErr::ParseErr(
+                0,
+                TokenType::Eof,
+                "unknown".to_string(),
+                format!("{}, {}", "Unexpected end", message),
+            ));
         }
-
-        self.tokens
-            .pop_front()
-            .map_or_else(|| Err(self.error(message)), Result::Ok)
     }
 
     fn advance(&mut self) -> Option<Token> {
-        if self.is_at_end() {
-            None
-        } else {
-            self.tokens.pop_front()
-        }
+        self.tokens.pop_front()
     }
 
     fn is_at_end(&self) -> bool {
-        self.peek().toke_type == TokenType::Eof
+        self.peek().map_or(true, |t| t.toke_type == TokenType::Eof)
     }
 
-    fn peek(&self) -> &Token {
-        &self.tokens[self.current]
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.front()
     }
 
     fn match_type(&mut self, ty: TokenType) -> Option<Token> {
@@ -193,15 +229,10 @@ impl Parser {
     }
 
     fn check(&self, ty: TokenType) -> bool {
-        if self.is_at_end() {
-            return false;
-        }
-
-        self.peek().toke_type == ty
+        self.peek().map_or(false, |t| t.toke_type == ty)
     }
 
-    fn error(&mut self, message: &str) -> LoxErr {
-        let token = self.peek();
+    fn error(&mut self, token: &Token, message: &str) -> LoxErr {
         LoxErr::ParseErr(
             token.line,
             token.toke_type,
@@ -215,19 +246,20 @@ impl Parser {
             if oper.toke_type == TokenType::Semicolon {
                 return;
             }
-            if self.is_at_end() {
-                return;
-            }
-            match self.peek().toke_type {
-                TokenType::Class
-                | TokenType::Fun
-                | TokenType::Var
-                | TokenType::For
-                | TokenType::If
-                | TokenType::While
-                | TokenType::Print
-                | TokenType::Return => return,
-                _ => {}
+
+            match self.peek() {
+                Some(token) => match token.toke_type {
+                    TokenType::Class
+                    | TokenType::Fun
+                    | TokenType::Var
+                    | TokenType::For
+                    | TokenType::If
+                    | TokenType::While
+                    | TokenType::Print
+                    | TokenType::Return => return,
+                    _ => {}
+                },
+                None => return,
             }
         }
     }
