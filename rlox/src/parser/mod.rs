@@ -11,7 +11,6 @@ use crate::{
 
 pub struct Parser {
     tokens: VecDeque<Token>,
-
     lox: Arc<Mutex<Lox>>,
 }
 
@@ -91,7 +90,22 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, LoxErr> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, LoxErr> {
+        let expr = self.equality()?;
+
+        if let Some(equal) = self.match_type(TokenType::Equal) {
+            let value = self.assignment()?;
+
+            match expr {
+                Expr::Variable(name) => return Ok(Expr::Assign(name, Box::new(value))),
+                _ => self.report_error(&equal, "Invalid assignment target."),
+            }
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, LoxErr> {
@@ -237,6 +251,12 @@ impl Parser {
             token.lexeme.clone(),
             message.to_string(),
         )
+    }
+
+    fn report_error(&mut self, token: &Token, message: &str) {
+        if let Ok(mut lox) = self.lox.lock() {
+            lox.error(token.line, message)
+        }
     }
 
     fn synchronize(&mut self) {

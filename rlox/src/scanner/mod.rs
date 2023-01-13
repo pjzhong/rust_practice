@@ -122,7 +122,7 @@ impl Scanner {
         let value = self.source[(self.start + 1)..(self.current - 1)]
             .iter()
             .collect::<String>();
-        self.add_token_value(TokenType::String, Literal::String(value));
+        self.add_token_value(TokenType::String, value.into());
     }
 
     fn number(&mut self) {

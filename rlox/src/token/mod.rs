@@ -85,7 +85,7 @@ pub enum TokenType {
 
 #[derive(Debug, Clone)]
 pub enum Literal {
-    String(String),
+    String(Arc<String>),
     Number(f64),
     Bool(bool),
     Nil,
@@ -100,7 +100,7 @@ impl From<f64> for Literal {
 
 impl From<String> for Literal {
     fn from(a: String) -> Self {
-        Literal::String(a)
+        Literal::String(Arc::new(a))
     }
 }
 

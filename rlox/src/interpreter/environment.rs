@@ -1,5 +1,5 @@
 use crate::{interpreter::LoxValue, token::Token, LoxErr};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::format, sync::Arc};
 
 #[derive(Debug, Default)]
 pub struct Environment {
@@ -23,5 +23,17 @@ impl Environment {
             },
             |v| Ok(v.clone()),
         )
+    }
+
+    pub fn assign(&mut self, token: &Token, value: &LoxValue) -> Result<(), LoxErr> {
+        if let Some(val) = self.values.get_mut(&token.lexeme) {
+            *val = value.clone();
+            Ok(())
+        } else {
+            Err(LoxErr::RunTimeErr(
+                Some(token.line),
+                format!("Undefined variable '{}'.", token.lexeme),
+            ))
+        }
     }
 }

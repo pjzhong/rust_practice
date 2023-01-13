@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
-    token::{Literal, Token, TokenType},
+    token::{self, Literal, Token, TokenType},
     Lox, LoxErr,
 };
 
@@ -35,6 +35,12 @@ impl Display for LoxValue {
 impl From<String> for LoxValue {
     fn from(a: String) -> Self {
         LoxValue::String(Arc::new(a))
+    }
+}
+
+impl From<Arc<String>> for LoxValue {
+    fn from(a: Arc<String>) -> Self {
+        LoxValue::String(a.clone())
     }
 }
 
@@ -77,6 +83,11 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
             Expr::Grouping(expr) => self.visit(expr.as_ref()),
             Expr::Variable(token) => self.environment.get(token),
+            Expr::Assign(token, value) => {
+                let value = self.visit(value.as_ref())?;
+                self.environment.assign(token, &value)?;
+                Ok(value)
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ pub enum Expr {
     Literal(Literal),
     Variable(Token),
     Unary(Token, Box<Expr>),
+    Assign(Token, Box<Expr>),
 }
 
 ///简化代码编写，不然这种包装写法太长了
