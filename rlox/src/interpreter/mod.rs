@@ -1,23 +1,23 @@
 mod environment;
 
 use std::{
-    any::Any,
     fmt::Display,
     sync::{Arc, Mutex},
 };
 
 use crate::{
-    ast::{Expr, Stmt},
+    ast::{Expr, Stmt, Visitor},
     token::{Literal, Token, TokenType},
-    Lox, LoxErr, Visitor,
+    Lox, LoxErr,
 };
 
-#[derive(Debug)]
+use self::environment::Environment;
+
+#[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
     Boolean(bool),
-    String(String),
-    Any(Box<dyn Any>),
+    String(Arc<String>),
     Nil,
 }
 
@@ -27,7 +27,6 @@ impl Display for LoxValue {
             LoxValue::Number(a) => write!(f, "{}", a),
             LoxValue::Boolean(a) => write!(f, "{}", a),
             LoxValue::String(a) => write!(f, "{}", a),
-            LoxValue::Any(_) => write!(f, "any value"),
             LoxValue::Nil => write!(f, "nil"),
         }
     }
@@ -35,7 +34,7 @@ impl Display for LoxValue {
 
 impl From<String> for LoxValue {
     fn from(a: String) -> Self {
-        LoxValue::String(a)
+        LoxValue::String(Arc::new(a))
     }
 }
 
@@ -63,35 +62,27 @@ impl From<&f64> for LoxValue {
     }
 }
 
-impl From<Box<dyn Any>> for LoxValue {
-    fn from(a: Box<dyn Any>) -> Self {
-        LoxValue::Any(a)
-    }
-}
-
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
-
-
 
 pub struct Interpreter {
     lox: Arc<Mutex<Lox>>,
-
+    environment: Environment,
 }
 
 impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
-    fn visit(&self, expr: &Expr) -> Result<LoxValue, LoxErr> {
+    fn visit(&mut self, expr: &Expr) -> Result<LoxValue, LoxErr> {
         match expr {
             Expr::Literal(a) => self.literal(a),
             Expr::Unary(token, expr) => self.unary(expr, token),
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
             Expr::Grouping(expr) => self.visit(expr.as_ref()),
-            _ => todo!()
+            Expr::Variable(token) => self.environment.get(token),
         }
     }
 }
 
 impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
-    fn visit(&self, stmt: &Stmt) -> Result<(), LoxErr> {
+    fn visit(&mut self, stmt: &Stmt) -> Result<(), LoxErr> {
         match stmt {
             Stmt::Expression(expr) => match self.visit(expr) {
                 Ok(_) => Ok(()),
@@ -104,14 +95,26 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 }
                 Err(e) => Err(e),
             },
-            _ => todo!(),
+            Stmt::Var(token, expr) => {
+                let value = if let Some(expr) = expr {
+                    self.visit(expr)?
+                } else {
+                    LoxValue::Nil
+                };
+
+                self.environment.define(token.lexeme.clone(), value);
+                Ok(())
+            }
         }
     }
 }
 
 impl Interpreter {
     pub fn new(lox: Arc<Mutex<Lox>>) -> Self {
-        Self { lox }
+        Self {
+            lox,
+            environment: Environment::default(),
+        }
     }
 
     pub fn interpret(&mut self, stmts: &[Stmt]) {
@@ -127,7 +130,7 @@ impl Interpreter {
         }
     }
 
-    fn literal(&self, a: &Literal) -> LoxResult<LoxValue> {
+    fn literal(&mut self, a: &Literal) -> LoxResult<LoxValue> {
         match a {
             Literal::String(str) => Ok(str.clone().into()),
             Literal::Number(num) => Ok(num.into()),
@@ -136,7 +139,7 @@ impl Interpreter {
         }
     }
 
-    fn unary(&self, expr: &Expr, token: &Token) -> LoxResult<LoxValue> {
+    fn unary(&mut self, expr: &Expr, token: &Token) -> LoxResult<LoxValue> {
         let right = self.visit(expr)?;
         match token.toke_type {
             TokenType::Minus => match right {
@@ -154,7 +157,7 @@ impl Interpreter {
         }
     }
 
-    fn binary(&self, left: &Expr, operator: &Token, right: &Expr) -> LoxResult<LoxValue> {
+    fn binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> LoxResult<LoxValue> {
         let left = self.visit(left)?;
         let right = self.visit(right)?;
 

@@ -1,7 +1,8 @@
-use crate::{
-    token::{Literal, Token},
-    Visitor,
-};
+use crate::token::{Literal, Token};
+
+pub trait Visitor<T, R> {
+    fn visit(&self, t: T) -> R;
+}
 
 #[derive(Debug)]
 pub enum Expr {
@@ -65,7 +66,7 @@ impl Visitor<&Expr, String> for AstPrinter {
             Expr::Grouping(expr) => self.parenthesize("group", &[expr]),
             Expr::Literal(val) => format!("{}", val),
             Expr::Unary(operator, right) => self.parenthesize(&operator.lexeme, &[right]),
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }
@@ -80,11 +81,11 @@ mod tests {
     fn print() {
         let expression = Expr::Binary(
             Expr::Unary(
-                Token::new(TokenType::Minus, "-", Literal::Nil, 1),
+                Token::new(TokenType::Minus, "-".to_string().into(), Literal::Nil, 1),
                 Box::new(123.0.into()),
             )
             .into(),
-            Token::new(TokenType::Star, "*", Literal::Nil, 1),
+            Token::new(TokenType::Star, "*".to_string().into(), Literal::Nil, 1),
             Expr::Grouping(Box::new(45.67.into())).into(),
         );
 

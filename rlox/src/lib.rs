@@ -5,7 +5,7 @@ mod parser;
 mod scanner;
 mod token;
 
-pub use ast::{AstPrinter, Visitor};
+pub use ast::AstPrinter;
 pub use error::LoxErr;
 pub use interpreter::Interpreter;
 pub use parser::Parser;

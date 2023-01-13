@@ -1,9 +1,9 @@
 use crate::token::Token;
 
-use super::Expr;
+use super::expr::Expr;
 
-pub trait Visitor<T> {
-    fn visit_stmt(&self, expr: &Stmt) -> T;
+pub trait Visitor<T, R> {
+    fn visit(&mut self, expr: T) -> R;
 }
 
 pub enum Stmt {

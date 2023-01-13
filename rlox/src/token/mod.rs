@@ -1,20 +1,18 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 #[derive(Clone)]
 pub struct Token {
     pub toke_type: TokenType,
-    pub lexeme: String,
+    pub lexeme: Arc<String>,
     pub value: Literal,
     pub line: usize,
 }
 
 impl Token {
-    pub fn new<Str: Into<String>>(
-        toke_type: TokenType,
-        lexeme: Str,
-        value: Literal,
-        line: usize,
-    ) -> Self {
+    pub fn new(toke_type: TokenType, lexeme: String, value: Literal, line: usize) -> Self {
         Self {
             toke_type,
             lexeme: lexeme.into(),

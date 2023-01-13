@@ -166,36 +166,34 @@ impl Parser {
                 _ => {
                     let err = Err(self.error(&token, "Expect expression."));
                     self.tokens.push_front(token);
-                    return err;
+                    err
                 }
             },
-            None => {
-                return Err(LoxErr::ParseErr(
-                    0,
-                    TokenType::Eof,
-                    "unknown".to_string(),
-                    "Unexpected end, Expect expression.".to_string(),
-                ));
-            }
+            None => Err(LoxErr::ParseErr(
+                0,
+                TokenType::Eof,
+                "unknown".to_string().into(),
+                "Unexpected end, Expect expression.".to_string(),
+            )),
         }
     }
 
     fn consume(&mut self, ty: TokenType, message: &str) -> Result<Token, LoxErr> {
         if let Some(token) = self.advance() {
             if token.toke_type == ty {
-                return Ok(token);
+                Ok(token)
             } else {
                 let err = Err(self.error(&token, message));
                 self.tokens.push_front(token);
-                return err;
+                err
             }
         } else {
-            return Err(LoxErr::ParseErr(
+            Err(LoxErr::ParseErr(
                 0,
                 TokenType::Eof,
-                "unknown".to_string(),
+                "unknown".to_string().into(),
                 format!("{}, {}", "Unexpected end", message),
-            ));
+            ))
         }
     }
 
