@@ -9,7 +9,6 @@ use rlox::{Interpreter, Lox, Parser, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
-    let args = vec!["aaa", "I:\\work\\rust_practice\\rlox\\test\\scopes.lox"];
     let lox = Arc::new(Mutex::new(Lox::default()));
 
     match args.len() {
@@ -67,7 +66,6 @@ fn run_prompt(lox: Arc<Mutex<Lox>>) {
 fn run(code: &str, lox: Arc<Mutex<Lox>>) {
     let scanner = Scanner::new(code, lox.clone());
     let tokens = scanner.scan_tokens();
-    println!("{:?}", tokens);
     let mut parser = Parser::new(tokens, lox.clone());
 
     let stmts = parser.parse();
