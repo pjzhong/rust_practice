@@ -10,7 +10,7 @@ pub use error::LoxErr;
 pub use interpreter::Interpreter;
 pub use parser::Parser;
 pub use scanner::Scanner;
-use token::{Token, TokenType};
+use token::TokenType;
 
 #[derive(Default)]
 pub struct Lox {

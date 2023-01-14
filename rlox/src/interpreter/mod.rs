@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
-    token::{self, Literal, Token, TokenType},
+    token::{Literal, Token, TokenType},
     Lox, LoxErr,
 };
 
@@ -40,7 +40,7 @@ impl From<String> for LoxValue {
 
 impl From<Arc<String>> for LoxValue {
     fn from(a: Arc<String>) -> Self {
-        LoxValue::String(a.clone())
+        LoxValue::String(a)
     }
 }
 
@@ -72,7 +72,7 @@ type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
 pub struct Interpreter {
     lox: Arc<Mutex<Lox>>,
-    environment: Environment,
+    environment: Option<Environment>,
 }
 
 impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
@@ -82,10 +82,32 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             Expr::Unary(token, expr) => self.unary(expr, token),
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
             Expr::Grouping(expr) => self.visit(expr.as_ref()),
-            Expr::Variable(token) => self.environment.get(token),
+            Expr::Variable(token) => {
+                if let Some(env) = &self.environment {
+                    env.get(token)
+                } else {
+                    self.error(
+                        token,
+                        format!(
+                            "environment is None, Undefined variable '{}'",
+                            &token.lexeme
+                        ),
+                    )
+                }
+            }
             Expr::Assign(token, value) => {
                 let value = self.visit(value.as_ref())?;
-                self.environment.assign(token, &value)?;
+                if let Some(env) = &mut self.environment {
+                    env.assign(token, &value)?;
+                } else {
+                    return self.error(
+                        token,
+                        format!(
+                            "environment is None, Undefined variable variable '{}'",
+                            &token.lexeme
+                        ),
+                    );
+                }
                 Ok(value)
             }
         }
@@ -113,8 +135,26 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                     LoxValue::Nil
                 };
 
-                self.environment.define(token.lexeme.clone(), value);
+                if let Some(env) = self.environment.as_mut() {
+                    env.define(token.lexeme.clone(), value)
+                }
                 Ok(())
+            }
+            Stmt::Block(stmts) => {
+                if stmts.is_empty() {
+                    Ok(())
+                } else {
+                    self.environment = Environment::enclosing(self.environment.take());
+                    let res = stmts
+                        .iter()
+                        .map(|stmt| self.visit(stmt))
+                        .find(Result::is_err)
+                        .map_or(Ok(()), Result::from);
+
+                    self.environment = self.environment.take().and_then(Environment::declosing);
+
+                    res
+                }
             }
         }
     }
@@ -124,7 +164,7 @@ impl Interpreter {
     pub fn new(lox: Arc<Mutex<Lox>>) -> Self {
         Self {
             lox,
-            environment: Environment::default(),
+            environment: Some(Environment::default()),
         }
     }
 

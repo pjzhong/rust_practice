@@ -10,4 +10,5 @@ pub enum Stmt {
     Print(Expr),
     Expression(Expr),
     Var(Token, Option<Expr>),
+    Block(Vec<Stmt>),
 }

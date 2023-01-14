@@ -1,39 +1,54 @@
 use crate::{interpreter::LoxValue, token::Token, LoxErr};
-use std::{collections::HashMap, fmt::format, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug, Default)]
 pub struct Environment {
+    enclosing: Option<Box<Environment>>,
     values: HashMap<Arc<String>, LoxValue>,
 }
 
 impl Environment {
+    pub fn enclosing(enclosing: Option<Environment>) -> Option<Self> {
+        Some(Self {
+            enclosing: enclosing.map(Box::new),
+            values: HashMap::new(),
+        })
+    }
+
+    pub fn declosing(self) -> Option<Self> {
+        self.enclosing.map(|env| *env)
+    }
+
     pub fn define(&mut self, name: Arc<String>, value: LoxValue) {
         self.values.insert(name, value);
     }
 
     pub fn get(&self, token: &Token) -> Result<LoxValue, LoxErr> {
-        let name = &token.lexeme;
-        let line = token.line;
-        self.values.get(name).map_or_else(
-            || {
-                Err(LoxErr::RunTimeErr(
-                    Some(line),
-                    format!("Undefined variable '{}'", name),
-                ))
+        match self.values.get(&token.lexeme) {
+            Some(a) => Ok(a.clone()),
+            None => match &self.enclosing {
+                Some(enclosing) => enclosing.get(token),
+                None => Err(LoxErr::RunTimeErr(
+                    Some(token.line),
+                    format!("Undefined variable '{}'", &token.lexeme),
+                )),
             },
-            |v| Ok(v.clone()),
-        )
+        }
     }
 
     pub fn assign(&mut self, token: &Token, value: &LoxValue) -> Result<(), LoxErr> {
-        if let Some(val) = self.values.get_mut(&token.lexeme) {
-            *val = value.clone();
-            Ok(())
-        } else {
-            Err(LoxErr::RunTimeErr(
-                Some(token.line),
-                format!("Undefined variable '{}'.", token.lexeme),
-            ))
+        match self.values.get_mut(&token.lexeme) {
+            Some(val) => {
+                *val = value.clone();
+                Ok(())
+            }
+            None => match &mut self.enclosing {
+                Some(enclosing) => enclosing.assign(token, value),
+                None => Err(LoxErr::RunTimeErr(
+                    Some(token.line),
+                    format!("Undefined variable '{}'.", token.lexeme),
+                )),
+            },
         }
     }
 }

@@ -9,6 +9,7 @@ use rlox::{Interpreter, Lox, Parser, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
+    let args = vec!["aaa", "I:\\work\\rust_practice\\rlox\\test\\scopes.lox"];
     let lox = Arc::new(Mutex::new(Lox::default()));
 
     match args.len() {
@@ -23,7 +24,7 @@ fn main() {
     }
 }
 
-fn run_file(lox: Arc<Mutex<Lox>>, file: &String) {
+fn run_file(lox: Arc<Mutex<Lox>>, file: &str) {
     match fs::read_to_string(file) {
         Ok(file) => {
             run(&file, lox.clone());

@@ -71,9 +71,16 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, LoxErr> {
-        match self.match_type(TokenType::Print) {
-            Some(_) => self.print_statment(),
-            None => self.expression_statment(),
+        match self.match_types(&[TokenType::Print, TokenType::LeftBrace]) {
+            Some(Token {
+                toke_type: TokenType::Print,
+                ..
+            }) => self.print_statment(),
+            Some(Token {
+                toke_type: TokenType::LeftBrace,
+                ..
+            }) => self.block(),
+            _ => self.expression_statment(),
         }
     }
 
@@ -81,6 +88,18 @@ impl Parser {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(value))
+    }
+
+    fn block(&mut self) -> Result<Stmt, LoxErr> {
+        let mut statments = vec![];
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            if let Some(stmt) = self.declaration() {
+                statments.push(stmt);
+            }
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
+        Ok(Stmt::Block(statments))
     }
 
     fn expression_statment(&mut self) -> Result<Stmt, LoxErr> {
