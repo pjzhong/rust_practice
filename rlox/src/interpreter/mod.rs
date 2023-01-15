@@ -156,6 +156,16 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                     res
                 }
             }
+            Stmt::If(condition, then_branch, else_branch) => {
+                let value = self.visit(condition)?;
+                if self.is_truthy(&Some(value)) {
+                    self.visit(then_branch.as_ref())?;
+                } else if let Some(stmt) = else_branch {
+                    self.visit(stmt.as_ref())?;
+                }
+
+                Ok(())
+            }
         }
     }
 }

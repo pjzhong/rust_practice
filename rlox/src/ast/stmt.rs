@@ -11,4 +11,5 @@ pub enum Stmt {
     Expression(Expr),
     Var(Token, Option<Expr>),
     Block(Vec<Stmt>),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
 }

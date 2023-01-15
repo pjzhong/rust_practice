@@ -71,7 +71,11 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, LoxErr> {
-        match self.match_types(&[TokenType::Print, TokenType::LeftBrace]) {
+        match self.match_types(&[TokenType::Print, TokenType::LeftBrace, TokenType::If]) {
+            Some(Token {
+                toke_type: TokenType::If,
+                ..
+            }) => self.if_statment(),
             Some(Token {
                 toke_type: TokenType::Print,
                 ..
@@ -100,6 +104,32 @@ impl Parser {
 
         self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
         Ok(Stmt::Block(statments))
+    }
+
+    fn if_statment(&mut self) -> Result<Stmt, LoxErr> {
+        // I trying to use rust style
+        //ifStmt -> "if"  expression block
+        //          ( "else" block )?
+        let condition = self.expression()?;
+        self.consume(TokenType::LeftBrace, "expect a block after if condition")?;
+        let the_branch = self.block()?;
+
+        let else_branch = if self.match_type(TokenType::Else).is_some() {
+            if self.check(TokenType::If) {
+                Some(self.statement()?)
+            } else {
+                self.consume(TokenType::LeftBrace, "expect a block after else")?;
+                Some(self.block()?)
+            }
+        } else {
+            None
+        };
+
+        Ok(Stmt::If(
+            condition,
+            Box::new(the_branch),
+            else_branch.map(Box::new),
+        ))
     }
 
     fn expression_statment(&mut self) -> Result<Stmt, LoxErr> {

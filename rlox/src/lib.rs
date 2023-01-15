@@ -25,7 +25,7 @@ impl Lox {
                 if ty == TokenType::Eof {
                     self.report(line, " at end", &message)
                 } else {
-                    self.report(line, &format!("at '{};", lexme), &message)
+                    self.report(line, &format!("at '{}'", lexme), &message)
                 }
             }
             LoxErr::RunTimeErr(line, message) => {
@@ -44,7 +44,7 @@ impl Lox {
     }
 
     pub fn report(&mut self, line: usize, location: &str, message: &str) {
-        println!("[line {:?}] Error {:?}:{:?}", line, location, message);
+        println!("[line {}] Error {}, {}", line, location, message);
         self.has_error = true;
     }
 }
