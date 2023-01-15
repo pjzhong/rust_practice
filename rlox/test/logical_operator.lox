@@ -1,0 +1,16 @@
+print "aaa" or "bbbb";
+print false or "cccc";
+print "eeee" and "eeee";
+
+if "aaa" == "bbb" or "ccc" == "ccc" {
+    print "Or operator";
+}
+
+if !nil and 1==1 {
+    print "And operator";
+}
+
+
+if nil and 1==1 {
+    print "Wrong operator, Should not print";
+}

@@ -110,6 +110,19 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 }
                 Ok(value)
             }
+            Expr::Logical(left, oper, right) => {
+                let left = self.visit(left.as_ref())?;
+
+                if oper.toke_type == TokenType::Or {
+                    if self.is_truthy(Some(&left)) {
+                        return Ok(left);
+                    }
+                } else if !self.is_truthy(Some(&left)) {
+                    return Ok(left);
+                }
+
+                self.visit(right.as_ref())
+            }
         }
     }
 }
@@ -158,7 +171,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
             }
             Stmt::If(condition, then_branch, else_branch) => {
                 let value = self.visit(condition)?;
-                if self.is_truthy(&Some(value)) {
+                if self.is_truthy(Some(&value)) {
                     self.visit(then_branch.as_ref())?;
                 } else if let Some(stmt) = else_branch {
                     self.visit(stmt.as_ref())?;
@@ -207,7 +220,7 @@ impl Interpreter {
                 LoxValue::Number(right) => Ok((-right).into()),
                 _ => self.error(token, String::from("Operand mus be a number.")),
             },
-            TokenType::Bang => Ok((!self.is_truthy(&Some(right))).into()),
+            TokenType::Bang => Ok((!self.is_truthy(Some(&right))).into()),
             _ => self.error(
                 token,
                 format!(
@@ -282,9 +295,10 @@ impl Interpreter {
         }
     }
 
-    fn is_truthy(&self, val: &Option<LoxValue>) -> bool {
+    fn is_truthy(&self, val: Option<&LoxValue>) -> bool {
         match val {
             Some(LoxValue::Boolean(val)) => *val,
+            Some(LoxValue::Nil) => false,
             Some(_) => true,
             None => false,
         }

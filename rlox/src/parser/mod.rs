@@ -143,7 +143,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> Result<Expr, LoxErr> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if let Some(equal) = self.match_type(TokenType::Equal) {
             let value = self.assignment()?;
@@ -152,6 +152,28 @@ impl Parser {
                 Expr::Variable(name) => return Ok(Expr::Assign(name, Box::new(value))),
                 _ => self.report_error(&equal, "Invalid assignment target."),
             }
+        }
+
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr, LoxErr> {
+        let mut expr = self.and()?;
+
+        while let Some(token) = self.match_type(TokenType::Or) {
+            let right = self.and()?;
+            expr = Expr::Logical(Box::new(expr), token, Box::new(right));
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, LoxErr> {
+        let mut expr = self.equality()?;
+
+        while let Some(token) = self.match_type(TokenType::And) {
+            let right = self.equality()?;
+            expr = Expr::Logical(Box::new(expr), token, Box::new(right));
         }
 
         Ok(expr)
