@@ -90,7 +90,7 @@ impl Parser {
 
     fn print_statment(&mut self) -> Result<Stmt, LoxErr> {
         let value = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        self.consume(TokenType::Semicolon, "Expect ';' after print.")?;
         Ok(Stmt::Print(value))
     }
 
