@@ -179,6 +179,18 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 
                 Ok(())
             }
+            Stmt::While(condition, body) => {
+                loop {
+                    let value = self.visit(condition)?;
+                    if self.is_truthy(Some(&value)) {
+                        self.visit(body.as_ref())?;
+                    } else {
+                        break;
+                    }
+                }
+
+                Ok(())
+            }
         }
     }
 }

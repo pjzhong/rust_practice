@@ -71,7 +71,12 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, LoxErr> {
-        match self.match_types(&[TokenType::Print, TokenType::LeftBrace, TokenType::If]) {
+        match self.match_types(&[
+            TokenType::Print,
+            TokenType::LeftBrace,
+            TokenType::If,
+            TokenType::While,
+        ]) {
             Some(Token {
                 toke_type: TokenType::If,
                 ..
@@ -80,6 +85,10 @@ impl Parser {
                 toke_type: TokenType::Print,
                 ..
             }) => self.print_statment(),
+            Some(Token {
+                toke_type: TokenType::While,
+                ..
+            }) => self.while_statment(),
             Some(Token {
                 toke_type: TokenType::LeftBrace,
                 ..
@@ -92,6 +101,13 @@ impl Parser {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after print.")?;
         Ok(Stmt::Print(value))
+    }
+
+    fn while_statment(&mut self) -> Result<Stmt, LoxErr> {
+        let condition = self.expression()?;
+        self.match_error(TokenType::LeftBrace, "While expect a block.")?;
+        let body = self.statement()?;
+        Ok(Stmt::While(condition, Box::new(body)))
     }
 
     fn block(&mut self) -> Result<Stmt, LoxErr> {
@@ -111,15 +127,15 @@ impl Parser {
         //ifStmt -> "if"  expression block
         //          ( "else" block )?
         let condition = self.expression()?;
-        self.consume(TokenType::LeftBrace, "expect a block after if condition")?;
-        let the_branch = self.block()?;
+        self.match_error(TokenType::LeftBrace, "expect a block after if condition")?;
+        let the_branch = self.statement()?;
 
         let else_branch = if self.match_type(TokenType::Else).is_some() {
             if self.check(TokenType::If) {
                 Some(self.statement()?)
             } else {
-                self.consume(TokenType::LeftBrace, "expect a block after else")?;
-                Some(self.block()?)
+                self.match_error(TokenType::LeftBrace, "expect a block after else")?;
+                Some(self.statement()?)
             }
         } else {
             None
@@ -282,6 +298,23 @@ impl Parser {
         }
     }
 
+    fn match_error(&mut self, ty: TokenType, message: &str) -> Result<(), LoxErr> {
+        if let Some(token) = self.peek() {
+            if token.toke_type == ty {
+                Ok(())
+            } else {
+                Err(self.error(token, message))
+            }
+        } else {
+            Err(LoxErr::ParseErr(
+                0,
+                TokenType::Eof,
+                "unknown".to_string().into(),
+                format!("{}, {}", "Unexpected end", message),
+            ))
+        }
+    }
+
     fn advance(&mut self) -> Option<Token> {
         self.tokens.pop_front()
     }
@@ -315,7 +348,7 @@ impl Parser {
         self.peek().map_or(false, |t| t.toke_type == ty)
     }
 
-    fn error(&mut self, token: &Token, message: &str) -> LoxErr {
+    fn error(&self, token: &Token, message: &str) -> LoxErr {
         LoxErr::ParseErr(
             token.line,
             token.toke_type,
