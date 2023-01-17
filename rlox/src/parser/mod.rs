@@ -76,6 +76,7 @@ impl Parser {
             TokenType::LeftBrace,
             TokenType::If,
             TokenType::While,
+            TokenType::For,
         ]) {
             Some(Token {
                 toke_type: TokenType::If,
@@ -84,11 +85,17 @@ impl Parser {
             Some(Token {
                 toke_type: TokenType::Print,
                 ..
-            }) => self.print_statment(),
+            }) => self.print_statement(),
             Some(Token {
                 toke_type: TokenType::While,
                 ..
-            }) => self.while_statment(),
+            }) => self.while_statement(),
+            Some(
+                a @ Token {
+                    toke_type: TokenType::For,
+                    ..
+                },
+            ) => self.for_statement(a),
             Some(Token {
                 toke_type: TokenType::LeftBrace,
                 ..
@@ -97,17 +104,72 @@ impl Parser {
         }
     }
 
-    fn print_statment(&mut self) -> Result<Stmt, LoxErr> {
+    fn print_statement(&mut self) -> Result<Stmt, LoxErr> {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after print.")?;
         Ok(Stmt::Print(value))
     }
 
-    fn while_statment(&mut self) -> Result<Stmt, LoxErr> {
+    fn while_statement(&mut self) -> Result<Stmt, LoxErr> {
+        // I trying to use rust style
+        //WhileStmt -> "while"  expression block
         let condition = self.expression()?;
-        self.match_error(TokenType::LeftBrace, "While expect a block.")?;
+        self.check_error(TokenType::LeftBrace, "While expect a block.")?;
         let body = self.statement()?;
         Ok(Stmt::While(condition, Box::new(body)))
+    }
+
+    fn for_statement(&mut self, token: Token) -> Result<Stmt, LoxErr> {
+        self.consume(TokenType::LeftParen, "For exepct ( after it")?;
+        let initializer = match self.match_types(&[TokenType::Semicolon, TokenType::Var]) {
+            Some(Token {
+                toke_type: TokenType::Semicolon,
+                ..
+            }) => None,
+            Some(Token {
+                toke_type: TokenType::Var,
+                ..
+            }) => Some(self.var_declaration()?),
+            _ => Some(self.expression_statment()?),
+        };
+        let condition = if self.check(TokenType::Semicolon) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(TokenType::Semicolon, "expect ';' after loop condition")?;
+
+        let increment = if self.check(TokenType::RightParen) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(TokenType::RightParen, "expect ')' after for clauses.")?;
+
+        self.check_error(TokenType::LeftBrace, "for exepct a block")?;
+        let mut stmts = match self.statement()? {
+            Stmt::Block(stmts) => stmts,
+            _ => return Err(self.error(&token, "for exepct a block")),
+        };
+
+        if let Some(increment) = increment {
+            stmts.push(Stmt::Expression(increment));
+        }
+
+        let condition = if let Some(condtion) = condition {
+            condtion
+        } else {
+            Expr::Literal(true.into())
+        };
+
+        let for_loop = if let Some(initializer) = initializer {
+            let stmt_while = Stmt::While(condition, Box::new(Stmt::Block(stmts)));
+            Stmt::Block(vec![initializer, stmt_while])
+        } else {
+            Stmt::While(condition, Box::new(Stmt::Block(stmts)))
+        };
+
+        Ok(for_loop)
     }
 
     fn block(&mut self) -> Result<Stmt, LoxErr> {
@@ -127,14 +189,14 @@ impl Parser {
         //ifStmt -> "if"  expression block
         //          ( "else" block )?
         let condition = self.expression()?;
-        self.match_error(TokenType::LeftBrace, "expect a block after if condition")?;
+        self.check_error(TokenType::LeftBrace, "expect a block after if condition")?;
         let the_branch = self.statement()?;
 
         let else_branch = if self.match_type(TokenType::Else).is_some() {
             if self.check(TokenType::If) {
                 Some(self.statement()?)
             } else {
-                self.match_error(TokenType::LeftBrace, "expect a block after else")?;
+                self.check_error(TokenType::LeftBrace, "expect a block after else")?;
                 Some(self.statement()?)
             }
         } else {
@@ -298,7 +360,7 @@ impl Parser {
         }
     }
 
-    fn match_error(&mut self, ty: TokenType, message: &str) -> Result<(), LoxErr> {
+    fn check_error(&mut self, ty: TokenType, message: &str) -> Result<(), LoxErr> {
         if let Some(token) = self.peek() {
             if token.toke_type == ty {
                 Ok(())
