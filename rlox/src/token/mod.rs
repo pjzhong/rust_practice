@@ -79,6 +79,7 @@ pub enum TokenType {
     Ture,
     Var,
     While,
+    Break,
 
     Eof,
 }
@@ -140,6 +141,7 @@ impl TokenType {
             "true" => Some(TokenType::Ture),
             "var" => Some(TokenType::Var),
             "while" => Some(TokenType::While),
+            "break" => Some(TokenType::Break),
             _ => None,
         }
     }

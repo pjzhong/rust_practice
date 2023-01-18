@@ -12,6 +12,7 @@ use crate::{
 pub struct Parser {
     tokens: VecDeque<Token>,
     lox: Arc<Mutex<Lox>>,
+    loop_depath: usize,
 }
 
 impl<T> From<LoxErr> for Result<T, LoxErr> {
@@ -25,6 +26,7 @@ impl Parser {
         Self {
             tokens: tokens.into(),
             lox,
+            loop_depath: 0,
         }
     }
 
@@ -77,6 +79,7 @@ impl Parser {
             TokenType::If,
             TokenType::While,
             TokenType::For,
+            TokenType::Break,
         ]) {
             Some(Token {
                 toke_type: TokenType::If,
@@ -96,6 +99,10 @@ impl Parser {
                     ..
                 },
             ) => self.for_statement(a),
+            Some(a@Token {
+                toke_type: TokenType::Break,
+                ..
+            }) => self.break_statement(a),
             Some(Token {
                 toke_type: TokenType::LeftBrace,
                 ..
@@ -115,7 +122,10 @@ impl Parser {
         //WhileStmt -> "while"  expression block
         let condition = self.expression()?;
         self.check_error(TokenType::LeftBrace, "While expect a block.")?;
-        let body = self.statement()?;
+        self.loop_depath += 1;
+        let body = self.statement();
+        self.loop_depath -= 1;
+        let body = body?;
         Ok(Stmt::While(condition, Box::new(body)))
     }
 
@@ -146,14 +156,20 @@ impl Parser {
         };
         self.consume(TokenType::RightParen, "expect ')' after for clauses.")?;
 
-        self.check_error(TokenType::LeftBrace, "for exepct a block")?;
-        let mut stmts = match self.statement()? {
-            Stmt::Block(stmts) => stmts,
-            _ => return Err(self.error(&token, "for exepct a block")),
+        let mut body = {
+            self.check_error(TokenType::LeftBrace, "for exepct a block")?;
+            self.loop_depath += 1;
+            let body = self.statement();
+            self.loop_depath -= 1;
+
+            match body? {
+                Stmt::Block(stmts) => stmts,
+                _ => return Err(self.error(&token, "for exepct a block")),
+            }
         };
 
         if let Some(increment) = increment {
-            stmts.push(Stmt::Expression(increment));
+            body.push(Stmt::Expression(increment));
         }
 
         let condition = if let Some(condtion) = condition {
@@ -163,13 +179,22 @@ impl Parser {
         };
 
         let for_loop = if let Some(initializer) = initializer {
-            let stmt_while = Stmt::While(condition, Box::new(Stmt::Block(stmts)));
+            let stmt_while = Stmt::While(condition, Box::new(Stmt::Block(body)));
             Stmt::Block(vec![initializer, stmt_while])
         } else {
-            Stmt::While(condition, Box::new(Stmt::Block(stmts)))
+            Stmt::While(condition, Box::new(Stmt::Block(body)))
         };
 
         Ok(for_loop)
+    }
+
+    fn break_statement(&mut self, token: Token) -> Result<Stmt, LoxErr> {
+        self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
+        if self.loop_depath == 0 {
+            Err(self.error(&token, "break outside of loop"))
+        } else {
+            Ok(Stmt::Break)
+        }
     }
 
     fn block(&mut self) -> Result<Stmt, LoxErr> {

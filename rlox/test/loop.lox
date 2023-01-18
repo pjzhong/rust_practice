@@ -3,3 +3,15 @@ while a < 10 or a < 20 {
     print a;
     a = a + 1;
 } 
+
+break;
+
+while a < 100000000 {
+    if 100 <= a {
+        print "break";
+        print a;
+        break;
+    }
+
+    a = a + 1;
+}

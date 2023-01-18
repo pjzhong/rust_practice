@@ -183,7 +183,11 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 loop {
                     let value = self.visit(condition)?;
                     if self.is_truthy(Some(&value)) {
-                        self.visit(body.as_ref())?;
+                        match self.visit(body.as_ref()) {
+                            Err(LoxErr::BreakOutSideLoop) => return Ok(()),
+                            a @ Err(_) => return a,
+                            Ok(_) => {}
+                        };
                     } else {
                         break;
                     }
@@ -191,6 +195,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 
                 Ok(())
             }
+            Stmt::Break => Err(LoxErr::BreakOutSideLoop),
         }
     }
 }

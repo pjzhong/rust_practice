@@ -6,4 +6,5 @@ use crate::token::TokenType;
 pub enum LoxErr {
     ParseErr(usize, TokenType, Arc<String>, String),
     RunTimeErr(Option<usize>, String),
+    BreakOutSideLoop,
 }
