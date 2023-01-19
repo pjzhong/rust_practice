@@ -13,6 +13,7 @@ pub enum Expr {
     Unary(Token, Box<Expr>),
     Assign(Token, Box<Expr>),
     Logical(Box<Expr>, Token, Box<Expr>),
+    Call(Box<Expr>, Token, Vec<Expr>),
 }
 
 ///简化代码编写，不然这种包装写法太长了

@@ -1,5 +1,6 @@
 mod ast;
 mod error;
+mod function;
 mod interpreter;
 mod parser;
 mod scanner;
@@ -35,11 +36,11 @@ impl Lox {
                     eprintln!("{}", message);
                 }
                 self.had_runtime_error = true;
-            },
+            }
             LoxErr::BreakOutSideLoop => {
                 eprintln!("Break out side of loop");
                 self.had_runtime_error = true;
-            },
+            }
         }
     }
 

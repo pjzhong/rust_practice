@@ -7,6 +7,7 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
+    function::LoxCallable,
     token::{Literal, Token, TokenType},
     Lox, LoxErr,
 };
@@ -18,6 +19,7 @@ pub enum LoxValue {
     Number(f64),
     Boolean(bool),
     String(Arc<String>),
+    Call(Arc<dyn LoxCallable>),
     Nil,
 }
 
@@ -27,6 +29,7 @@ impl Display for LoxValue {
             LoxValue::Number(a) => write!(f, "{}", a),
             LoxValue::Boolean(a) => write!(f, "{}", a),
             LoxValue::String(a) => write!(f, "{}", a),
+            LoxValue::Call(_) => write!(f, "callable"),
             LoxValue::Nil => write!(f, "nil"),
         }
     }
@@ -122,6 +125,26 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 }
 
                 self.visit(right.as_ref())
+            }
+            Expr::Call(callee, paren, exprs) => {
+                let callee = self.visit(callee.as_ref())?;
+
+                let mut args = vec![];
+                for expr in exprs {
+                    args.push(self.visit(expr)?);
+                }
+
+                let mut callee = match callee {
+                    LoxValue::Call(callee) => callee,
+                    _ => {
+                        return Err(LoxErr::RunTimeErr(
+                            Some(paren.line),
+                            "Can only call functions and classess.".to_string(),
+                        ))
+                    }
+                };
+
+                todo!()
             }
         }
     }

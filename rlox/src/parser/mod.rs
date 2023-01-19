@@ -99,10 +99,12 @@ impl Parser {
                     ..
                 },
             ) => self.for_statement(a),
-            Some(a@Token {
-                toke_type: TokenType::Break,
-                ..
-            }) => self.break_statement(a),
+            Some(
+                a @ Token {
+                    toke_type: TokenType::Break,
+                    ..
+                },
+            ) => self.break_statement(a),
             Some(Token {
                 toke_type: TokenType::LeftBrace,
                 ..
@@ -156,21 +158,22 @@ impl Parser {
         };
         self.consume(TokenType::RightParen, "expect ')' after for clauses.")?;
 
-        let mut body = {
+        let body = {
             self.check_error(TokenType::LeftBrace, "for exepct a block")?;
             self.loop_depath += 1;
             let body = self.statement();
             self.loop_depath -= 1;
 
             match body? {
-                Stmt::Block(stmts) => stmts,
+                Stmt::Block(mut stmts) => {
+                    if let Some(increment) = increment {
+                        stmts.push(Stmt::Expression(increment));
+                    }
+                    stmts
+                }
                 _ => return Err(self.error(&token, "for exepct a block")),
             }
         };
-
-        if let Some(increment) = increment {
-            body.push(Stmt::Expression(increment));
-        }
 
         let condition = if let Some(condtion) = condition {
             condtion
@@ -335,7 +338,44 @@ impl Parser {
             return Ok(Expr::Unary(operator, Box::new(right)));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr, LoxErr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if let Some(token) = self.match_type(TokenType::LeftParen) {
+                expr = self.finish_call(expr, token)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr, token: Token) -> Result<Expr, LoxErr> {
+        let arguments = {
+            let mut arguments = vec![];
+
+            if !self.check(TokenType::RightParen) {
+                loop {
+                    arguments.push(self.expression()?);
+                    if 255 <= arguments.len() {
+                        self.report_error(&token, "Can't have more than 255 arguments.");
+                    }
+                    if self.match_type(TokenType::Comma).is_none() {
+                        break;
+                    }
+                }
+            }
+
+            arguments
+        };
+
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+        Ok(Expr::Call(Box::new(callee), paren, arguments))
     }
 
     fn primary(&mut self) -> Result<Expr, LoxErr> {
