@@ -38,14 +38,14 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Option<Stmt> {
-        let stmt = match self.match_types(&[TokenType::Var, TokenType::Fun]) {
+        let stmt = match self.match_types(&[TokenType::Var, TokenType::Fn]) {
             Some(Token {
                 toke_type: TokenType::Var,
                 ..
             }) => self.var_declaration(),
             Some(
                 a @ Token {
-                    toke_type: TokenType::Fun,
+                    toke_type: TokenType::Fn,
                     ..
                 },
             ) => self.function(&a),
@@ -535,7 +535,7 @@ impl Parser {
             match self.peek() {
                 Some(token) => match token.toke_type {
                     TokenType::Class
-                    | TokenType::Fun
+                    | TokenType::Fn
                     | TokenType::Var
                     | TokenType::For
                     | TokenType::If

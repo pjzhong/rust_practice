@@ -1,10 +1,10 @@
-fun sayHi(first, last) {
+fn sayHi(first, last) {
     print "Hi, " + first + " " + last + "!";
 }
 
 sayHi("Dear", "Reader");
 
-fun count(n) {
+fn count(n) {
     if 0 < n {
         count(n - 1);
         print n;
