@@ -1,12 +1,12 @@
 use std::{
     fmt::{Debug, Display},
-    sync::Arc,
+    rc::Rc,
 };
 
 #[derive(Clone)]
 pub struct Token {
     pub toke_type: TokenType,
-    pub lexeme: Arc<String>,
+    pub lexeme: Rc<String>,
     pub value: Literal,
     pub line: usize,
 }
@@ -86,7 +86,7 @@ pub enum TokenType {
 
 #[derive(Debug, Clone)]
 pub enum Literal {
-    String(Arc<String>),
+    String(Rc<String>),
     Number(f64),
     Bool(bool),
     Nil,
@@ -101,7 +101,7 @@ impl From<f64> for Literal {
 
 impl From<String> for Literal {
     fn from(a: String) -> Self {
-        Literal::String(Arc::new(a))
+        Literal::String(Rc::new(a))
     }
 }
 

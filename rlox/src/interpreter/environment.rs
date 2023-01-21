@@ -1,10 +1,10 @@
 use crate::{interpreter::LoxValue, token::Token, LoxErr};
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Default)]
 pub struct Environment {
     enclosing: Option<Rc<RefCell<Environment>>>,
-    values: HashMap<Arc<String>, LoxValue>,
+    values: HashMap<Rc<String>, LoxValue>,
 }
 
 impl Environment {
@@ -15,7 +15,7 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: Arc<String>, value: LoxValue) {
+    pub fn define(&mut self, name: Rc<String>, value: LoxValue) {
         self.values.insert(name, value);
     }
 

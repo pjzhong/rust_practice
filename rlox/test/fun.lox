@@ -3,3 +3,16 @@ fun sayHi(first, last) {
 }
 
 sayHi("Dear", "Reader");
+
+fun count(n) {
+    if 0 < n {
+        count(n - 1);
+        print n;
+    } else {
+        print n;
+    }
+}
+
+count(15);
+
+print clock();

@@ -1,11 +1,6 @@
 mod environment;
 
-use std::{
-    cell::RefCell,
-    fmt::Display,
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, fmt::Display, rc::Rc, sync::Mutex};
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
@@ -20,7 +15,7 @@ pub use self::environment::Environment;
 pub enum LoxValue {
     Number(f64),
     Boolean(bool),
-    String(Arc<String>),
+    String(Rc<String>),
     Call(LoxCallable),
     Nil,
 }
@@ -39,12 +34,12 @@ impl Display for LoxValue {
 
 impl From<String> for LoxValue {
     fn from(a: String) -> Self {
-        LoxValue::String(Arc::new(a))
+        LoxValue::String(Rc::new(a))
     }
 }
 
-impl From<Arc<String>> for LoxValue {
-    fn from(a: Arc<String>) -> Self {
+impl From<Rc<String>> for LoxValue {
+    fn from(a: Rc<String>) -> Self {
         LoxValue::String(a)
     }
 }
@@ -129,11 +124,11 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
 
                 self.visit(right.as_ref())
             }
-            Expr::Call(callee, paren, exprs) => {
+            Expr::Call(callee, paren, arg_exprs) => {
                 let callee = self.visit(callee.as_ref())?;
 
                 let mut args = vec![];
-                for expr in exprs {
+                for expr in arg_exprs {
                     args.push(self.visit(expr)?);
                 }
 
@@ -146,6 +141,17 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                         ))
                     }
                 };
+
+                if callee.arity() != arg_exprs.len() {
+                    return Err(LoxErr::RunTimeErr(
+                        Some(paren.line),
+                        format!(
+                            "Expected {} arguments but got {}.",
+                            callee.arity(),
+                            args.len()
+                        ),
+                    ));
+                }
 
                 callee.call(self, args)
             }
@@ -213,9 +219,13 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(LoxErr::BreakOutSideLoop),
-            fun @ Stmt::Fun(name, _, _) => match self.environment.try_borrow_mut() {
+            Stmt::Fun(name, args, bodys) => match self.environment.try_borrow_mut() {
                 Ok(mut evir) => {
-                    let callable = LoxValue::Call(LoxCallable::LoxFun(fun.clone()));
+                    let callable = LoxValue::Call(LoxCallable::LoxFun(
+                        name.clone(),
+                        args.clone(),
+                        bodys.clone(),
+                    ));
                     evir.define(name.lexeme.clone(), callable);
                     Ok(())
                 }
@@ -230,7 +240,12 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 
 impl Interpreter {
     pub fn new(lox: Rc<Mutex<Lox>>) -> Self {
-        let envir = Rc::new(RefCell::new(Environment::default()));
+        let mut envir = Environment::default();
+        envir.define(
+            Rc::new("clock".to_string()),
+            LoxValue::Call(LoxCallable::Clock),
+        );
+        let envir = Rc::new(RefCell::new(envir));
         Self {
             lox,
             environment: envir.clone(),
