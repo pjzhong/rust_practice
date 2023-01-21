@@ -66,7 +66,7 @@ impl Display for LoxCallable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LoxCallable::Clock => write!(f, "native fn clock()"),
-            LoxCallable::LoxFun(token, ..) => write!(f, "fn {}", token.lexeme),
+            LoxCallable::LoxFun(token, ..) => write!(f, "fn {}()", token.lexeme),
         }
     }
 }

@@ -26,7 +26,7 @@ impl Display for LoxValue {
             LoxValue::Number(a) => write!(f, "{}", a),
             LoxValue::Boolean(a) => write!(f, "{}", a),
             LoxValue::String(a) => write!(f, "{}", a),
-            LoxValue::Call(_) => write!(f, "callable"),
+            LoxValue::Call(c) => c.fmt(f),
             LoxValue::Nil => write!(f, "nil"),
         }
     }

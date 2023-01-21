@@ -16,3 +16,5 @@ fun count(n) {
 count(15);
 
 print clock();
+print clock;
+print count;
