@@ -4,7 +4,7 @@ pub trait Visitor<T, R> {
     fn visit(&self, t: T) -> R;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),

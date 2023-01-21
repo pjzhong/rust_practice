@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{rc::Rc, sync::Mutex};
 
 use crate::{
     token::{Literal, Token, TokenType},
@@ -11,11 +11,11 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    lox: Arc<Mutex<Lox>>,
+    lox: Rc<Mutex<Lox>>,
 }
 
 impl Scanner {
-    pub fn new(source: &str, lox: Arc<Mutex<Lox>>) -> Self {
+    pub fn new(source: &str, lox: Rc<Mutex<Lox>>) -> Self {
         Self {
             source: source.chars().collect(),
             tokens: vec![],

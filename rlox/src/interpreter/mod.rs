@@ -1,7 +1,9 @@
 mod environment;
 
 use std::{
+    cell::RefCell,
     fmt::Display,
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 
@@ -12,14 +14,14 @@ use crate::{
     Lox, LoxErr,
 };
 
-use self::environment::Environment;
+pub use self::environment::Environment;
 
 #[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
     Boolean(bool),
     String(Arc<String>),
-    Call(Arc<dyn LoxCallable>),
+    Call(LoxCallable),
     Nil,
 }
 
@@ -74,8 +76,9 @@ impl From<&f64> for LoxValue {
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
 pub struct Interpreter {
-    lox: Arc<Mutex<Lox>>,
-    environment: Option<Environment>,
+    lox: Rc<Mutex<Lox>>,
+    environment: Rc<RefCell<Environment>>,
+    pub global: Rc<RefCell<Environment>>,
 }
 
 impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
@@ -86,7 +89,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
             Expr::Grouping(expr) => self.visit(expr.as_ref()),
             Expr::Variable(token) => {
-                if let Some(env) = &self.environment {
+                if let Ok(env) = &self.environment.try_borrow_mut() {
                     env.get(token)
                 } else {
                     self.error(
@@ -100,7 +103,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             }
             Expr::Assign(token, value) => {
                 let value = self.visit(value.as_ref())?;
-                if let Some(env) = &mut self.environment {
+                if let Ok(env) = &mut self.environment.try_borrow_mut() {
                     env.assign(token, &value)?;
                 } else {
                     return self.error(
@@ -144,7 +147,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                     }
                 };
 
-                todo!()
+                callee.call(self, args)
             }
         }
     }
@@ -171,7 +174,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                     LoxValue::Nil
                 };
 
-                if let Some(env) = self.environment.as_mut() {
+                if let Ok(mut env) = self.environment.try_borrow_mut() {
                     env.define(token.lexeme.clone(), value)
                 }
                 Ok(())
@@ -180,16 +183,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 if stmts.is_empty() {
                     Ok(())
                 } else {
-                    self.environment = Environment::enclosing(self.environment.take());
-                    let res = stmts
-                        .iter()
-                        .map(|stmt| self.visit(stmt))
-                        .find(Result::is_err)
-                        .map_or(Ok(()), Result::from);
-
-                    self.environment = self.environment.take().and_then(Environment::declosing);
-
-                    res
+                    self.execute_block(stmts, Environment::enclosing(self.environment.clone()))
                 }
             }
             Stmt::If(condition, then_branch, else_branch) => {
@@ -219,15 +213,28 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(LoxErr::BreakOutSideLoop),
+            fun @ Stmt::Fun(name, _, _) => match self.environment.try_borrow_mut() {
+                Ok(mut evir) => {
+                    let callable = LoxValue::Call(LoxCallable::LoxFun(fun.clone()));
+                    evir.define(name.lexeme.clone(), callable);
+                    Ok(())
+                }
+                Err(e) => Err(LoxErr::RunTimeErr(
+                    None,
+                    format!("define fun err。envir err:{}", e),
+                )),
+            },
         }
     }
 }
 
 impl Interpreter {
-    pub fn new(lox: Arc<Mutex<Lox>>) -> Self {
+    pub fn new(lox: Rc<Mutex<Lox>>) -> Self {
+        let envir = Rc::new(RefCell::new(Environment::default()));
         Self {
             lox,
-            environment: Some(Environment::default()),
+            environment: envir.clone(),
+            global: envir,
         }
     }
 
@@ -358,5 +365,23 @@ impl Interpreter {
 
     fn error(&self, token: &Token, message: String) -> LoxResult<LoxValue> {
         Err(LoxErr::RunTimeErr(Some(token.line), message))
+    }
+
+    pub fn execute_block(
+        &mut self,
+        stmts: &[Stmt],
+        environment: Environment,
+    ) -> Result<(), LoxErr> {
+        let previous = self.environment.clone();
+
+        self.environment = Rc::new(RefCell::new(environment));
+        let res = stmts
+            .iter()
+            .map(|stmt| self.visit(stmt))
+            .find(Result::is_err)
+            .map_or(Ok(()), Result::from);
+
+        self.environment = previous;
+        res
     }
 }

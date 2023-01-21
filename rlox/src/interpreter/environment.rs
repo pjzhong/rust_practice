@@ -1,22 +1,18 @@
 use crate::{interpreter::LoxValue, token::Token, LoxErr};
-use std::{collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 #[derive(Debug, Default)]
 pub struct Environment {
-    enclosing: Option<Box<Environment>>,
+    enclosing: Option<Rc<RefCell<Environment>>>,
     values: HashMap<Arc<String>, LoxValue>,
 }
 
 impl Environment {
-    pub fn enclosing(enclosing: Option<Environment>) -> Option<Self> {
-        Some(Self {
-            enclosing: enclosing.map(Box::new),
+    pub fn enclosing(enclosing: Rc<RefCell<Environment>>) -> Self {
+        Self {
+            enclosing: Some(enclosing),
             values: HashMap::new(),
-        })
-    }
-
-    pub fn declosing(self) -> Option<Self> {
-        self.enclosing.map(|env| *env)
+        }
     }
 
     pub fn define(&mut self, name: Arc<String>, value: LoxValue) {
@@ -27,7 +23,13 @@ impl Environment {
         match self.values.get(&token.lexeme) {
             Some(a) => Ok(a.clone()),
             None => match &self.enclosing {
-                Some(enclosing) => enclosing.get(token),
+                Some(enclosing) => match enclosing.try_borrow() {
+                    Ok(enclosing) => enclosing.get(token),
+                    Err(e) => Err(LoxErr::RunTimeErr(
+                        Some(token.line),
+                        format!("Undefined variable '{}', err:{}", &token.lexeme, e),
+                    )),
+                },
                 None => Err(LoxErr::RunTimeErr(
                     Some(token.line),
                     format!("Undefined variable '{}'", &token.lexeme),
@@ -42,11 +44,17 @@ impl Environment {
                 *val = value.clone();
                 Ok(())
             }
-            None => match &mut self.enclosing {
-                Some(enclosing) => enclosing.assign(token, value),
+            None => match &self.enclosing {
+                Some(enclosing) => match enclosing.try_borrow_mut() {
+                    Ok(mut enclosing) => enclosing.assign(token, value),
+                    Err(e) => Err(LoxErr::RunTimeErr(
+                        Some(token.line),
+                        format!("Undefined variable '{}', err:{}", &token.lexeme, e),
+                    )),
+                },
                 None => Err(LoxErr::RunTimeErr(
                     Some(token.line),
-                    format!("Undefined variable '{}'.", token.lexeme),
+                    format!("Undefined variable '{}'", &token.lexeme),
                 )),
             },
         }

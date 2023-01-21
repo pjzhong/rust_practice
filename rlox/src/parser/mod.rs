@@ -1,7 +1,4 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{collections::VecDeque, rc::Rc, sync::Mutex};
 
 use crate::{
     ast::{Expr, Stmt},
@@ -11,7 +8,7 @@ use crate::{
 
 pub struct Parser {
     tokens: VecDeque<Token>,
-    lox: Arc<Mutex<Lox>>,
+    lox: Rc<Mutex<Lox>>,
     loop_depath: usize,
 }
 
@@ -22,7 +19,7 @@ impl<T> From<LoxErr> for Result<T, LoxErr> {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>, lox: Arc<Mutex<Lox>>) -> Self {
+    pub fn new(tokens: Vec<Token>, lox: Rc<Mutex<Lox>>) -> Self {
         Self {
             tokens: tokens.into(),
             lox,
@@ -41,10 +38,18 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Option<Stmt> {
-        let stmt = if self.match_type(TokenType::Var).is_some() {
-            self.var_declaration()
-        } else {
-            self.statement()
+        let stmt = match self.match_types(&[TokenType::Var, TokenType::Fun]) {
+            Some(Token {
+                toke_type: TokenType::Var,
+                ..
+            }) => self.var_declaration(),
+            Some(
+                a @ Token {
+                    toke_type: TokenType::Fun,
+                    ..
+                },
+            ) => self.function(&a),
+            _ => self.statement(),
         };
 
         match stmt {
@@ -244,6 +249,41 @@ impl Parser {
         Ok(Stmt::Expression(value))
     }
 
+    fn function(&mut self, token: &Token) -> Result<Stmt, LoxErr> {
+        let name = self.consume(
+            TokenType::Identifier,
+            &format!("Expect {:?} name.", token.toke_type),
+        )?;
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '( ' after {:?} name.", token.toke_type),
+        )?;
+
+        let mut parameters = vec![];
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    self.report_error(token, "Can't have more than 255 parameters.");
+                }
+
+                parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?);
+
+                if self.match_type(TokenType::Comma).is_none() {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
+
+        self.check_error(TokenType::LeftBrace, "function expect a block.")?;
+        let body = match self.statement()? {
+            Stmt::Block(body) => body,
+            _ => return Err(self.error(token, "function expect a block.")),
+        };
+        Ok(Stmt::Fun(name, parameters, body))
+    }
+
     fn expression(&mut self) -> Result<Expr, LoxErr> {
         self.assignment()
     }
@@ -344,12 +384,8 @@ impl Parser {
     fn call(&mut self) -> Result<Expr, LoxErr> {
         let mut expr = self.primary()?;
 
-        loop {
-            if let Some(token) = self.match_type(TokenType::LeftParen) {
-                expr = self.finish_call(expr, token)?;
-            } else {
-                break;
-            }
+        while let Some(token) = self.match_type(TokenType::LeftParen) {
+            expr = self.finish_call(expr, token)?;
         }
 
         Ok(expr)

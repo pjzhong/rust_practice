@@ -2,14 +2,15 @@ use std::{
     env, fs,
     io::{self, Write},
     process::exit,
-    sync::{Arc, Mutex},
+    rc::Rc,
+    sync::Mutex,
 };
 
 use rlox::{Interpreter, Lox, Parser, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
-    let lox = Arc::new(Mutex::new(Lox::default()));
+    let lox = Rc::new(Mutex::new(Lox::default()));
 
     match args.len() {
         a if a > 2 => {
@@ -23,7 +24,7 @@ fn main() {
     }
 }
 
-fn run_file(lox: Arc<Mutex<Lox>>, file: &str) {
+fn run_file(lox: Rc<Mutex<Lox>>, file: &str) {
     match fs::read_to_string(file) {
         Ok(file) => {
             run(&file, lox.clone());
@@ -45,7 +46,7 @@ fn run_file(lox: Arc<Mutex<Lox>>, file: &str) {
     }
 }
 
-fn run_prompt(lox: Arc<Mutex<Lox>>) {
+fn run_prompt(lox: Rc<Mutex<Lox>>) {
     let mut string = String::new();
     let stdio = io::stdin();
     loop {
@@ -63,7 +64,7 @@ fn run_prompt(lox: Arc<Mutex<Lox>>) {
     }
 }
 
-fn run(code: &str, lox: Arc<Mutex<Lox>>) {
+fn run(code: &str, lox: Rc<Mutex<Lox>>) {
     let scanner = Scanner::new(code, lox.clone());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens, lox.clone());
