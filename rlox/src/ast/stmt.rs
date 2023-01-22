@@ -15,5 +15,6 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
     Fun(Token, Vec<Token>, Vec<Stmt>),
+    Return(Token, Expr),
     Break,
 }

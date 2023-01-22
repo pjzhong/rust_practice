@@ -85,6 +85,7 @@ impl Parser {
             TokenType::While,
             TokenType::For,
             TokenType::Break,
+            TokenType::Return,
         ]) {
             Some(Token {
                 toke_type: TokenType::If,
@@ -94,6 +95,12 @@ impl Parser {
                 toke_type: TokenType::Print,
                 ..
             }) => self.print_statement(),
+            Some(
+                ret @ Token {
+                    toke_type: TokenType::Return,
+                    ..
+                },
+            ) => self.return_statement(ret),
             Some(Token {
                 toke_type: TokenType::While,
                 ..
@@ -124,6 +131,16 @@ impl Parser {
         Ok(Stmt::Print(value))
     }
 
+    fn return_statement(&mut self, key_word: Token) -> Result<Stmt, LoxErr> {
+        let value = if self.check(TokenType::Semicolon) {
+            Expr::Literal(Literal::Nil)
+        } else {
+            self.expression()?
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after return value")?;
+        Ok(Stmt::Return(key_word, value))
+    }
     fn while_statement(&mut self) -> Result<Stmt, LoxErr> {
         // I trying to use rust style
         //WhileStmt -> "while"  expression block

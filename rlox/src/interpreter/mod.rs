@@ -234,6 +234,10 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                     format!("define fun err。envir err:{}", e),
                 )),
             },
+            Stmt::Return(_, expr) => {
+                let value = self.visit(expr)?;
+                Err(LoxErr::Return(value))
+            }
         }
     }
 }

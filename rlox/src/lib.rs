@@ -41,6 +41,10 @@ impl Lox {
                 eprintln!("Break out side of loop");
                 self.had_runtime_error = true;
             }
+            LoxErr::Return(_) => {
+                eprintln!("Unhandle return");
+                self.had_runtime_error = true;
+            }
         }
     }
 

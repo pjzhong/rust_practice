@@ -57,8 +57,11 @@ impl LoxCallable {
             environment.define(name.lexeme.clone(), value);
         }
 
-        interpreter.execute_block(body, environment)?;
-        Ok(LoxValue::Nil)
+        match interpreter.execute_block(body, environment) {
+            Ok(_) => Ok(LoxValue::Nil),
+            Err(LoxErr::Return(val)) => Ok(val),
+            Err(err) => Err(err),
+        }
     }
 }
 
