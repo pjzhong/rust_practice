@@ -73,7 +73,6 @@ type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 pub struct Interpreter {
     lox: Rc<Mutex<Lox>>,
     environment: Rc<RefCell<Environment>>,
-    pub global: Rc<RefCell<Environment>>,
 }
 
 impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
@@ -225,6 +224,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                         name.clone(),
                         args.clone(),
                         bodys.clone(),
+                        self.environment.clone(),
                     ));
                     evir.define(name.lexeme.clone(), callable);
                     Ok(())
@@ -252,8 +252,7 @@ impl Interpreter {
         let envir = Rc::new(RefCell::new(envir));
         Self {
             lox,
-            environment: envir.clone(),
-            global: envir,
+            environment: envir,
         }
     }
 

@@ -1,5 +1,7 @@
 use std::{
+    cell::RefCell,
     fmt::{Debug, Display},
+    rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -13,14 +15,14 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum LoxCallable {
     Clock,
-    LoxFun(Token, Vec<Token>, Vec<Stmt>),
+    LoxFun(Token, Vec<Token>, Vec<Stmt>, Rc<RefCell<Environment>>),
 }
 
 impl LoxCallable {
     pub fn arity(&self) -> usize {
         match self {
             LoxCallable::Clock => 0,
-            LoxCallable::LoxFun(_, args, _) => args.len(),
+            LoxCallable::LoxFun(_, args, _, _) => args.len(),
         }
     }
 
@@ -31,8 +33,8 @@ impl LoxCallable {
     ) -> Result<LoxValue, LoxErr> {
         match self {
             LoxCallable::Clock => LoxCallable::clock(),
-            LoxCallable::LoxFun(_, args, body) => {
-                LoxCallable::lox_call(args, body, interpreter, arguments)
+            LoxCallable::LoxFun(_, args, body, closure) => {
+                LoxCallable::lox_call(args, body, closure.clone(), interpreter, arguments)
             }
         }
     }
@@ -49,10 +51,11 @@ impl LoxCallable {
     fn lox_call(
         arg_tokens: &[Token],
         body: &[Stmt],
+        closure: Rc<RefCell<Environment>>,
         interpreter: &mut Interpreter,
         args: Vec<LoxValue>,
     ) -> Result<LoxValue, LoxErr> {
-        let mut environment = Environment::enclosing(interpreter.global.clone());
+        let mut environment = Environment::enclosing(closure);
         for (name, value) in arg_tokens.iter().zip(args) {
             environment.define(name.lexeme.clone(), value);
         }
