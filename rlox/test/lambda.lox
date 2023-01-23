@@ -1,0 +1,18 @@
+fn thrice(afun, bfun) {
+  print afun;
+  print bfun;
+  for (var i = 1; i <= 3; i = i + 1) {
+    var a = afun(i);
+    bfun(a);
+    a = 4;
+  }
+}
+
+fn () {};
+
+var offset = 10;
+thrice(fn (a) {
+  return a + offset;
+}, fn (a) {
+    print a;
+});

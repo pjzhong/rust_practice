@@ -73,6 +73,7 @@ type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 pub struct Interpreter {
     lox: Rc<Mutex<Lox>>,
     environment: Rc<RefCell<Environment>>,
+    lambda: usize,
 }
 
 impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
@@ -153,6 +154,22 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 }
 
                 callee.call(self, args)
+            }
+            Expr::Lambda(token, param, body) => {
+                self.lambda += 1;
+                let token = Token {
+                    toke_type: token.toke_type,
+                    lexeme: Rc::new(format!("lambda#{}", self.lambda)),
+                    value: Literal::Nil,
+                    line: token.line,
+                };
+                let callee = LoxCallable::LoxFun(
+                    token,
+                    param.clone(),
+                    body.clone(),
+                    self.environment.clone(),
+                );
+                Ok(LoxValue::Call(callee))
             }
         }
     }
@@ -253,6 +270,7 @@ impl Interpreter {
         Self {
             lox,
             environment: envir,
+            lambda: 0,
         }
     }
 

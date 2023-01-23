@@ -302,7 +302,45 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, LoxErr> {
-        self.assignment()
+        match self.match_type(TokenType::Fn) {
+            Some(
+                lambda @ Token {
+                    toke_type: TokenType::Fn,
+                    ..
+                },
+            ) => self.lambda(lambda),
+            _ => self.assignment(),
+        }
+    }
+
+    fn lambda(&mut self, token: Token) -> Result<Expr, LoxErr> {
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '( ' after {:?} name.", token.toke_type),
+        )?;
+        let mut parameters = vec![];
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    self.report_error(&token, "Can't have more than 255 parameters.");
+                }
+
+                parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?);
+
+                if self.match_type(TokenType::Comma).is_none() {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
+
+        self.check_error(TokenType::LeftBrace, "function expect a block.")?;
+        let body = match self.statement()? {
+            Stmt::Block(body) => body,
+            _ => return Err(self.error(&token, "function expect a block.")),
+        };
+        Ok(Expr::Lambda(token, parameters, body))
     }
 
     fn assignment(&mut self) -> Result<Expr, LoxErr> {

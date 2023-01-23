@@ -10,6 +10,10 @@ use rlox::{Interpreter, Lox, Parser, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
+    let args = vec![
+        "aa",
+        "D:\\software\\rust\\rust_practice\\rlox\\test\\lambda.lox",
+    ];
     let lox = Rc::new(Mutex::new(Lox::default()));
 
     match args.len() {

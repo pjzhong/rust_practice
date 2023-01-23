@@ -1,5 +1,7 @@
 use crate::token::{Literal, Token};
 
+use super::Stmt;
+
 pub trait Visitor<T, R> {
     fn visit(&self, t: T) -> R;
 }
@@ -14,6 +16,7 @@ pub enum Expr {
     Assign(Token, Box<Expr>),
     Logical(Box<Expr>, Token, Box<Expr>),
     Call(Box<Expr>, Token, Vec<Expr>),
+    Lambda(Token, Vec<Token>, Vec<Stmt>),
 }
 
 ///简化代码编写，不然这种包装写法太长了
