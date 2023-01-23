@@ -8,8 +8,6 @@ fn thrice(afun, bfun) {
   }
 }
 
-fn () {};
-
 var offset = 10;
 thrice(fn (a) {
   return a + offset;
