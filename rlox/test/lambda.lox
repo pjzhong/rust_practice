@@ -14,3 +14,12 @@ thrice(fn (a) {
 }, fn (a) {
     print a;
 });
+
+
+var lam = fn (a) {
+  print a;
+};
+
+lam("asdfasdf");
+lam(123123);
+lam(thrice);

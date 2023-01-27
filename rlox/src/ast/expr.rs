@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::token::{Literal, Token};
 
 use super::Stmt;
@@ -6,7 +8,7 @@ pub trait Visitor<T, R> {
     fn visit(&self, t: T) -> R;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Expr {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
@@ -16,7 +18,7 @@ pub enum Expr {
     Assign(Token, Box<Expr>),
     Logical(Box<Expr>, Token, Box<Expr>),
     Call(Box<Expr>, Token, Vec<Expr>),
-    Lambda(Token, Vec<Token>, Vec<Stmt>),
+    Lambda(Token, Vec<Token>, Rc<Vec<Stmt>>),
 }
 
 ///简化代码编写，不然这种包装写法太长了
@@ -79,6 +81,8 @@ impl Visitor<&Expr, String> for AstPrinter {
 
 #[cfg(test)]
 mod tests {
+
+    
 
     use super::*;
     use crate::token::*;

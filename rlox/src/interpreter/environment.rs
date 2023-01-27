@@ -38,6 +38,16 @@ impl Environment {
         }
     }
 
+    pub fn get_direct(&self, token: &Token) -> Result<LoxValue, LoxErr> {
+        match self.values.get(&token.lexeme) {
+            Some(a) => Ok(a.clone()),
+            None => Err(LoxErr::RunTimeErr(
+                Some(token.line),
+                format!("Undefined variable '{}'", &token.lexeme),
+            )),
+        }
+    }
+
     pub fn assign(&mut self, token: &Token, value: &LoxValue) -> Result<(), LoxErr> {
         match self.values.get_mut(&token.lexeme) {
             Some(val) => {
@@ -58,5 +68,54 @@ impl Environment {
                 )),
             },
         }
+    }
+
+    pub fn get_at(
+        env: Rc<RefCell<Environment>>,
+        distance: usize,
+        name: &Token,
+    ) -> Result<LoxValue, LoxErr> {
+        match Environment::ancestor(env, distance).try_borrow() {
+            Ok(env) => env.get_direct(name),
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(name.line),
+                format!("Undefined variable '{}',e:{}", &name.lexeme, e),
+            )),
+        }
+    }
+
+    pub fn assign_at(
+        env: Rc<RefCell<Environment>>,
+        distance: usize,
+        name: &Token,
+        value: &LoxValue,
+    ) -> Result<(), LoxErr> {
+        match Environment::ancestor(env, distance).try_borrow_mut() {
+            Ok(mut env) => match env.values.get_mut(&name.lexeme) {
+                Some(val) => {
+                    *val = value.clone();
+                    Ok(())
+                }
+                None => Err(LoxErr::RunTimeErr(
+                    Some(name.line),
+                    format!("Undefined variable '{}'", name.lexeme),
+                )),
+            },
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(name.line),
+                format!("Undefined variable '{}',e:{}", name.lexeme, e),
+            )),
+        }
+    }
+
+    fn ancestor(env: Rc<RefCell<Environment>>, distance: usize) -> Rc<RefCell<Self>> {
+        let mut environment = env;
+        for _ in 0..distance {
+            if let Ok(Some(enclosing)) = environment.try_borrow().map(|e| e.enclosing.clone()) {
+                environment = enclosing;
+            }
+        }
+
+        environment
     }
 }

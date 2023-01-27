@@ -1,9 +1,10 @@
 use std::{
     fmt::{Debug, Display},
+    hash::Hash,
     rc::Rc,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub struct Token {
     pub toke_type: TokenType,
     pub lexeme: Rc<String>,
@@ -32,7 +33,7 @@ impl Debug for Token {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -90,6 +91,35 @@ pub enum Literal {
     Number(f64),
     Bool(bool),
     Nil,
+}
+
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::String(l0), Self::String(r0)) => l0 == r0,
+            (Self::Number(l0), Self::Number(r0)) => l0 == r0,
+            (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+            (Self::Nil, Self::Nil) => true,
+            _ => false,
+        }
+    }
+}
+// Why this would Work
+impl Eq for Literal {}
+
+impl Hash for Literal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Literal::String(str) => str.hash(state),
+            Literal::Number(num) => {
+                let bites = num.to_bits();
+                let bites = bites ^ (bites >> 32);
+                state.write_u64(bites)
+            }
+            Literal::Bool(a) => a.hash(state),
+            Literal::Nil => state.write_i8(0),
+        }
+    }
 }
 
 ///简化代码编写，不然这种包装写法太长了

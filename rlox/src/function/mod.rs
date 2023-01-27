@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum LoxCallable {
     Clock,
-    LoxFun(Token, Vec<Token>, Vec<Stmt>, Rc<RefCell<Environment>>),
+    LoxFun(Token, Vec<Token>, Rc<Vec<Stmt>>, Rc<RefCell<Environment>>),
 }
 
 impl LoxCallable {

@@ -101,10 +101,10 @@ impl Parser {
                     ..
                 },
             ) => self.return_statement(ret),
-            Some(Token {
+            Some(a@Token {
                 toke_type: TokenType::While,
                 ..
-            }) => self.while_statement(),
+            }) => self.while_statement(&a),
             Some(
                 a @ Token {
                     toke_type: TokenType::For,
@@ -141,16 +141,20 @@ impl Parser {
         self.consume(TokenType::Semicolon, "Expect ';' after return value")?;
         Ok(Stmt::Return(key_word, value))
     }
-    fn while_statement(&mut self) -> Result<Stmt, LoxErr> {
+    fn while_statement(&mut self, token: &Token) -> Result<Stmt, LoxErr> {
         // I trying to use rust style
         //WhileStmt -> "while"  expression block
         let condition = self.expression()?;
-        self.check_error(TokenType::LeftBrace, "While expect a block.")?;
+        self.consume(TokenType::LeftBrace, "While expect a block.")?;
         self.loop_depath += 1;
-        let body = self.statement();
+        let body = self.block();
         self.loop_depath -= 1;
-        let body = body?;
-        Ok(Stmt::While(condition, Box::new(body)))
+        let body = match body? {
+            Stmt::Block(body) => body,
+            _ => return Err(self.error(token, "While expect a block.")),
+        };
+
+        Ok(Stmt::Block(vec![Stmt::While(None, condition, body)]))
     }
 
     fn for_statement(&mut self, token: Token) -> Result<Stmt, LoxErr> {
@@ -181,9 +185,9 @@ impl Parser {
         self.consume(TokenType::RightParen, "expect ')' after for clauses.")?;
 
         let body = {
-            self.check_error(TokenType::LeftBrace, "for exepct a block")?;
+            self.consume(TokenType::LeftBrace, "for exepct a block")?;
             self.loop_depath += 1;
-            let body = self.statement();
+            let body = self.block();
             self.loop_depath -= 1;
 
             match body? {
@@ -204,13 +208,12 @@ impl Parser {
         };
 
         let for_loop = if let Some(initializer) = initializer {
-            let stmt_while = Stmt::While(condition, Box::new(Stmt::Block(body)));
-            Stmt::Block(vec![initializer, stmt_while])
+            Stmt::While(Some(Box::new(initializer)), condition, body)
         } else {
-            Stmt::While(condition, Box::new(Stmt::Block(body)))
+            Stmt::While(None, condition, body)
         };
 
-        Ok(for_loop)
+        Ok(Stmt::Block(vec![for_loop]))
     }
 
     fn break_statement(&mut self, token: Token) -> Result<Stmt, LoxErr> {
@@ -298,7 +301,7 @@ impl Parser {
             Stmt::Block(body) => body,
             _ => return Err(self.error(token, "function expect a block.")),
         };
-        Ok(Stmt::Fun(name, parameters, body))
+        Ok(Stmt::Fun(name, parameters, Rc::new(body)))
     }
 
     fn expression(&mut self) -> Result<Expr, LoxErr> {
@@ -340,7 +343,7 @@ impl Parser {
             Stmt::Block(body) => body,
             _ => return Err(self.error(&token, "function expect a block.")),
         };
-        Ok(Expr::Lambda(token, parameters, body))
+        Ok(Expr::Lambda(token, parameters, Rc::new(body)))
     }
 
     fn assignment(&mut self) -> Result<Expr, LoxErr> {

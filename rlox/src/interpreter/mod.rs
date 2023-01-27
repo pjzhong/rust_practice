@@ -1,6 +1,6 @@
 mod environment;
 
-use std::{cell::RefCell, fmt::Display, rc::Rc, sync::Mutex};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, sync::Mutex};
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
@@ -73,6 +73,8 @@ type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 pub struct Interpreter {
     lox: Rc<Mutex<Lox>>,
     environment: Rc<RefCell<Environment>>,
+    global: Rc<RefCell<Environment>>,
+    locals: HashMap<Expr, usize>,
     lambda: usize,
 }
 
@@ -83,23 +85,15 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             Expr::Unary(token, expr) => self.unary(expr, token),
             Expr::Binary(left, oper, right) => self.binary(left, oper, right),
             Expr::Grouping(expr) => self.visit(expr.as_ref()),
-            Expr::Variable(token) => {
-                if let Ok(env) = &self.environment.try_borrow_mut() {
-                    env.get(token)
-                } else {
-                    self.error(
-                        token,
-                        format!(
-                            "environment is None, Undefined variable '{}'",
-                            &token.lexeme
-                        ),
-                    )
-                }
-            }
+            Expr::Variable(token) => self.look_up_variable(token, expr),
             Expr::Assign(token, value) => {
-                let value = self.visit(value.as_ref())?;
-                if let Ok(env) = &mut self.environment.try_borrow_mut() {
-                    env.assign(token, &value)?;
+                let new_val = self.visit(value.as_ref())?;
+                let distance = self.locals.get(value);
+
+                if let Some(distance) = distance {
+                    Environment::assign_at(self.environment.clone(), *distance, token, &new_val)?;
+                } else if let Ok(env) = &mut self.global.try_borrow_mut() {
+                    env.assign(token, &new_val)?;
                 } else {
                     return self.error(
                         token,
@@ -109,7 +103,8 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                         ),
                     );
                 }
-                Ok(value)
+
+                Ok(new_val)
             }
             Expr::Logical(left, oper, right) => {
                 let left = self.visit(left.as_ref())?;
@@ -218,15 +213,20 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 
                 Ok(())
             }
-            Stmt::While(condition, body) => {
+            Stmt::While(init, condition, body) => {
+                if let Some(init) = init {
+                    self.visit(init.as_ref())?;
+                }
                 loop {
                     let value = self.visit(condition)?;
                     if self.is_truthy(Some(&value)) {
-                        match self.visit(body.as_ref()) {
-                            Err(LoxErr::BreakOutSideLoop) => return Ok(()),
-                            a @ Err(_) => return a,
-                            Ok(_) => {}
-                        };
+                        for stmt in body {
+                            match self.visit(stmt) {
+                                Err(LoxErr::BreakOutSideLoop) => return Ok(()),
+                                a @ Err(_) => return a,
+                                Ok(_) => {}
+                            };
+                        }
                     } else {
                         break;
                     }
@@ -269,7 +269,9 @@ impl Interpreter {
         let envir = Rc::new(RefCell::new(envir));
         Self {
             lox,
-            environment: envir,
+            environment: envir.clone(),
+            global: envir,
+            locals: HashMap::new(),
             lambda: 0,
         }
     }
@@ -409,15 +411,52 @@ impl Interpreter {
         environment: Environment,
     ) -> Result<(), LoxErr> {
         let previous = self.environment.clone();
-
         self.environment = Rc::new(RefCell::new(environment));
-        let res = stmts
-            .iter()
-            .map(|stmt| self.visit(stmt))
-            .find(Result::is_err)
-            .map_or(Ok(()), Result::from);
+        // let res = stmts
+        //     .iter()
+        //     .map(|stmt|
+        //         self.visit(stmt)
+        //     )
+        //     .find(Result::is_err)
+        //     .map_or(Ok(()), Result::from);
+
+        let mut res = Ok(());
+        for stmt in stmts {
+            let temp = self.visit(stmt);
+            if temp.is_err() {
+                res = temp;
+                break;
+            }
+        }
 
         self.environment = previous;
         res
+    }
+
+    fn look_up_variable(&mut self, name: &Token, expr: &Expr) -> Result<LoxValue, LoxErr> {
+        let distance = self.locals.get(expr);
+        let env = if distance.is_some() {
+            self.environment.clone()
+        } else {
+            self.global.clone()
+        };
+
+        if let Some(distance) = distance {
+            Environment::get_at(env, *distance, name)
+        } else {
+            match self.global.try_borrow() {
+                Ok(env) => env.get(name),
+                Err(e) => Err(LoxErr::RunTimeErr(
+                    Some(name.line),
+                    format!("Undefined variable '{}', e:{:?}", name.lexeme, e),
+                )),
+            }
+        }
+    }
+
+    pub fn resolve(&mut self, locals: HashMap<Expr, usize>) {
+        for (expr, depth) in locals {
+            self.locals.insert(expr, depth);
+        }
     }
 }

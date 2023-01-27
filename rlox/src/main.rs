@@ -6,7 +6,7 @@ use std::{
     sync::Mutex,
 };
 
-use rlox::{Interpreter, Lox, Parser, Scanner};
+use rlox::{Interpreter, Lox, Parser, Resolver, Scanner};
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
@@ -71,10 +71,13 @@ fn run(code: &str, lox: Rc<Mutex<Lox>>) {
 
     let stmts = parser.parse();
 
+    let mut interpreter = Interpreter::new(lox.clone());
+
+    let resolver = Resolver::new(lox);
+    resolver.resolve(&stmts, &mut interpreter);
+
     // let printer = AstPrinter;
     // println!("{:?}", expr);
     // println!("{:?}", printer.visit_expr(&expr));
-
-    let mut interpreter = Interpreter::new(lox);
     interpreter.interpret(&stmts);
 }

@@ -3,6 +3,7 @@ mod error;
 mod function;
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
 mod token;
 
@@ -10,6 +11,7 @@ pub use ast::AstPrinter;
 pub use error::LoxErr;
 pub use interpreter::Interpreter;
 pub use parser::Parser;
+pub use resolver::Resolver;
 pub use scanner::Scanner;
 use token::TokenType;
 
