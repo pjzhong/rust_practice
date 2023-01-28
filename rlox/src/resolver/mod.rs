@@ -27,8 +27,8 @@ impl Visitor<&Expr, ()> for Resolver {
 
                 self.resolve_local(expr, token);
             }
-            Expr::Assign(token, expr) => {
-                self.visit(expr.as_ref());
+            Expr::Assign(token, value) => {
+                self.visit(value.as_ref());
                 self.resolve_local(expr, token);
             }
             Expr::Binary(left, _, right) => {
@@ -170,7 +170,6 @@ impl Resolver {
 
     pub fn resolve(mut self, stmt: &[Stmt], interpret: &mut Interpreter) {
         self.visit(stmt);
-        println!("{:?}", self.locals);
         interpret.resolve(self.locals);
     }
 }

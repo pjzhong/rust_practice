@@ -88,7 +88,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
             Expr::Variable(token) => self.look_up_variable(token, expr),
             Expr::Assign(token, value) => {
                 let new_val = self.visit(value.as_ref())?;
-                let distance = self.locals.get(value);
+                let distance = self.locals.get(expr);
 
                 if let Some(distance) = distance {
                     Environment::assign_at(self.environment.clone(), *distance, token, &new_val)?;
