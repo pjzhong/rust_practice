@@ -123,7 +123,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 let callee = self.visit(callee.as_ref())?;
 
                 let mut args = vec![];
-                for expr in arg_exprs {
+                for expr in arg_exprs.as_ref() {
                     args.push(self.visit(expr)?);
                 }
 

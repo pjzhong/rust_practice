@@ -44,7 +44,7 @@ impl Visitor<&Expr, ()> for Resolver {
             }
             Expr::Call(expr, _, exprs) => {
                 self.visit(expr.as_ref());
-                for expr in exprs {
+                for expr in exprs.as_ref() {
                     self.visit(expr);
                 }
             }

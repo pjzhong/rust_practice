@@ -208,7 +208,7 @@ impl Parser {
         };
 
         let for_loop = if let Some(initializer) = initializer {
-            Stmt::While(Some(Box::new(initializer)), condition, body)
+            Stmt::While(Some(Rc::new(initializer)), condition, body)
         } else {
             Stmt::While(None, condition, body)
         };
@@ -258,8 +258,8 @@ impl Parser {
 
         Ok(Stmt::If(
             condition,
-            Box::new(the_branch),
-            else_branch.map(Box::new),
+            Rc::new(the_branch),
+            else_branch.map(Rc::new),
         ))
     }
 
@@ -353,7 +353,7 @@ impl Parser {
             let value = self.assignment()?;
 
             match expr {
-                Expr::Variable(name) => return Ok(Expr::Assign(name, Box::new(value))),
+                Expr::Variable(name) => return Ok(Expr::Assign(name, Rc::new(value))),
                 _ => self.report_error(&equal, "Invalid assignment target."),
             }
         }
@@ -366,7 +366,7 @@ impl Parser {
 
         while let Some(token) = self.match_type(TokenType::Or) {
             let right = self.and()?;
-            expr = Expr::Logical(Box::new(expr), token, Box::new(right));
+            expr = Expr::Logical(Rc::new(expr), token, Rc::new(right));
         }
 
         Ok(expr)
@@ -377,7 +377,7 @@ impl Parser {
 
         while let Some(token) = self.match_type(TokenType::And) {
             let right = self.equality()?;
-            expr = Expr::Logical(Box::new(expr), token, Box::new(right));
+            expr = Expr::Logical(Rc::new(expr), token, Rc::new(right));
         }
 
         Ok(expr)
@@ -389,7 +389,7 @@ impl Parser {
         while let Some(operator) = self.match_types(&[TokenType::BangEqual, TokenType::EqualEqual])
         {
             let right = self.comparison()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(right))
+            expr = Expr::Binary(Rc::new(expr), operator, Rc::new(right))
         }
 
         Ok(expr)
@@ -404,7 +404,7 @@ impl Parser {
             TokenType::LessEqual,
         ]) {
             let right = self.factor()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+            expr = Expr::Binary(Rc::new(expr), operator, Rc::new(right));
         }
 
         Ok(expr)
@@ -415,7 +415,7 @@ impl Parser {
 
         while let Some(operator) = self.match_types(&[TokenType::Minus, TokenType::Plus]) {
             let right = self.factor()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+            expr = Expr::Binary(Rc::new(expr), operator, Rc::new(right));
         }
 
         Ok(expr)
@@ -425,7 +425,7 @@ impl Parser {
         let mut expr = self.unary()?;
         while let Some(operator) = self.match_types(&[TokenType::Slash, TokenType::Star]) {
             let right = self.unary()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
+            expr = Expr::Binary(Rc::new(expr), operator, Rc::new(right));
         }
         Ok(expr)
     }
@@ -433,7 +433,7 @@ impl Parser {
     fn unary(&mut self) -> Result<Expr, LoxErr> {
         if let Some(operator) = self.match_types(&[TokenType::Bang, TokenType::Minus]) {
             let right = self.unary()?;
-            return Ok(Expr::Unary(operator, Box::new(right)));
+            return Ok(Expr::Unary(operator, Rc::new(right)));
         }
 
         self.call()
@@ -469,7 +469,7 @@ impl Parser {
         };
 
         let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
-        Ok(Expr::Call(Box::new(callee), paren, arguments))
+        Ok(Expr::Call(Rc::new(callee), paren, Rc::new(arguments)))
     }
 
     fn primary(&mut self) -> Result<Expr, LoxErr> {
@@ -483,7 +483,7 @@ impl Parser {
                 TokenType::LeftParen => {
                     let expr = self.expression()?;
                     self.consume(TokenType::RightParen, "Expect ')' after expression")?;
-                    Ok(Expr::Grouping(Box::new(expr)))
+                    Ok(Expr::Grouping(Rc::new(expr)))
                 }
                 _ => {
                     let err = Err(self.error(&token, "Expect expression."));

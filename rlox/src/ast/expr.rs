@@ -10,14 +10,14 @@ pub trait Visitor<T, R> {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Expr {
-    Binary(Box<Expr>, Token, Box<Expr>),
-    Grouping(Box<Expr>),
+    Binary(Rc<Expr>, Token, Rc<Expr>),
+    Grouping(Rc<Expr>),
     Literal(Literal),
     Variable(Token),
-    Unary(Token, Box<Expr>),
-    Assign(Token, Box<Expr>),
-    Logical(Box<Expr>, Token, Box<Expr>),
-    Call(Box<Expr>, Token, Vec<Expr>),
+    Unary(Token, Rc<Expr>),
+    Assign(Token, Rc<Expr>),
+    Logical(Rc<Expr>, Token, Rc<Expr>),
+    Call(Rc<Expr>, Token, Rc<Vec<Expr>>),
     Lambda(Token, Vec<Token>, Rc<Vec<Stmt>>),
 }
 
@@ -92,11 +92,11 @@ mod tests {
         let expression = Expr::Binary(
             Expr::Unary(
                 Token::new(TokenType::Minus, "-".to_string().into(), Literal::Nil, 1),
-                Box::new(123.0.into()),
+                Rc::new(123.0.into()),
             )
             .into(),
             Token::new(TokenType::Star, "*".to_string().into(), Literal::Nil, 1),
-            Expr::Grouping(Box::new(45.67.into())).into(),
+            Expr::Grouping(Rc::new(45.67.into())).into(),
         );
 
         let printer = AstPrinter;
