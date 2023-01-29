@@ -94,6 +94,10 @@ impl Visitor<&Stmt, ()> for Resolver {
             }
             Stmt::Return(_, expr) => self.visit(expr),
             Stmt::Break => {}
+            Stmt::Class(name, _) => {
+                self.declare(name);
+                self.define(name);
+            }
         }
     }
 }

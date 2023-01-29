@@ -38,7 +38,7 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Option<Stmt> {
-        let stmt = match self.match_types(&[TokenType::Var, TokenType::Fn]) {
+        let stmt = match self.match_types(&[TokenType::Var, TokenType::Fn, TokenType::Class]) {
             Some(Token {
                 toke_type: TokenType::Var,
                 ..
@@ -49,6 +49,10 @@ impl Parser {
                     ..
                 },
             ) => self.function(&a),
+            Some(Token {
+                toke_type: TokenType::Class,
+                ..
+            }) => self.class(),
             _ => self.statement(),
         };
 
@@ -101,10 +105,12 @@ impl Parser {
                     ..
                 },
             ) => self.return_statement(ret),
-            Some(a@Token {
-                toke_type: TokenType::While,
-                ..
-            }) => self.while_statement(&a),
+            Some(
+                a @ Token {
+                    toke_type: TokenType::While,
+                    ..
+                },
+            ) => self.while_statement(&a),
             Some(
                 a @ Token {
                     toke_type: TokenType::For,
@@ -267,6 +273,22 @@ impl Parser {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Expression(value))
+    }
+
+    fn class(&mut self) -> Result<Stmt, LoxErr> {
+        let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+        self.consume(TokenType::LeftBrace, "Class Expect a block")?;
+
+        let mut methods = vec![];
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            if let Some(token) = self.match_type(TokenType::Fn) {
+                methods.push(self.function(&token)?);
+            }
+        }
+
+        self.consume(TokenType::RightBrace, "Class Expectt a block end")?;
+
+        Ok(Stmt::Class(name, Rc::new(methods)))
     }
 
     fn function(&mut self, token: &Token) -> Result<Stmt, LoxErr> {

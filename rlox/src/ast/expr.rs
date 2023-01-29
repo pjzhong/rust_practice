@@ -82,8 +82,6 @@ impl Visitor<&Expr, String> for AstPrinter {
 #[cfg(test)]
 mod tests {
 
-    
-
     use super::*;
     use crate::token::*;
 

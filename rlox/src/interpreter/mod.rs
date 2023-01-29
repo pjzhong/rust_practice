@@ -1,6 +1,12 @@
 mod environment;
 
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, sync::Mutex};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::{Display},
+    rc::Rc,
+    sync::Mutex,
+};
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
@@ -16,6 +22,7 @@ pub enum LoxValue {
     Number(f64),
     Boolean(bool),
     String(Rc<String>),
+    Classs(Rc<String>),
     Call(LoxCallable),
     Nil,
 }
@@ -28,6 +35,7 @@ impl Display for LoxValue {
             LoxValue::String(a) => write!(f, "{}", a),
             LoxValue::Call(c) => c.fmt(f),
             LoxValue::Nil => write!(f, "nil"),
+            LoxValue::Classs(e) => write!(f, "class {}", e),
         }
     }
 }
@@ -254,6 +262,22 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
             Stmt::Return(_, expr) => {
                 let value = self.visit(expr)?;
                 Err(LoxErr::Return(value))
+            }
+            Stmt::Class(name, _) => {
+                match self.environment.try_borrow_mut() {
+                    Ok(mut env) => {
+                        env.define(name.lexeme.clone(), LoxValue::Nil);
+                        let klass = LoxValue::Classs(name.lexeme.clone());
+                        env.define(name.lexeme.clone(), klass);
+                    }
+                    Err(e) => {
+                        return Err(LoxErr::RunTimeErr(
+                            Some(name.line),
+                            format!("define class {} error, env error:{}", name.lexeme, e),
+                        ))
+                    }
+                }
+                Ok(())
             }
         }
     }
