@@ -1,6 +1,5 @@
 mod ast;
 mod error;
-mod function;
 mod interpreter;
 mod parser;
 mod resolver;

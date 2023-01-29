@@ -12,10 +12,13 @@ use crate::{
     Interpreter, LoxErr,
 };
 
+use super::class::{Class, Instance};
+
 #[derive(Debug, Clone)]
 pub enum LoxCallable {
     Clock,
     LoxFun(Token, Vec<Token>, Rc<Vec<Stmt>>, Rc<RefCell<Environment>>),
+    Class(Rc<Class>),
 }
 
 impl LoxCallable {
@@ -23,6 +26,7 @@ impl LoxCallable {
         match self {
             LoxCallable::Clock => 0,
             LoxCallable::LoxFun(_, args, _, _) => args.len(),
+            LoxCallable::Class(_) => 0,
         }
     }
 
@@ -36,6 +40,7 @@ impl LoxCallable {
             LoxCallable::LoxFun(_, args, body, closure) => {
                 LoxCallable::lox_call(args, body, closure.clone(), interpreter, arguments)
             }
+            LoxCallable::Class(class) => Ok(LoxValue::Instance(Rc::new(Instance::new(class.clone())))),
         }
     }
 
@@ -73,6 +78,7 @@ impl Display for LoxCallable {
         match self {
             LoxCallable::Clock => write!(f, "native fn clock()"),
             LoxCallable::LoxFun(token, ..) => write!(f, "fn {}()", token.lexeme),
+            LoxCallable::Class(c) => Display::fmt(&c, f),
         }
     }
 }

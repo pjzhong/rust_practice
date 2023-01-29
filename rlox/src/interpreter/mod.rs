@@ -1,80 +1,19 @@
+mod class;
 mod environment;
+mod function;
+mod value;
 
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    fmt::{Display},
-    rc::Rc,
-    sync::Mutex,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Mutex};
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
-    function::LoxCallable,
     token::{Literal, Token, TokenType},
     Lox, LoxErr,
 };
 
 pub use self::environment::Environment;
-
-#[derive(Debug, Clone)]
-pub enum LoxValue {
-    Number(f64),
-    Boolean(bool),
-    String(Rc<String>),
-    Classs(Rc<String>),
-    Call(LoxCallable),
-    Nil,
-}
-
-impl Display for LoxValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoxValue::Number(a) => write!(f, "{}", a),
-            LoxValue::Boolean(a) => write!(f, "{}", a),
-            LoxValue::String(a) => write!(f, "{}", a),
-            LoxValue::Call(c) => c.fmt(f),
-            LoxValue::Nil => write!(f, "nil"),
-            LoxValue::Classs(e) => write!(f, "class {}", e),
-        }
-    }
-}
-
-impl From<String> for LoxValue {
-    fn from(a: String) -> Self {
-        LoxValue::String(Rc::new(a))
-    }
-}
-
-impl From<Rc<String>> for LoxValue {
-    fn from(a: Rc<String>) -> Self {
-        LoxValue::String(a)
-    }
-}
-
-impl From<bool> for LoxValue {
-    fn from(a: bool) -> Self {
-        LoxValue::Boolean(a)
-    }
-}
-
-impl From<&bool> for LoxValue {
-    fn from(a: &bool) -> Self {
-        LoxValue::Boolean(*a)
-    }
-}
-
-impl From<f64> for LoxValue {
-    fn from(a: f64) -> Self {
-        LoxValue::Number(a)
-    }
-}
-
-impl From<&f64> for LoxValue {
-    fn from(a: &f64) -> Self {
-        LoxValue::Number(*a)
-    }
-}
+pub use self::value::LoxValue;
+use self::{class::Class, function::LoxCallable};
 
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
@@ -137,6 +76,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
 
                 let mut callee = match callee {
                     LoxValue::Call(callee) => callee,
+                    LoxValue::Classs(_, callee) => callee,
                     _ => {
                         return Err(LoxErr::RunTimeErr(
                             Some(paren.line),
@@ -267,7 +207,8 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 match self.environment.try_borrow_mut() {
                     Ok(mut env) => {
                         env.define(name.lexeme.clone(), LoxValue::Nil);
-                        let klass = LoxValue::Classs(name.lexeme.clone());
+                        let class: Rc<Class> = Rc::new(name.lexeme.clone().into());
+                        let klass = LoxValue::Classs(class.clone(), LoxCallable::Class(class));
                         env.define(name.lexeme.clone(), klass);
                     }
                     Err(e) => {
