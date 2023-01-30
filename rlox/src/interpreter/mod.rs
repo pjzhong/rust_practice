@@ -3,7 +3,7 @@ mod environment;
 mod function;
 mod value;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Mutex};
+use std::{collections::HashMap, rc::Rc, sync::Mutex};
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
@@ -19,8 +19,8 @@ type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
 pub struct Interpreter {
     lox: Rc<Mutex<Lox>>,
-    environment: Rc<RefCell<Environment>>,
-    global: Rc<RefCell<Environment>>,
+    environment: Rc<Environment>,
+    global: Rc<Environment>,
     locals: HashMap<Expr, usize>,
     lambda: usize,
 }
@@ -38,17 +38,9 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 let distance = self.locals.get(expr);
 
                 if let Some(distance) = distance {
-                    Environment::assign_at(self.environment.clone(), *distance, token, &new_val)?;
-                } else if let Ok(env) = &mut self.global.try_borrow_mut() {
-                    env.assign(token, &new_val)?;
+                    self.environment.assign_at(*distance, token, &new_val)?;
                 } else {
-                    return self.error(
-                        token,
-                        format!(
-                            "environment is None, Undefined variable variable '{}'",
-                            &token.lexeme
-                        ),
-                    );
+                    self.global.assign(token, &new_val)?;
                 }
 
                 Ok(new_val)
@@ -151,9 +143,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                     LoxValue::Nil
                 };
 
-                if let Ok(mut env) = self.environment.try_borrow_mut() {
-                    env.define(token.lexeme.clone(), value)
-                }
+                self.environment.define(token, value)?;
                 Ok(())
             }
             Stmt::Block(stmts) => {
@@ -195,41 +185,25 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(LoxErr::BreakOutSideLoop),
-            Stmt::Fun(name, args, bodys) => match self.environment.try_borrow_mut() {
-                Ok(mut evir) => {
-                    let callable = LoxValue::Call(LoxCallable::LoxFun(
-                        name.clone(),
-                        args.clone(),
-                        bodys.clone(),
-                        self.environment.clone(),
-                    ));
-                    evir.define(name.lexeme.clone(), callable);
-                    Ok(())
-                }
-                Err(e) => Err(LoxErr::RunTimeErr(
-                    None,
-                    format!("define fun err。envir err:{}", e),
-                )),
-            },
+            Stmt::Fun(name, args, bodys) => {
+                let callable = LoxValue::Call(LoxCallable::LoxFun(
+                    name.clone(),
+                    args.clone(),
+                    bodys.clone(),
+                    self.environment.clone(),
+                ));
+                self.environment.define(name, callable)?;
+                Ok(())
+            }
             Stmt::Return(_, expr) => {
                 let value = self.visit(expr)?;
                 Err(LoxErr::Return(value))
             }
             Stmt::Class(name, _) => {
-                match self.environment.try_borrow_mut() {
-                    Ok(mut env) => {
-                        env.define(name.lexeme.clone(), LoxValue::Nil);
-                        let class: Rc<LoxClass> = Rc::new(name.lexeme.clone().into());
-                        let klass = LoxValue::Classs(class.clone(), LoxCallable::Class(class));
-                        env.define(name.lexeme.clone(), klass);
-                    }
-                    Err(e) => {
-                        return Err(LoxErr::RunTimeErr(
-                            Some(name.line),
-                            format!("define class {} error, env error:{}", name.lexeme, e),
-                        ))
-                    }
-                }
+                self.environment.define(name, LoxValue::Nil)?;
+                let class: Rc<LoxClass> = Rc::new(name.lexeme.clone().into());
+                let klass = LoxValue::Classs(class.clone(), LoxCallable::Class(class));
+                self.environment.define(name, klass)?;
                 Ok(())
             }
         }
@@ -238,12 +212,20 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 
 impl Interpreter {
     pub fn new(lox: Rc<Mutex<Lox>>) -> Self {
-        let mut envir = Environment::default();
-        envir.define(
-            Rc::new("clock".to_string()),
-            LoxValue::Call(LoxCallable::Clock),
-        );
-        let envir = Rc::new(RefCell::new(envir));
+        let envir = Environment::default();
+        envir
+            .define(
+                &Token {
+                    toke_type: TokenType::Fn,
+                    lexeme: Rc::new("clock".to_string()),
+                    value: Literal::Nil,
+                    line: 0,
+                },
+                LoxValue::Call(LoxCallable::Clock),
+            )
+            .expect("fix me, don't panic");
+
+        let envir = Rc::new(envir);
         Self {
             lox,
             environment: envir.clone(),
@@ -388,7 +370,7 @@ impl Interpreter {
         environment: Environment,
     ) -> Result<(), LoxErr> {
         let previous = self.environment.clone();
-        self.environment = Rc::new(RefCell::new(environment));
+        self.environment = Rc::new(environment);
         // let res = stmts
         //     .iter()
         //     .map(|stmt|
@@ -411,23 +393,10 @@ impl Interpreter {
     }
 
     fn look_up_variable(&mut self, name: &Token, expr: &Expr) -> Result<LoxValue, LoxErr> {
-        let distance = self.locals.get(expr);
-        let env = if distance.is_some() {
-            self.environment.clone()
+        if let Some(distance) = self.locals.get(expr) {
+            self.environment.get_at(*distance, name)
         } else {
-            self.global.clone()
-        };
-
-        if let Some(distance) = distance {
-            Environment::get_at(env, *distance, name)
-        } else {
-            match self.global.try_borrow() {
-                Ok(env) => env.get(name),
-                Err(e) => Err(LoxErr::RunTimeErr(
-                    Some(name.line),
-                    format!("Undefined variable '{}', e:{:?}", name.lexeme, e),
-                )),
-            }
+            self.global.get(name)
         }
     }
 

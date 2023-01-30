@@ -3,115 +3,154 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Default)]
 pub struct Environment {
-    enclosing: Option<Rc<RefCell<Environment>>>,
+    enclosing: Option<Rc<Environment>>,
+    inner: RefCell<EnvironmentInner>,
+}
+
+#[derive(Debug, Default)]
+struct EnvironmentInner {
     values: HashMap<Rc<String>, LoxValue>,
 }
 
 impl Environment {
-    pub fn enclosing(enclosing: Rc<RefCell<Environment>>) -> Self {
+    pub fn enclosing(enclosing: Rc<Environment>) -> Self {
         Self {
             enclosing: Some(enclosing),
-            values: HashMap::new(),
+            inner: Default::default(),
         }
     }
 
-    pub fn define(&mut self, name: Rc<String>, value: LoxValue) {
-        self.values.insert(name, value);
+    pub fn define(&self, name: &Token, value: LoxValue) -> Result<(), LoxErr> {
+        match self.inner.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.values.insert(name.lexeme.clone(), value);
+                Ok(())
+            }
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(name.line),
+                format!("concurreny exception, define error:{}", e),
+            )),
+        }
     }
 
     pub fn get(&self, token: &Token) -> Result<LoxValue, LoxErr> {
-        match self.values.get(&token.lexeme) {
-            Some(a) => Ok(a.clone()),
-            None => match &self.enclosing {
-                Some(enclosing) => match enclosing.try_borrow() {
-                    Ok(enclosing) => enclosing.get(token),
-                    Err(e) => Err(LoxErr::RunTimeErr(
+        match self.inner.try_borrow() {
+            Ok(inner) => match inner.values.get(&token.lexeme) {
+                Some(a) => Ok(a.clone()),
+                None => match &self.enclosing {
+                    Some(enclosing) => enclosing.get(token),
+                    None => Err(LoxErr::RunTimeErr(
                         Some(token.line),
-                        format!("Undefined variable '{}', err:{}", &token.lexeme, e),
+                        format!("Undefined variable '{}'", &token.lexeme),
                     )),
                 },
-                None => Err(LoxErr::RunTimeErr(
-                    Some(token.line),
-                    format!("Undefined variable '{}'", &token.lexeme),
-                )),
             },
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(token.line),
+                format!("concurreny exception, get error:{}", e),
+            )),
         }
     }
 
     pub fn get_direct(&self, token: &Token) -> Result<LoxValue, LoxErr> {
-        match self.values.get(&token.lexeme) {
-            Some(a) => Ok(a.clone()),
-            None => Err(LoxErr::RunTimeErr(
-                Some(token.line),
-                format!("Undefined variable '{}'", &token.lexeme),
-            )),
-        }
-    }
-
-    pub fn assign(&mut self, token: &Token, value: &LoxValue) -> Result<(), LoxErr> {
-        match self.values.get_mut(&token.lexeme) {
-            Some(val) => {
-                *val = value.clone();
-                Ok(())
-            }
-            None => match &self.enclosing {
-                Some(enclosing) => match enclosing.try_borrow_mut() {
-                    Ok(mut enclosing) => enclosing.assign(token, value),
-                    Err(e) => Err(LoxErr::RunTimeErr(
-                        Some(token.line),
-                        format!("Undefined variable '{}', err:{}", &token.lexeme, e),
-                    )),
-                },
+        match self.inner.try_borrow() {
+            Ok(inner) => match inner.values.get(&token.lexeme) {
+                Some(a) => Ok(a.clone()),
                 None => Err(LoxErr::RunTimeErr(
                     Some(token.line),
                     format!("Undefined variable '{}'", &token.lexeme),
                 )),
             },
-        }
-    }
-
-    pub fn get_at(
-        env: Rc<RefCell<Environment>>,
-        distance: usize,
-        name: &Token,
-    ) -> Result<LoxValue, LoxErr> {
-        match Environment::ancestor(env, distance).try_borrow() {
-            Ok(env) => env.get_direct(name),
             Err(e) => Err(LoxErr::RunTimeErr(
-                Some(name.line),
-                format!("Undefined variable '{}',e:{}", &name.lexeme, e),
+                Some(token.line),
+                format!("concurreny exception, get error:{}", e),
             )),
         }
+        // match self.inner.get(&token.lexeme) {
+        //     Some(a) => Ok(a.clone()),
+        //     None => Err(LoxErr::RunTimeErr(
+        //         Some(token.line),
+        //         format!("Undefined variable '{}'", &token.lexeme),
+        //     )),
+        // }
     }
 
-    pub fn assign_at(
-        env: Rc<RefCell<Environment>>,
-        distance: usize,
-        name: &Token,
-        value: &LoxValue,
-    ) -> Result<(), LoxErr> {
-        match Environment::ancestor(env, distance).try_borrow_mut() {
-            Ok(mut env) => match env.values.get_mut(&name.lexeme) {
+    pub fn assign(&self, token: &Token, value: &LoxValue) -> Result<(), LoxErr> {
+        match self.inner.try_borrow_mut() {
+            Ok(mut inner) => match inner.values.get_mut(&token.lexeme) {
                 Some(val) => {
                     *val = value.clone();
                     Ok(())
                 }
-                None => Err(LoxErr::RunTimeErr(
-                    Some(name.line),
-                    format!("Undefined variable '{}'", name.lexeme),
-                )),
+                None => match &self.enclosing {
+                    Some(enclosing) => enclosing.assign(token, value),
+                    None => Err(LoxErr::RunTimeErr(
+                        Some(token.line),
+                        format!("Undefined variable '{}'", &token.lexeme),
+                    )),
+                },
             },
             Err(e) => Err(LoxErr::RunTimeErr(
-                Some(name.line),
-                format!("Undefined variable '{}',e:{}", name.lexeme, e),
+                Some(token.line),
+                format!("concurreny exception, assign error:{}", e),
             )),
         }
     }
 
-    fn ancestor(env: Rc<RefCell<Environment>>, distance: usize) -> Rc<RefCell<Self>> {
-        let mut environment = env;
+    pub fn get_at(
+        self: &Rc<Environment>,
+        distance: usize,
+        token: &Token,
+    ) -> Result<LoxValue, LoxErr> {
+        let env = self.ancestor(distance);
+        let brrow_evn = env.inner.try_borrow();
+        match brrow_evn {
+            Ok(inner) => match inner.values.get(&token.lexeme) {
+                Some(a) => Ok(a.clone()),
+                None => Err(LoxErr::RunTimeErr(
+                    Some(token.line),
+                    format!("Undefined variable '{}'", &token.lexeme),
+                )),
+            },
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(token.line),
+                format!("concurreny exception, get error:{}", e),
+            )),
+        }
+
+        // match Environment::ancestor(env, distance).try_borrow() {
+        //     Ok(env) => env.get_direct(name),
+        //     Err(e) => Err(LoxErr::RunTimeErr(
+        //         Some(name.line),
+        //         format!("Undefined variable '{}',e:{}", &name.lexeme, e),
+        //     )),
+        // }
+    }
+
+    pub fn assign_at(
+        self: &Rc<Environment>,
+        distance: usize,
+        name: &Token,
+        value: &LoxValue,
+    ) -> Result<(), LoxErr> {
+        let env = self.ancestor(distance);
+        let env_inner_mut = env.inner.try_borrow_mut();
+        match env_inner_mut {
+            Ok(mut inner) => {
+                inner.values.insert(name.lexeme.clone(), value.clone());
+                Ok(())
+            }
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(name.line),
+                format!("concurreny exception, define error:{}", e),
+            )),
+        }
+    }
+
+    fn ancestor(self: &Rc<Environment>, distance: usize) -> Rc<Self> {
+        let mut environment = self.clone();
         for _ in 0..distance {
-            if let Ok(Some(enclosing)) = environment.try_borrow().map(|e| e.enclosing.clone()) {
+            if let Some(enclosing) = environment.enclosing.clone() {
                 environment = enclosing;
             }
         }

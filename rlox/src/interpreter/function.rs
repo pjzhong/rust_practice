@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     fmt::{Debug, Display},
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
@@ -17,7 +16,7 @@ use super::class::{LoxClass, LoxInstance};
 #[derive(Debug, Clone)]
 pub enum LoxCallable {
     Clock,
-    LoxFun(Token, Vec<Token>, Rc<Vec<Stmt>>, Rc<RefCell<Environment>>),
+    LoxFun(Token, Vec<Token>, Rc<Vec<Stmt>>, Rc<Environment>),
     Class(Rc<LoxClass>),
 }
 
@@ -58,13 +57,13 @@ impl LoxCallable {
     fn lox_call(
         arg_tokens: &[Token],
         body: &[Stmt],
-        closure: Rc<RefCell<Environment>>,
+        closure: Rc<Environment>,
         interpreter: &mut Interpreter,
         args: Vec<LoxValue>,
     ) -> Result<LoxValue, LoxErr> {
-        let mut environment = Environment::enclosing(closure);
+        let environment = Environment::enclosing(closure);
         for (name, value) in arg_tokens.iter().zip(args) {
-            environment.define(name.lexeme.clone(), value);
+            environment.define(name, value)?;
         }
 
         match interpreter.execute_block(body, environment) {
