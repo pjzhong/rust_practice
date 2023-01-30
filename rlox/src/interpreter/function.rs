@@ -14,9 +14,23 @@ use crate::{
 use super::class::{LoxClass, LoxInstance};
 
 #[derive(Debug, Clone)]
+pub struct LoxFunction {
+    pub name: Token,
+    pub args: Rc<Vec<Token>>,
+    pub body: Rc<Vec<Stmt>>,
+    pub closure: Rc<Environment>,
+}
+
+pub enum FunctionType {
+    None,
+    Fn,
+    Method,
+}
+
+#[derive(Debug, Clone)]
 pub enum LoxCallable {
     Clock,
-    LoxFun(Token, Vec<Token>, Rc<Vec<Stmt>>, Rc<Environment>),
+    LoxFun(LoxFunction),
     Class(Rc<LoxClass>),
 }
 
@@ -24,7 +38,7 @@ impl LoxCallable {
     pub fn arity(&self) -> usize {
         match self {
             LoxCallable::Clock => 0,
-            LoxCallable::LoxFun(_, args, _, _) => args.len(),
+            LoxCallable::LoxFun(fun) => fun.args.len(),
             LoxCallable::Class(_) => 0,
         }
     }
@@ -36,9 +50,7 @@ impl LoxCallable {
     ) -> Result<LoxValue, LoxErr> {
         match self {
             LoxCallable::Clock => LoxCallable::clock(),
-            LoxCallable::LoxFun(_, args, body, closure) => {
-                LoxCallable::lox_call(args, body, closure.clone(), interpreter, arguments)
-            }
+            LoxCallable::LoxFun(fun) => LoxCallable::lox_call(fun, interpreter, arguments),
             LoxCallable::Class(class) => {
                 Ok(LoxValue::Instance(Rc::new(LoxInstance::new(class.clone()))))
             }
@@ -55,18 +67,16 @@ impl LoxCallable {
     }
 
     fn lox_call(
-        arg_tokens: &[Token],
-        body: &[Stmt],
-        closure: Rc<Environment>,
+        fun: &LoxFunction,
         interpreter: &mut Interpreter,
         args: Vec<LoxValue>,
     ) -> Result<LoxValue, LoxErr> {
-        let environment = Environment::enclosing(closure);
-        for (name, value) in arg_tokens.iter().zip(args) {
+        let environment = Environment::enclosing(fun.closure.clone());
+        for (name, value) in fun.args.iter().zip(args) {
             environment.define(name, value)?;
         }
 
-        match interpreter.execute_block(body, environment) {
+        match interpreter.execute_block(fun.body.as_ref(), environment) {
             Ok(_) => Ok(LoxValue::Nil),
             Err(LoxErr::Return(val)) => Ok(val),
             Err(err) => Err(err),
@@ -78,7 +88,7 @@ impl Display for LoxCallable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LoxCallable::Clock => write!(f, "native fn clock()"),
-            LoxCallable::LoxFun(token, ..) => write!(f, "fn {}()", token.lexeme),
+            LoxCallable::LoxFun(fun) => write!(f, "fn {}()", fun.name.lexeme),
             LoxCallable::Class(c) => Display::fmt(&c, f),
         }
     }

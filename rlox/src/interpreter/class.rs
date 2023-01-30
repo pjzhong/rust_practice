@@ -7,11 +7,25 @@ use super::LoxValue;
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     name: Rc<String>,
+    methods: HashMap<Rc<String>, LoxValue>,
 }
 
 impl From<Rc<String>> for LoxClass {
     fn from(name: Rc<String>) -> Self {
-        Self { name }
+        Self {
+            name,
+            methods: HashMap::new(),
+        }
+    }
+}
+
+impl LoxClass {
+    pub fn new(name: Rc<String>, methods: HashMap<Rc<String>, LoxValue>) -> Self {
+        Self { name, methods }
+    }
+
+    pub fn find_method(&self, name: &Rc<String>) -> Option<LoxValue> {
+        self.methods.get(name).cloned()
     }
 }
 
@@ -42,7 +56,7 @@ impl LoxInstance {
 
     pub fn get(&self, name: &Token) -> Result<LoxValue, LoxErr> {
         match self.inner.try_borrow() {
-            Ok(val) => val.get(name),
+            Ok(val) => val.get(self.klass.as_ref(), name),
             Err(e) => Err(LoxErr::RunTimeErr(
                 Some(name.line),
                 format!(
@@ -71,13 +85,16 @@ impl LoxInstance {
 }
 
 impl LoxInstanceInner {
-    pub fn get(&self, name: &Token) -> Result<LoxValue, LoxErr> {
+    pub fn get(&self, cls: &LoxClass, name: &Token) -> Result<LoxValue, LoxErr> {
         match self.fields.get(&name.lexeme) {
             Some(val) => Ok(val.clone()),
-            None => Err(LoxErr::RunTimeErr(
-                Some(name.line),
-                format!("Undefined property '{}'.", name.lexeme),
-            )),
+            None => match cls.find_method(&name.lexeme) {
+                Some(val) => Ok(val.clone()),
+                None => Err(LoxErr::RunTimeErr(
+                    Some(name.line),
+                    format!("Undefined property '{}'.", name.lexeme),
+                )),
+            },
         }
     }
 

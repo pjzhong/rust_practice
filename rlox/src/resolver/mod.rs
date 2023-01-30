@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
+    interpreter::FunctionType,
     token::Token,
     Interpreter, Lox,
 };
@@ -47,7 +48,7 @@ impl Visitor<&Expr, ()> for Resolver {
                     self.visit(expr);
                 }
             }
-            Expr::Lambda(_, tokens, body) => self.resolve_fun(tokens, body),
+            Expr::Lambda(_, tokens, body) => self.resolve_fun(tokens, body, FunctionType::Fn),
             Expr::Get(expr, _) => self.visit(expr.as_ref()),
             Expr::Set(object, _, value) => {
                 self.visit(value.as_ref());
@@ -78,7 +79,7 @@ impl Visitor<&Stmt, ()> for Resolver {
                 self.declare(token);
                 self.define(token);
 
-                self.resolve_fun(params, body);
+                self.resolve_fun(params, body, FunctionType::Fn);
             }
             Stmt::Print(expr) => self.visit(expr),
             Stmt::Expression(expr) => self.visit(expr),
@@ -98,9 +99,15 @@ impl Visitor<&Stmt, ()> for Resolver {
             }
             Stmt::Return(_, expr) => self.visit(expr),
             Stmt::Break => {}
-            Stmt::Class(name, _) => {
+            Stmt::Class(name, methods) => {
                 self.declare(name);
                 self.define(name);
+
+                for method in methods.as_ref() {
+                    if let Stmt::Fun(_, args, body) = method {
+                        self.resolve_fun(args, body, FunctionType::Method)
+                    }
+                }
             }
         }
     }
@@ -158,9 +165,9 @@ impl Resolver {
         }
     }
 
-    fn resolve_fun(&mut self, params: &[Token], body: &[Stmt]) {
+    fn resolve_fun(&mut self, args: &[Token], body: &[Stmt], fun_type: FunctionType) {
         self.begin_scope();
-        for param in params {
+        for param in args {
             self.declare(param);
             self.define(param);
         }

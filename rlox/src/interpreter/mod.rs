@@ -12,8 +12,12 @@ use crate::{
 };
 
 pub use self::environment::Environment;
+pub use self::function::FunctionType;
 pub use self::value::LoxValue;
-use self::{class::LoxClass, function::LoxCallable};
+use self::{
+    class::LoxClass,
+    function::{LoxCallable, LoxFunction},
+};
 
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
@@ -68,7 +72,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
 
                 let mut callee = match callee {
                     LoxValue::Call(callee) => callee,
-                    LoxValue::Classs(_, callee) => callee,
+                    LoxValue::Classs(class) => LoxCallable::Class(class),
                     _ => {
                         return Err(LoxErr::RunTimeErr(
                             Some(paren.line),
@@ -90,20 +94,20 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
 
                 callee.call(self, args)
             }
-            Expr::Lambda(token, param, body) => {
+            Expr::Lambda(token, args, body) => {
                 self.lambda += 1;
-                let token = Token {
+                let name = Token {
                     toke_type: token.toke_type,
                     lexeme: Rc::new(format!("lambda#{}", self.lambda)),
                     value: Literal::Nil,
                     line: token.line,
                 };
-                let callee = LoxCallable::LoxFun(
-                    token,
-                    param.clone(),
-                    body.clone(),
-                    self.environment.clone(),
-                );
+                let callee = LoxCallable::LoxFun(LoxFunction {
+                    name,
+                    args: args.clone(),
+                    body: body.clone(),
+                    closure: self.environment.clone(),
+                });
                 Ok(LoxValue::Call(callee))
             }
             Expr::Get(expr, name) => match self.visit(expr.as_ref())? {
@@ -185,13 +189,13 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(LoxErr::BreakOutSideLoop),
-            Stmt::Fun(name, args, bodys) => {
-                let callable = LoxValue::Call(LoxCallable::LoxFun(
-                    name.clone(),
-                    args.clone(),
-                    bodys.clone(),
-                    self.environment.clone(),
-                ));
+            Stmt::Fun(name, args, body) => {
+                let callable = LoxValue::Call(LoxCallable::LoxFun(LoxFunction {
+                    name: name.clone(),
+                    args: args.clone(),
+                    body: body.clone(),
+                    closure: self.environment.clone(),
+                }));
                 self.environment.define(name, callable)?;
                 Ok(())
             }
@@ -199,11 +203,29 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 let value = self.visit(expr)?;
                 Err(LoxErr::Return(value))
             }
-            Stmt::Class(name, _) => {
+            Stmt::Class(name, methods) => {
                 self.environment.define(name, LoxValue::Nil)?;
-                let class: Rc<LoxClass> = Rc::new(name.lexeme.clone().into());
-                let klass = LoxValue::Classs(class.clone(), LoxCallable::Class(class));
-                self.environment.define(name, klass)?;
+
+                let mut class_methods = HashMap::new();
+                for stmt in methods.as_ref() {
+                    if let Stmt::Fun(name, args, body) = stmt {
+                        let function = LoxFunction {
+                            name: name.clone(),
+                            args: args.clone(),
+                            body: body.clone(),
+                            closure: self.environment.clone(),
+                        };
+
+                        class_methods.insert(
+                            name.lexeme.clone(),
+                            LoxValue::Call(LoxCallable::LoxFun(function)),
+                        );
+                    }
+                }
+
+                let class = LoxClass::new(name.lexeme.clone(), class_methods);
+                let class = LoxValue::Classs(Rc::new(class));
+                self.environment.define(name, class)?;
                 Ok(())
             }
         }
@@ -213,18 +235,17 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 impl Interpreter {
     pub fn new(lox: Rc<Lox>) -> Self {
         let envir = Environment::default();
-        if let Err(e) = envir
-            .define(
-                &Token {
-                    toke_type: TokenType::Fn,
-                    lexeme: Rc::new("clock".to_string()),
-                    value: Literal::Nil,
-                    line: 0,
-                },
-                LoxValue::Call(LoxCallable::Clock),
-            ) {
-                lox.lox_error(e)
-            }
+        if let Err(e) = envir.define(
+            &Token {
+                toke_type: TokenType::Fn,
+                lexeme: Rc::new("clock".to_string()),
+                value: Literal::Nil,
+                line: 0,
+            },
+            LoxValue::Call(LoxCallable::Clock),
+        ) {
+            lox.lox_error(e)
+        }
 
         let envir = Rc::new(envir);
         Self {

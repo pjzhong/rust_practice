@@ -10,7 +10,7 @@ pub enum LoxValue {
     Number(f64),
     Boolean(bool),
     String(Rc<String>),
-    Classs(Rc<LoxClass>, LoxCallable),
+    Classs(Rc<LoxClass>),
     Call(LoxCallable),
     Instance(Rc<LoxInstance>),
     Nil,
@@ -24,7 +24,7 @@ impl Display for LoxValue {
             LoxValue::String(a) => write!(f, "{}", a),
             LoxValue::Call(c) => c.fmt(f),
             LoxValue::Nil => write!(f, "nil"),
-            LoxValue::Classs(e, _) => e.fmt(f),
+            LoxValue::Classs(e) => e.fmt(f),
             LoxValue::Instance(i) => i.fmt(f),
         }
     }

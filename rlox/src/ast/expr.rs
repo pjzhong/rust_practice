@@ -18,7 +18,7 @@ pub enum Expr {
     Assign(Token, Rc<Expr>),
     Logical(Rc<Expr>, Token, Rc<Expr>),
     Call(Rc<Expr>, Token, Rc<Vec<Expr>>),
-    Lambda(Token, Vec<Token>, Rc<Vec<Stmt>>),
+    Lambda(Token, Rc<Vec<Token>>, Rc<Vec<Stmt>>),
     Get(Rc<Expr>, Token),
     Set(Rc<Expr>, Token, Rc<Expr>),
 }

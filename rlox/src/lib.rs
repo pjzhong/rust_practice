@@ -76,12 +76,8 @@ impl Lox {
 
     pub fn had_runtime_error(&self) -> bool {
         match self.inner.try_borrow() {
-            Ok(inner) => {
-                inner.had_runtime_error
-            }
-            Err(_) => {
-               false
-            }
+            Ok(inner) => inner.had_runtime_error,
+            Err(_) => false,
         }
     }
 }

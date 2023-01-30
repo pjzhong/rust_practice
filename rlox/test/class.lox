@@ -13,3 +13,12 @@ print bagel;
 
 bagel.test = "Hello world!";
 print bagel.test;
+
+
+class Meat {
+  eat() {
+    print "Crunch Crunch Crunch";
+  }
+}
+
+Meat().eat();

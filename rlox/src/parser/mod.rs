@@ -321,7 +321,7 @@ impl Parser {
             Stmt::Block(body) => body,
             _ => return Err(self.error(token, "function expect a block.")),
         };
-        Ok(Stmt::Fun(name, parameters, Rc::new(body)))
+        Ok(Stmt::Fun(name, Rc::new(parameters), Rc::new(body)))
     }
 
     fn expression(&mut self) -> Result<Expr, LoxErr> {
@@ -363,7 +363,7 @@ impl Parser {
             Stmt::Block(body) => body,
             _ => return Err(self.error(&token, "function expect a block.")),
         };
-        Ok(Expr::Lambda(token, parameters, Rc::new(body)))
+        Ok(Expr::Lambda(token, Rc::new(parameters), Rc::new(body)))
     }
 
     fn assignment(&mut self) -> Result<Expr, LoxErr> {
