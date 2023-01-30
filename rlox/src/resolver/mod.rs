@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
     rc::Rc,
-    sync::Mutex,
 };
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
 pub struct Resolver {
     scopes: VecDeque<HashMap<Rc<String>, bool>>,
     locals: HashMap<Expr, usize>,
-    lox: Rc<Mutex<Lox>>,
+    lox: Rc<Lox>,
 }
 
 impl Visitor<&Expr, ()> for Resolver {
@@ -116,7 +115,7 @@ impl Visitor<&[Stmt], ()> for Resolver {
 }
 
 impl Resolver {
-    pub fn new(lox: Rc<Mutex<Lox>>) -> Self {
+    pub fn new(lox: Rc<Lox>) -> Self {
         Self {
             scopes: VecDeque::new(),
             locals: HashMap::new(),
@@ -172,9 +171,7 @@ impl Resolver {
     }
 
     fn error(&mut self, token: &Token, message: &str) {
-        if let Ok(mut lox) = self.lox.lock() {
-            lox.error(token.line, message);
-        }
+        self.lox.error(token.line, message);
     }
 
     pub fn resolve(mut self, stmt: &[Stmt], interpret: &mut Interpreter) {

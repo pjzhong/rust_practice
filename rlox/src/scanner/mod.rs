@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Mutex};
+use std::{rc::Rc};
 
 use crate::{
     token::{Literal, Token, TokenType},
@@ -11,11 +11,11 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    lox: Rc<Mutex<Lox>>,
+    lox: Rc<Lox>,
 }
 
 impl Scanner {
-    pub fn new(source: &str, lox: Rc<Mutex<Lox>>) -> Self {
+    pub fn new(source: &str, lox: Rc<Lox>) -> Self {
         Self {
             source: source.chars().collect(),
             tokens: vec![],
@@ -154,9 +154,7 @@ impl Scanner {
     }
 
     fn error(&mut self, line: usize, message: &str) {
-        if let Ok(mut lox) = self.lox.lock() {
-            lox.error(line, message);
-        }
+        self.lox.error(line, message);
     }
 
     fn identifier(&mut self) {

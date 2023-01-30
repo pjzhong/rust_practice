@@ -3,7 +3,7 @@ mod environment;
 mod function;
 mod value;
 
-use std::{collections::HashMap, rc::Rc, sync::Mutex};
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
@@ -18,7 +18,7 @@ use self::{class::LoxClass, function::LoxCallable};
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
 pub struct Interpreter {
-    lox: Rc<Mutex<Lox>>,
+    lox: Rc<Lox>,
     environment: Rc<Environment>,
     global: Rc<Environment>,
     locals: HashMap<Expr, usize>,
@@ -211,7 +211,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 }
 
 impl Interpreter {
-    pub fn new(lox: Rc<Mutex<Lox>>) -> Self {
+    pub fn new(lox: Rc<Lox>) -> Self {
         let envir = Environment::default();
         envir
             .define(
@@ -240,9 +240,7 @@ impl Interpreter {
             match self.visit(stmt) {
                 Ok(_) => {}
                 Err(e) => {
-                    if let Ok(mut lox) = self.lox.lock() {
-                        lox.lox_error(e);
-                    }
+                    self.lox.lox_error(e);
                 }
             }
         }

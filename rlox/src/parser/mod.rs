@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+use std::{collections::VecDeque, rc::Rc};
 
 use crate::{
     ast::{Expr, Stmt},
@@ -8,7 +8,7 @@ use crate::{
 
 pub struct Parser {
     tokens: VecDeque<Token>,
-    lox: Rc<Mutex<Lox>>,
+    lox: Rc<Lox>,
     loop_depath: usize,
 }
 
@@ -19,7 +19,7 @@ impl<T> From<LoxErr> for Result<T, LoxErr> {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>, lox: Rc<Mutex<Lox>>) -> Self {
+    pub fn new(tokens: Vec<Token>, lox: Rc<Lox>) -> Self {
         Self {
             tokens: tokens.into(),
             lox,
@@ -59,9 +59,7 @@ impl Parser {
         match stmt {
             Ok(stmt) => Some(stmt),
             Err(e) => {
-                if let Ok(mut lox) = self.lox.lock() {
-                    lox.lox_error(e);
-                }
+                self.lox.lox_error(e);
                 self.synchronize();
                 None
             }
@@ -623,9 +621,7 @@ impl Parser {
     }
 
     fn report_error(&mut self, token: &Token, message: &str) {
-        if let Ok(mut lox) = self.lox.lock() {
-            lox.error(token.line, message)
-        }
+        self.lox.error(token.line, message)
     }
 
     fn synchronize(&mut self) {
