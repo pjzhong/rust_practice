@@ -279,12 +279,11 @@ impl Parser {
 
         let mut methods = vec![];
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
-            if let Some(token) = self.match_type(TokenType::Fn) {
-                methods.push(self.function(&token)?);
-            }
+            let token = self.consume(TokenType::Fn, "Unknow  token is class")?;
+            methods.push(self.function(&token)?);
         }
 
-        self.consume(TokenType::RightBrace, "Class Expectt a block end")?;
+        self.consume(TokenType::RightBrace, "Class Expect a block end")?;
 
         Ok(Stmt::Class(name, Rc::new(methods)))
     }

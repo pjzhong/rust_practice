@@ -16,7 +16,7 @@ print bagel.test;
 
 
 class Meat {
-  eat() {
+  fn eat() {
     print "Crunch Crunch Crunch";
   }
 }
