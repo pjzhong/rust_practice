@@ -50,6 +50,10 @@ impl Visitor<&Expr, ()> for Resolver {
             }
             Expr::Lambda(_, tokens, body) => self.resolve_fun(tokens, body),
             Expr::Get(expr, _) => self.visit(expr.as_ref()),
+            Expr::Set(object, _, value) => {
+                self.visit(value.as_ref());
+                self.visit(object.as_ref());
+            }
         }
     }
 }

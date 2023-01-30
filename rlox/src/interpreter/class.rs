@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{token::Token, LoxErr};
 
@@ -24,6 +24,11 @@ impl Display for LoxClass {
 #[derive(Debug)]
 pub struct LoxInstance {
     klass: Rc<LoxClass>,
+    inner: RefCell<LoxInstanceInner>,
+}
+
+#[derive(Debug, Default)]
+struct LoxInstanceInner {
     fields: HashMap<Rc<String>, LoxValue>,
 }
 
@@ -31,10 +36,41 @@ impl LoxInstance {
     pub fn new(klass: Rc<LoxClass>) -> Self {
         Self {
             klass,
-            fields: HashMap::new(),
+            inner: RefCell::new(Default::default()),
         }
     }
 
+    pub fn get(&self, name: &Token) -> Result<LoxValue, LoxErr> {
+        match self.inner.try_borrow() {
+            Ok(val) => val.get(name),
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(name.line),
+                format!(
+                    "Concurrency exception get property '{}'. error:{}",
+                    name.lexeme, e
+                ),
+            )),
+        }
+    }
+
+    pub fn set(&self, name: &Token, value: LoxValue) -> Result<(), LoxErr> {
+        match self.inner.try_borrow_mut() {
+            Ok(mut val) => {
+                val.set(name, value);
+                Ok(())
+            }
+            Err(e) => Err(LoxErr::RunTimeErr(
+                Some(name.line),
+                format!(
+                    "Concurrency exception set property '{}'. error:{}",
+                    name.lexeme, e
+                ),
+            )),
+        }
+    }
+}
+
+impl LoxInstanceInner {
     pub fn get(&self, name: &Token) -> Result<LoxValue, LoxErr> {
         match self.fields.get(&name.lexeme) {
             Some(val) => Ok(val.clone()),
@@ -43,6 +79,10 @@ impl LoxInstance {
                 format!("Undefined property '{}'.", name.lexeme),
             )),
         }
+    }
+
+    pub fn set(&mut self, name: &Token, value: LoxValue) {
+        self.fields.insert(name.lexeme.clone(), value);
     }
 }
 

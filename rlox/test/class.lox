@@ -10,4 +10,6 @@ print DevonshireCream; // Prints "DevonshireCream".
 class Bagel {}
 var bagel = Bagel();
 print bagel;
+
+bagel.test = "Hello world!";
 print bagel.test;

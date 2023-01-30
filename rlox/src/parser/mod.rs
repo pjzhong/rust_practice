@@ -376,6 +376,7 @@ impl Parser {
 
             match expr {
                 Expr::Variable(name) => return Ok(Expr::Assign(name, Rc::new(value))),
+                Expr::Get(expr, token) => return Ok(Expr::Set(expr, token, Rc::new(value))),
                 _ => self.report_error(&equal, "Invalid assignment target."),
             }
         }
@@ -470,7 +471,6 @@ impl Parser {
                     toke_type: TokenType::LeftParen,
                     ..
                 } => expr = self.finish_call(expr, token)?,
-
                 Token {
                     toke_type: TokenType::Dot,
                     ..

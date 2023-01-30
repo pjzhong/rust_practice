@@ -20,6 +20,7 @@ pub enum Expr {
     Call(Rc<Expr>, Token, Rc<Vec<Expr>>),
     Lambda(Token, Vec<Token>, Rc<Vec<Stmt>>),
     Get(Rc<Expr>, Token),
+    Set(Rc<Expr>, Token, Rc<Expr>),
 }
 
 ///简化代码编写，不然这种包装写法太长了

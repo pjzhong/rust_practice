@@ -118,6 +118,14 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 LoxValue::Instance(inst) => inst.get(name),
                 _ => self.error(name, "Only instances have properties.".to_string()),
             },
+            Expr::Set(object, name, value) => match self.visit(object.as_ref())? {
+                LoxValue::Instance(inst) => {
+                    let value = self.visit(value.as_ref())?;
+                    inst.set(name, value.clone())?;
+                    Ok(value)
+                }
+                _ => self.error(name, "Only instances have fields".to_string()),
+            },
         }
     }
 }
