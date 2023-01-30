@@ -464,8 +464,30 @@ impl Parser {
     fn call(&mut self) -> Result<Expr, LoxErr> {
         let mut expr = self.primary()?;
 
-        while let Some(token) = self.match_type(TokenType::LeftParen) {
-            expr = self.finish_call(expr, token)?;
+        while let Some(token) = self.match_types(&[TokenType::LeftParen, TokenType::Dot]) {
+            match token {
+                Token {
+                    toke_type: TokenType::LeftParen,
+                    ..
+                } => expr = self.finish_call(expr, token)?,
+
+                Token {
+                    toke_type: TokenType::Dot,
+                    ..
+                } => {
+                    let name =
+                        self.consume(TokenType::Identifier, "Expect property name after '.'.")?;
+                    expr = Expr::Get(Rc::new(expr), name);
+                }
+                _ => {
+                    return Err(LoxErr::ParseErr(
+                        token.line,
+                        token.toke_type,
+                        token.lexeme,
+                        "unhandle call".to_string(),
+                    ))
+                }
+            }
         }
 
         Ok(expr)

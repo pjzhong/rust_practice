@@ -13,7 +13,7 @@ use crate::{
 
 pub use self::environment::Environment;
 pub use self::value::LoxValue;
-use self::{class::Class, function::LoxCallable};
+use self::{class::LoxClass, function::LoxCallable};
 
 type LoxResult<LoxValue> = Result<LoxValue, LoxErr>;
 
@@ -114,6 +114,10 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 );
                 Ok(LoxValue::Call(callee))
             }
+            Expr::Get(expr, name) => match self.visit(expr.as_ref())? {
+                LoxValue::Instance(inst) => inst.get(name),
+                _ => self.error(name, "Only instances have properties.".to_string()),
+            },
         }
     }
 }
@@ -207,7 +211,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 match self.environment.try_borrow_mut() {
                     Ok(mut env) => {
                         env.define(name.lexeme.clone(), LoxValue::Nil);
-                        let class: Rc<Class> = Rc::new(name.lexeme.clone().into());
+                        let class: Rc<LoxClass> = Rc::new(name.lexeme.clone().into());
                         let klass = LoxValue::Classs(class.clone(), LoxCallable::Class(class));
                         env.define(name.lexeme.clone(), klass);
                     }

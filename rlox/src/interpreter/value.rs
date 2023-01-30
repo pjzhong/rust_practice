@@ -1,7 +1,7 @@
 use std::{fmt::Display, rc::Rc};
 
 use super::{
-    class::{Class, Instance},
+    class::{LoxClass, LoxInstance},
     function::LoxCallable,
 };
 
@@ -10,9 +10,9 @@ pub enum LoxValue {
     Number(f64),
     Boolean(bool),
     String(Rc<String>),
-    Classs(Rc<Class>, LoxCallable),
+    Classs(Rc<LoxClass>, LoxCallable),
     Call(LoxCallable),
-    Instance(Rc<Instance>),
+    Instance(Rc<LoxInstance>),
     Nil,
 }
 
