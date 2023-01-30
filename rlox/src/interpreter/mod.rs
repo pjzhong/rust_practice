@@ -213,7 +213,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 impl Interpreter {
     pub fn new(lox: Rc<Lox>) -> Self {
         let envir = Environment::default();
-        envir
+        if let Err(e) = envir
             .define(
                 &Token {
                     toke_type: TokenType::Fn,
@@ -222,8 +222,9 @@ impl Interpreter {
                     line: 0,
                 },
                 LoxValue::Call(LoxCallable::Clock),
-            )
-            .expect("fix me, don't panic");
+            ) {
+                lox.lox_error(e)
+            }
 
         let envir = Rc::new(envir);
         Self {

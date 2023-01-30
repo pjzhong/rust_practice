@@ -30,7 +30,14 @@ struct LoxInner {
 /// TODO Fix me, don't let it panic
 impl Lox {
     pub fn lox_error(&self, err: LoxErr) {
-        self.inner.borrow_mut().lox_error(err)
+        match self.inner.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.lox_error(err);
+            }
+            Err(e) => {
+                eprintln!("concurrent exception , ignore err:{}, loxErr:{:?}", e, err);
+            }
+        }
     }
 
     pub fn error(&self, line: usize, message: &str) {
@@ -39,19 +46,43 @@ impl Lox {
 
     pub fn report(&self, line: usize, location: &str, message: &str) {
         println!("[line {}] Error {}, {}", line, location, message);
-        self.inner.borrow_mut().had_runtime_error = true;
+        match self.inner.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.had_runtime_error = true;
+            }
+            Err(e) => {
+                eprintln!("concurrent exception ,set run_time_error ignore, err:{}", e);
+            }
+        }
     }
 
     pub fn has_error(&self) -> bool {
-        self.inner.borrow().has_error
+        match self.inner.try_borrow() {
+            Ok(inner) => inner.has_error,
+            Err(_) => false,
+        }
     }
 
     pub fn set_error(&self, err: bool) {
-        self.inner.borrow_mut().has_error = err;
+        match self.inner.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.has_error = err;
+            }
+            Err(e) => {
+                eprintln!("concurrent exception ,set run_error ignore, err:{}", e);
+            }
+        }
     }
 
     pub fn had_runtime_error(&self) -> bool {
-        self.inner.borrow().had_runtime_error
+        match self.inner.try_borrow() {
+            Ok(inner) => {
+                inner.had_runtime_error
+            }
+            Err(_) => {
+               false
+            }
+        }
     }
 }
 
