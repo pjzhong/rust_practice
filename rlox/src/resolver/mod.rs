@@ -5,7 +5,6 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
-    interpreter::FunctionType,
     token::Token,
     Interpreter, Lox,
 };
@@ -14,6 +13,20 @@ pub struct Resolver {
     scopes: VecDeque<HashMap<Rc<String>, bool>>,
     locals: HashMap<Expr, usize>,
     lox: Rc<Lox>,
+    current_class: ClassType,
+}
+
+#[derive(Clone)]
+pub enum FunctionType {
+    None,
+    Fn,
+    Method,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum ClassType {
+    None,
+    Class,
 }
 
 impl Visitor<&Expr, ()> for Resolver {
@@ -54,7 +67,13 @@ impl Visitor<&Expr, ()> for Resolver {
                 self.visit(value.as_ref());
                 self.visit(object.as_ref());
             }
-            Expr::This(token) => self.resolve_local(expr, token),
+            Expr::This(token) => {
+                if self.current_class == ClassType::None {
+                    self.lox.error(token.line, "Can't use use 'this' outside of a class");
+                    return;
+                }
+                self.resolve_local(expr, token);
+            },
         }
     }
 }
@@ -101,6 +120,9 @@ impl Visitor<&Stmt, ()> for Resolver {
             Stmt::Return(_, expr) => self.visit(expr),
             Stmt::Break => {}
             Stmt::Class(name, methods) => {
+                let enclosing_class = self.current_class.clone();
+                self.current_class = ClassType::Class;
+
                 self.declare(name);
                 self.define(name);
 
@@ -116,6 +138,7 @@ impl Visitor<&Stmt, ()> for Resolver {
                 }
 
                 self.end_scope();
+                self.current_class = enclosing_class;
             }
         }
     }
@@ -135,6 +158,7 @@ impl Resolver {
             scopes: VecDeque::new(),
             locals: HashMap::new(),
             lox,
+            current_class: ClassType::None
         }
     }
 

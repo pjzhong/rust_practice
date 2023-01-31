@@ -70,7 +70,10 @@ fn run(code: &str, lox: Rc<Lox>) {
     }
 
     let mut interpreter = Interpreter::new(lox.clone());
-    let resolver = Resolver::new(lox);
+    let resolver = Resolver::new(lox.clone());
     resolver.resolve(&stmts, &mut interpreter);
+    if lox.has_error() {
+        return;
+    }
     interpreter.interpret(&stmts);
 }

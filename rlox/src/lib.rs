@@ -48,7 +48,7 @@ impl Lox {
         println!("[line {}] Error {}, {}", line, location, message);
         match self.inner.try_borrow_mut() {
             Ok(mut inner) => {
-                inner.had_runtime_error = true;
+                inner.has_error = true;
             }
             Err(e) => {
                 eprintln!("concurrent exception ,set run_time_error ignore, err:{}", e);
