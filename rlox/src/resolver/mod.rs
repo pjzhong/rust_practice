@@ -6,7 +6,7 @@ use std::{
 use crate::{
     ast::{Expr, Stmt, Visitor},
     interpreter::FunctionType,
-    token::{self, Token},
+    token::{Token},
     Interpreter, Lox,
 };
 
@@ -14,6 +14,7 @@ pub struct Resolver {
     scopes: VecDeque<HashMap<Rc<String>, bool>>,
     locals: HashMap<Expr, usize>,
     lox: Rc<Lox>,
+    loops: usize,
     current_class: ClassType,
     current_function: FunctionType,
 }
@@ -107,11 +108,13 @@ impl Visitor<&Stmt, ()> for Resolver {
                 }
             }
             Stmt::While(init, cond, body) => {
+                self.loops += 1;
                 if let Some(init) = init {
                     self.visit(init.as_ref());
                 }
                 self.visit(cond);
                 self.visit(body.as_slice());
+                self.loops -= 1;
             }
             Stmt::Return(token, expr) => {
                 if self.current_function == FunctionType::None {
@@ -120,10 +123,20 @@ impl Visitor<&Stmt, ()> for Resolver {
                 }
 
                 if let Some(expr) = expr {
+                    if self.current_function == FunctionType::Initializer {
+                        self.lox
+                            .error(token.line, "Can't return a value from an initializer.")
+                    }
+
                     self.visit(expr);
                 }
             }
-            Stmt::Break => {}
+            Stmt::Break(token) => {
+                if self.loops == 0 {
+                    self.lox
+                        .error(token.line, "Can't break outside of loop.")
+                }
+            }
             Stmt::Class(name, methods) => {
                 let enclosing_class = self.current_class.clone();
                 self.current_class = ClassType::Class;
@@ -137,8 +150,16 @@ impl Visitor<&Stmt, ()> for Resolver {
                 }
 
                 for method in methods.as_ref() {
-                    if let Stmt::Fun(_, args, body) = method {
-                        self.resolve_fun(args, body, FunctionType::Method)
+                    if let Stmt::Fun(token, args, body) = method {
+                        self.resolve_fun(
+                            args,
+                            body,
+                            if token.lexeme.as_ref() == "init" {
+                                FunctionType::Initializer
+                            } else {
+                                FunctionType::Method
+                            },
+                        )
                     }
                 }
 
@@ -162,9 +183,10 @@ impl Resolver {
         Self {
             scopes: VecDeque::new(),
             locals: HashMap::new(),
-            lox,
             current_class: ClassType::None,
             current_function: FunctionType::None,
+            loops:0,
+            lox,
         }
     }
 

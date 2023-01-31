@@ -18,6 +18,6 @@ pub enum Stmt {
     While(Option<Rc<Stmt>>, Expr, Vec<Stmt>),
     Fun(Token, Rc<Vec<Token>>, Rc<Vec<Stmt>>),
     Return(Token, Option<Expr>),
-    Break,
+    Break(Token),
     Class(Token, Rc<Vec<Stmt>>),
 }

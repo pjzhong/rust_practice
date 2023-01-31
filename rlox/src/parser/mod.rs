@@ -9,7 +9,6 @@ use crate::{
 pub struct Parser {
     tokens: VecDeque<Token>,
     lox: Rc<Lox>,
-    loop_depath: usize,
 }
 
 impl<T> From<LoxErr> for Result<T, LoxErr> {
@@ -23,7 +22,6 @@ impl Parser {
         Self {
             tokens: tokens.into(),
             lox,
-            loop_depath: 0,
         }
     }
 
@@ -150,9 +148,7 @@ impl Parser {
         //WhileStmt -> "while"  expression block
         let condition = self.expression()?;
         self.consume(TokenType::LeftBrace, "While expect a block.")?;
-        self.loop_depath += 1;
         let body = self.block();
-        self.loop_depath -= 1;
         let body = match body? {
             Stmt::Block(body) => body,
             _ => return Err(self.error(token, "While expect a block.")),
@@ -190,9 +186,7 @@ impl Parser {
 
         let body = {
             self.consume(TokenType::LeftBrace, "for exepct a block")?;
-            self.loop_depath += 1;
             let body = self.block();
-            self.loop_depath -= 1;
 
             match body? {
                 Stmt::Block(mut stmts) => {
@@ -222,11 +216,7 @@ impl Parser {
 
     fn break_statement(&mut self, token: Token) -> Result<Stmt, LoxErr> {
         self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
-        if self.loop_depath == 0 {
-            Err(self.error(&token, "break outside of loop"))
-        } else {
-            Ok(Stmt::Break)
-        }
+        Ok(Stmt::Break(token))
     }
 
     fn block(&mut self) -> Result<Stmt, LoxErr> {

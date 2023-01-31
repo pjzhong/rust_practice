@@ -191,7 +191,7 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
 
                 Ok(())
             }
-            Stmt::Break => Err(LoxErr::BreakOutSideLoop),
+            Stmt::Break(_) => Err(LoxErr::BreakOutSideLoop),
             Stmt::Fun(name, args, body) => {
                 let callable = LoxValue::Call(
                     LoxFunction {

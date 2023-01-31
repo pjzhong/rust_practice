@@ -60,7 +60,15 @@ impl LoxCallable {
         match self {
             LoxCallable::Clock => 0,
             LoxCallable::LoxFun(fun) => fun.args.len(),
-            LoxCallable::Class(_) => 0,
+            LoxCallable::Class(clss) => {
+                if let Some(LoxValue::Call(Self::LoxFun(fun))) =
+                    clss.find_method(&Rc::new("init".to_string()))
+                {
+                    fun.args.len()
+                } else {
+                    0
+                }
+            }
         }
     }
 
@@ -73,7 +81,15 @@ impl LoxCallable {
             LoxCallable::Clock => LoxCallable::clock(),
             LoxCallable::LoxFun(fun) => LoxCallable::lox_call(fun, interpreter, arguments),
             LoxCallable::Class(class) => {
-                Ok(LoxValue::Instance(Rc::new(LoxInstance::new(class.clone()))))
+                let inst = Rc::new(LoxInstance::new(class.clone()));
+                if let Some(LoxValue::Call(LoxCallable::LoxFun(fun))) =
+                    class.find_method(&Rc::new("init".to_string()))
+                {
+                    let fun = fun.bind(inst.clone())?;
+                    LoxCallable::LoxFun(fun).call(interpreter, arguments)?;
+                }
+
+                Ok(inst.into())
             }
         }
     }

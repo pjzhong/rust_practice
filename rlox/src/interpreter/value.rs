@@ -65,3 +65,15 @@ impl From<&f64> for LoxValue {
         LoxValue::Number(*a)
     }
 }
+
+impl From<LoxInstance> for LoxValue {
+    fn from(inst: LoxInstance) -> Self {
+        LoxValue::Instance(Rc::new(inst))
+    }
+}
+
+impl From<Rc<LoxInstance>> for LoxValue {
+    fn from(inst: Rc<LoxInstance>) -> Self {
+        LoxValue::Instance(inst)
+    }
+}

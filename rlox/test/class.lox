@@ -34,3 +34,14 @@ var ego = Egotist();
 ego.name="hello";
 var method = ego.speak;
 method();
+
+class Foo {
+  fn init() {
+    print this;
+  }
+}
+
+var foo = Foo();
+print foo;
+
+break;
