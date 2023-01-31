@@ -65,14 +65,12 @@ fn run(code: &str, lox: Rc<Lox>) {
     let mut parser = Parser::new(tokens, lox.clone());
 
     let stmts = parser.parse();
+    if lox.has_error() {
+        return;
+    }
 
     let mut interpreter = Interpreter::new(lox.clone());
-
     let resolver = Resolver::new(lox);
     resolver.resolve(&stmts, &mut interpreter);
-
-    // let printer = AstPrinter;
-    // println!("{:?}", expr);
-    // println!("{:?}", printer.visit_expr(&expr));
     interpreter.interpret(&stmts);
 }

@@ -520,6 +520,7 @@ impl Parser {
                 TokenType::Ture => Ok(true.into()),
                 TokenType::Nil => Ok(Literal::Nil.into()),
                 TokenType::Identifier => Ok(Expr::Variable(token)),
+                TokenType::This => Ok(Expr::This(token)),
                 TokenType::Number | TokenType::String => Ok(Expr::Literal(token.value)),
                 TokenType::LeftParen => {
                     let expr = self.expression()?;

@@ -21,6 +21,18 @@ pub struct LoxFunction {
     pub closure: Rc<Environment>,
 }
 
+impl LoxFunction {
+    pub fn bind(&self, instance: Rc<LoxInstance>) -> Result<Self, LoxErr> {
+        let envir = Environment::enclosing(self.closure.clone());
+        envir.str_define(Rc::new("this".to_string()), LoxValue::Instance(instance))?;
+
+        let mut fun = self.clone();
+        fun.closure = Rc::new(envir);
+
+        Ok(fun)
+    }
+}
+
 pub enum FunctionType {
     None,
     Fn,

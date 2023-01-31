@@ -22,3 +22,15 @@ class Meat {
 }
 
 Meat().eat();
+
+
+class Egotist {
+  fn speak() {
+    print this.name;
+  }
+}
+
+var ego = Egotist();
+ego.name="hello";
+var method = ego.speak;
+method();

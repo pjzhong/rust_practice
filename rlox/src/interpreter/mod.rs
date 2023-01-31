@@ -122,6 +122,7 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 }
                 _ => self.error(name, "Only instances have fields".to_string()),
             },
+            Expr::This(token) => self.look_up_variable(token, expr),
         }
     }
 }

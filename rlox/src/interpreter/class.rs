@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{token::Token, LoxErr};
 
-use super::LoxValue;
+use super::{LoxValue, function::LoxCallable};
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
@@ -54,9 +54,9 @@ impl LoxInstance {
         }
     }
 
-    pub fn get(&self, name: &Token) -> Result<LoxValue, LoxErr> {
+    pub fn get(self: &Rc<Self>, name: &Token) -> Result<LoxValue, LoxErr> {
         match self.inner.try_borrow() {
-            Ok(val) => val.get(self.klass.as_ref(), name),
+            Ok(val) => val.get(self, name),
             Err(e) => Err(LoxErr::RunTimeErr(
                 Some(name.line),
                 format!(
@@ -85,12 +85,15 @@ impl LoxInstance {
 }
 
 impl LoxInstanceInner {
-    pub fn get(&self, cls: &LoxClass, name: &Token) -> Result<LoxValue, LoxErr> {
+    pub fn get(&self, inst: &Rc<LoxInstance>, name: &Token) -> Result<LoxValue, LoxErr> {
         match self.fields.get(&name.lexeme) {
             Some(val) => Ok(val.clone()),
-            None => match cls.find_method(&name.lexeme) {
-                Some(val) => Ok(val.clone()),
-                None => Err(LoxErr::RunTimeErr(
+            None => match inst.klass.find_method(&name.lexeme) {
+                Some(LoxValue::Call(LoxCallable::LoxFun(fun))) => {
+                    let new_fun = fun.bind(inst.clone())?;
+                    Ok(LoxValue::Call(LoxCallable::LoxFun(new_fun)))
+                },
+                _ => Err(LoxErr::RunTimeErr(
                     Some(name.line),
                     format!("Undefined property '{}'.", name.lexeme),
                 )),

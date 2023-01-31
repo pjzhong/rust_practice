@@ -33,6 +33,19 @@ impl Environment {
         }
     }
 
+    pub fn str_define(&self, name: Rc<String>, value: LoxValue) -> Result<(), LoxErr> {
+        match self.inner.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.values.insert(name.clone(), value);
+                Ok(())
+            }
+            Err(e) => Err(LoxErr::RunTimeErr(
+                None,
+                format!("concurreny exception, define error:{}", e),
+            )),
+        }
+    }
+
     pub fn get(&self, token: &Token) -> Result<LoxValue, LoxErr> {
         match self.inner.try_borrow() {
             Ok(inner) => match inner.values.get(&token.lexeme) {

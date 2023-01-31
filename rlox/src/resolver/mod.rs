@@ -54,6 +54,7 @@ impl Visitor<&Expr, ()> for Resolver {
                 self.visit(value.as_ref());
                 self.visit(object.as_ref());
             }
+            Expr::This(token) => self.resolve_local(expr, token),
         }
     }
 }
@@ -103,11 +104,18 @@ impl Visitor<&Stmt, ()> for Resolver {
                 self.declare(name);
                 self.define(name);
 
+                self.begin_scope();
+                if let Some(scope) = self.scopes.back_mut() {
+                    scope.insert(Rc::new("this".to_string()), true);
+                }
+
                 for method in methods.as_ref() {
                     if let Stmt::Fun(_, args, body) = method {
                         self.resolve_fun(args, body, FunctionType::Method)
                     }
                 }
+
+                self.end_scope();
             }
         }
     }
