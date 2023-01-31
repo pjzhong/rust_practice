@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{token::Token, LoxErr};
 
-use super::{LoxValue, function::LoxCallable};
+use super::{function::LoxCallable, LoxValue};
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
@@ -92,7 +92,7 @@ impl LoxInstanceInner {
                 Some(LoxValue::Call(LoxCallable::LoxFun(fun))) => {
                     let new_fun = fun.bind(inst.clone())?;
                     Ok(LoxValue::Call(LoxCallable::LoxFun(new_fun)))
-                },
+                }
                 _ => Err(LoxErr::RunTimeErr(
                     Some(name.line),
                     format!("Undefined property '{}'.", name.lexeme),

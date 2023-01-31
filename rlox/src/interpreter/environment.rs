@@ -36,7 +36,7 @@ impl Environment {
     pub fn str_define(&self, name: Rc<String>, value: LoxValue) -> Result<(), LoxErr> {
         match self.inner.try_borrow_mut() {
             Ok(mut inner) => {
-                inner.values.insert(name.clone(), value);
+                inner.values.insert(name, value);
                 Ok(())
             }
             Err(e) => Err(LoxErr::RunTimeErr(
@@ -130,14 +130,28 @@ impl Environment {
                 format!("concurreny exception, get error:{}", e),
             )),
         }
+    }
 
-        // match Environment::ancestor(env, distance).try_borrow() {
-        //     Ok(env) => env.get_direct(name),
-        //     Err(e) => Err(LoxErr::RunTimeErr(
-        //         Some(name.line),
-        //         format!("Undefined variable '{}',e:{}", &name.lexeme, e),
-        //     )),
-        // }
+    pub fn get_at_str(
+        self: &Rc<Environment>,
+        distance: usize,
+        token: &Rc<String>,
+    ) -> Result<LoxValue, LoxErr> {
+        let env = self.ancestor(distance);
+        let brrow_evn = env.inner.try_borrow();
+        match brrow_evn {
+            Ok(inner) => match inner.values.get(token) {
+                Some(a) => Ok(a.clone()),
+                None => Err(LoxErr::RunTimeErr(
+                    None,
+                    format!("Undefined variable '{}'", token),
+                )),
+            },
+            Err(e) => Err(LoxErr::RunTimeErr(
+                None,
+                format!("concurreny exception, get error:{}", e),
+            )),
+        }
     }
 
     pub fn assign_at(

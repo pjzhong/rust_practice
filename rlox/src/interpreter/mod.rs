@@ -102,12 +102,14 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                     value: Literal::Nil,
                     line: token.line,
                 };
-                let callee = LoxCallable::LoxFun(LoxFunction {
+                let callee = LoxFunction {
                     name,
                     args: args.clone(),
                     body: body.clone(),
                     closure: self.environment.clone(),
-                });
+                    fun_type: FunctionType::Fn,
+                }
+                .into();
                 Ok(LoxValue::Call(callee))
             }
             Expr::Get(expr, name) => match self.visit(expr.as_ref())? {
@@ -191,17 +193,25 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
             }
             Stmt::Break => Err(LoxErr::BreakOutSideLoop),
             Stmt::Fun(name, args, body) => {
-                let callable = LoxValue::Call(LoxCallable::LoxFun(LoxFunction {
-                    name: name.clone(),
-                    args: args.clone(),
-                    body: body.clone(),
-                    closure: self.environment.clone(),
-                }));
+                let callable = LoxValue::Call(
+                    LoxFunction {
+                        name: name.clone(),
+                        args: args.clone(),
+                        body: body.clone(),
+                        closure: self.environment.clone(),
+                        fun_type: FunctionType::Fn,
+                    }
+                    .into(),
+                );
                 self.environment.define(name, callable)?;
                 Ok(())
             }
             Stmt::Return(_, expr) => {
-                let value = self.visit(expr)?;
+                let value = if let Some(expr) = expr {
+                    self.visit(expr)?
+                } else {
+                    LoxValue::Nil
+                };
                 Err(LoxErr::Return(value))
             }
             Stmt::Class(name, methods) => {
@@ -215,12 +225,14 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                             args: args.clone(),
                             body: body.clone(),
                             closure: self.environment.clone(),
+                            fun_type: if name.lexeme.as_ref() == "init" {
+                                FunctionType::Initializer
+                            } else {
+                                FunctionType::Method
+                            },
                         };
 
-                        class_methods.insert(
-                            name.lexeme.clone(),
-                            LoxValue::Call(LoxCallable::LoxFun(function)),
-                        );
+                        class_methods.insert(name.lexeme.clone(), LoxValue::Call(function.into()));
                     }
                 }
 

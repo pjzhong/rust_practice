@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt, Visitor},
+    interpreter::FunctionType,
     token::Token,
     Interpreter, Lox,
 };
@@ -14,13 +15,7 @@ pub struct Resolver {
     locals: HashMap<Expr, usize>,
     lox: Rc<Lox>,
     current_class: ClassType,
-}
-
-#[derive(Clone)]
-pub enum FunctionType {
-    None,
-    Fn,
-    Method,
+    current_function: FunctionType,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -69,11 +64,12 @@ impl Visitor<&Expr, ()> for Resolver {
             }
             Expr::This(token) => {
                 if self.current_class == ClassType::None {
-                    self.lox.error(token.line, "Can't use use 'this' outside of a class");
+                    self.lox
+                        .error(token.line, "Can't use use 'this' outside of a class");
                     return;
                 }
                 self.resolve_local(expr, token);
-            },
+            }
         }
     }
 }
@@ -117,7 +113,11 @@ impl Visitor<&Stmt, ()> for Resolver {
                 self.visit(cond);
                 self.visit(body.as_slice());
             }
-            Stmt::Return(_, expr) => self.visit(expr),
+            Stmt::Return(_, expr) => {
+                if let Some(expr) = expr {
+                    self.visit(expr);
+                }
+            }
             Stmt::Break => {}
             Stmt::Class(name, methods) => {
                 let enclosing_class = self.current_class.clone();
@@ -158,7 +158,8 @@ impl Resolver {
             scopes: VecDeque::new(),
             locals: HashMap::new(),
             lox,
-            current_class: ClassType::None
+            current_class: ClassType::None,
+            current_function: FunctionType::None,
         }
     }
 
@@ -197,7 +198,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_fun(&mut self, args: &[Token], body: &[Stmt], fun_type: FunctionType) {
+    fn resolve_fun(&mut self, args: &[Token], body: &[Stmt], _: FunctionType) {
         self.begin_scope();
         for param in args {
             self.declare(param);

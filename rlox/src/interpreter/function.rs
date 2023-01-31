@@ -13,12 +13,21 @@ use crate::{
 
 use super::class::{LoxClass, LoxInstance};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FunctionType {
+    None,
+    Fn,
+    Method,
+    Initializer,
+}
+
 #[derive(Debug, Clone)]
 pub struct LoxFunction {
     pub name: Token,
     pub args: Rc<Vec<Token>>,
     pub body: Rc<Vec<Stmt>>,
     pub closure: Rc<Environment>,
+    pub fun_type: FunctionType,
 }
 
 impl LoxFunction {
@@ -33,10 +42,10 @@ impl LoxFunction {
     }
 }
 
-pub enum FunctionType {
-    None,
-    Fn,
-    Method,
+impl From<LoxFunction> for LoxCallable {
+    fn from(fun: LoxFunction) -> Self {
+        LoxCallable::LoxFun(fun)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -89,8 +98,21 @@ impl LoxCallable {
         }
 
         match interpreter.execute_block(fun.body.as_ref(), environment) {
-            Ok(_) => Ok(LoxValue::Nil),
-            Err(LoxErr::Return(val)) => Ok(val),
+            Ok(_) => {
+                if fun.fun_type == FunctionType::Initializer {
+                    Ok(fun.closure.get_at_str(0, &Rc::new("this".to_string()))?)
+                } else {
+                    Ok(LoxValue::Nil)
+                }
+            }
+
+            Err(LoxErr::Return(val)) => {
+                if fun.fun_type == FunctionType::Initializer {
+                    Ok(fun.closure.get_at_str(0, &Rc::new("this".to_string()))?)
+                } else {
+                    Ok(val)
+                }
+            }
             Err(err) => Err(err),
         }
     }
