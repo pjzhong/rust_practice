@@ -6,7 +6,7 @@ use std::{
 use crate::{
     ast::{Expr, Stmt, Visitor},
     interpreter::FunctionType,
-    token::Token,
+    token::{self, Token},
     Interpreter, Lox,
 };
 
@@ -113,7 +113,12 @@ impl Visitor<&Stmt, ()> for Resolver {
                 self.visit(cond);
                 self.visit(body.as_slice());
             }
-            Stmt::Return(_, expr) => {
+            Stmt::Return(token, expr) => {
+                if self.current_function == FunctionType::None {
+                    self.lox
+                        .error(token.line, "Can't return from top-level code.")
+                }
+
                 if let Some(expr) = expr {
                     self.visit(expr);
                 }
@@ -198,7 +203,9 @@ impl Resolver {
         }
     }
 
-    fn resolve_fun(&mut self, args: &[Token], body: &[Stmt], _: FunctionType) {
+    fn resolve_fun(&mut self, args: &[Token], body: &[Stmt], fun_type: FunctionType) {
+        let enclosing_fun = self.current_function.clone();
+        self.current_function = fun_type;
         self.begin_scope();
         for param in args {
             self.declare(param);
@@ -208,6 +215,7 @@ impl Resolver {
             self.visit(stmt)
         }
         self.end_scope();
+        self.current_function = enclosing_fun;
     }
 
     fn error(&mut self, token: &Token, message: &str) {
