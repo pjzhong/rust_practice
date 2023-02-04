@@ -20,6 +20,10 @@ impl Environment {
         }
     }
 
+    pub fn enclosing_env(&self) -> Option<Rc<Self>> {
+        self.enclosing.clone()
+    }
+
     pub fn define(&self, name: &Token, value: LoxValue) -> Result<(), LoxErr> {
         match self.inner.try_borrow_mut() {
             Ok(mut inner) => {

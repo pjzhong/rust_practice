@@ -125,6 +125,40 @@ impl Visitor<&Expr, LoxResult<LoxValue>> for Interpreter {
                 _ => self.error(name, "Only instances have fields".to_string()),
             },
             Expr::This(token) => self.look_up_variable(token, expr),
+            Expr::Super(key_word, method) => {
+                if let Some(dist) = self.locals.get(expr) {
+                    let super_cls = self
+                        .environment
+                        .get_at_str(*dist, &Rc::new("super".to_string()))?;
+                    let super_cls = if let LoxValue::Classs(lox_cls) = super_cls {
+                        lox_cls
+                    } else {
+                        return self.error(key_word, "super shuold be a clss".to_string());
+                    };
+
+                    let object = self
+                        .environment
+                        .get_at_str(dist - 1, &Rc::new("this".to_string()))?;
+                    let object = if let LoxValue::Instance(object) = object {
+                        object
+                    } else {
+                        return self.error(key_word, "this shuold be a instance".to_string());
+                    };
+
+                    let method = if let Some(LoxValue::Call(LoxCallable::LoxFun(fun))) =
+                        super_cls.find_method(&method.lexeme)
+                    {
+                        fun.bind(object)?
+                    } else {
+                        return self
+                            .error(method, format!("undefined  property,'{}'", method.lexeme));
+                    };
+
+                    Ok(LoxValue::Call(method.into()))
+                } else {
+                    self.error(key_word, "super not resolved".to_string())
+                }
+            }
         }
     }
 }
@@ -214,8 +248,29 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                 };
                 Err(LoxErr::Return(value))
             }
-            Stmt::Class(name, methods) => {
+            Stmt::Class(name, super_cls, methods) => {
+                let super_cls = if let Some(super_cls) = super_cls {
+                    if let LoxValue::Classs(super_cls) = self.visit(super_cls.as_ref())? {
+                        self.check_cyclic_inheritance(name, super_cls.clone())?;
+                        Some(super_cls)
+                    } else {
+                        return Err(LoxErr::RunTimeErr(
+                            Some(name.line),
+                            "Superclass must be a class".to_string(),
+                        ));
+                    }
+                } else {
+                    None
+                };
+
                 self.environment.define(name, LoxValue::Nil)?;
+
+                if let Some(super_cls) = super_cls.clone() {
+                    let environment = Environment::enclosing(self.environment.clone());
+                    environment
+                        .str_define(Rc::new("super".to_string()), LoxValue::Classs(super_cls))?;
+                    self.environment = Rc::new(environment);
+                }
 
                 let mut class_methods = HashMap::new();
                 for stmt in methods.as_ref() {
@@ -236,8 +291,14 @@ impl Visitor<&Stmt, Result<(), LoxErr>> for Interpreter {
                     }
                 }
 
-                let class = LoxClass::new(name.lexeme.clone(), class_methods);
+                let class = LoxClass::new(name.lexeme.clone(), super_cls.clone(), class_methods);
                 let class = LoxValue::Classs(Rc::new(class));
+
+                if super_cls.is_some() {
+                    if let Some(env) = self.environment.enclosing_env() {
+                        self.environment = env;
+                    }
+                }
                 self.environment.define(name, class)?;
                 Ok(())
             }
@@ -437,5 +498,23 @@ impl Interpreter {
         for (expr, depth) in locals {
             self.locals.insert(expr, depth);
         }
+    }
+
+    fn check_cyclic_inheritance(
+        &self,
+        name: &Token,
+        super_cls: Rc<LoxClass>,
+    ) -> Result<(), LoxErr> {
+        let mut super_cls = Some(super_cls);
+        while let Some(check_cls) = super_cls {
+            if name.lexeme == check_cls.name() {
+                return Err(LoxErr::RunTimeErr(
+                    Some(name.line),
+                    "detect cyclic inheritance".to_string(),
+                ));
+            }
+            super_cls = check_cls.super_cls();
+        }
+        Ok(())
     }
 }

@@ -22,6 +22,7 @@ pub enum Expr {
     Get(Rc<Expr>, Token),
     Set(Rc<Expr>, Token, Rc<Expr>),
     This(Token),
+    Super(Token, Token),
 }
 
 ///简化代码编写，不然这种包装写法太长了

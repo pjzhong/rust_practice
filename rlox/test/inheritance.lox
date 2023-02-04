@@ -1,0 +1,38 @@
+class Doughnut {
+  fn cook() {
+    print "Fry until golden brown.";
+  }
+}
+
+class BostonCream < Doughnut {}
+
+BostonCream().cook();
+
+
+class A {
+  fn method() {
+    print "A method";
+  }
+}
+
+class B < A {
+  fn method() {
+    print "B method";
+  }
+
+  fn test() {
+    super.method();
+  }
+}
+
+class C < B {}
+C().test();
+
+// class e {
+//
+//    fn test() {
+//        super.hahah();
+//    }
+// }
+
+// super.nothing();

@@ -19,5 +19,5 @@ pub enum Stmt {
     Fun(Token, Rc<Vec<Token>>, Rc<Vec<Stmt>>),
     Return(Token, Option<Expr>),
     Break(Token),
-    Class(Token, Rc<Vec<Stmt>>),
+    Class(Token, Option<Rc<Expr>>, Rc<Vec<Stmt>>),
 }

@@ -6,7 +6,7 @@ use std::{
 use crate::{
     ast::{Expr, Stmt, Visitor},
     interpreter::FunctionType,
-    token::{Token},
+    token::Token,
     Interpreter, Lox,
 };
 
@@ -23,6 +23,7 @@ pub struct Resolver {
 pub enum ClassType {
     None,
     Class,
+    SubClass,
 }
 
 impl Visitor<&Expr, ()> for Resolver {
@@ -68,6 +69,18 @@ impl Visitor<&Expr, ()> for Resolver {
                     self.lox
                         .error(token.line, "Can't use use 'this' outside of a class");
                     return;
+                }
+                self.resolve_local(expr, token);
+            }
+            Expr::Super(token, _) => {
+                if self.current_class == ClassType::None {
+                    self.lox
+                        .error(token.line, "Can't use use 'super' outside of a class");
+                } else if self.current_class != ClassType::SubClass {
+                    self.lox.error(
+                        token.line,
+                        "Can't use use 'super' in a class with no superclass.",
+                    );
                 }
                 self.resolve_local(expr, token);
             }
@@ -133,16 +146,32 @@ impl Visitor<&Stmt, ()> for Resolver {
             }
             Stmt::Break(token) => {
                 if self.loops == 0 {
-                    self.lox
-                        .error(token.line, "Can't break outside of loop.")
+                    self.lox.error(token.line, "Can't break outside of loop.")
                 }
             }
-            Stmt::Class(name, methods) => {
+            Stmt::Class(name, super_cls, methods) => {
                 let enclosing_class = self.current_class.clone();
                 self.current_class = ClassType::Class;
 
                 self.declare(name);
                 self.define(name);
+
+                //This method don't work for cyclic inheritance
+                if let Some(super_cls) = super_cls {
+                    if let Expr::Variable(token) = super_cls.as_ref() {
+                        if token.lexeme == name.lexeme {
+                            self.lox
+                                .error(token.line, "A class can't inherit from itself.")
+                        }
+                    }
+                    self.current_class = ClassType::SubClass;
+                    self.visit(super_cls.as_ref());
+
+                    self.begin_scope();
+                    if let Some(scope) = self.scopes.back_mut() {
+                        scope.insert(Rc::new("super".to_string()), true);
+                    }
+                }
 
                 self.begin_scope();
                 if let Some(scope) = self.scopes.back_mut() {
@@ -161,6 +190,10 @@ impl Visitor<&Stmt, ()> for Resolver {
                             },
                         )
                     }
+                }
+
+                if super_cls.is_some() {
+                    self.end_scope();
                 }
 
                 self.end_scope();
@@ -185,7 +218,7 @@ impl Resolver {
             locals: HashMap::new(),
             current_class: ClassType::None,
             current_function: FunctionType::None,
-            loops:0,
+            loops: 0,
             lox,
         }
     }

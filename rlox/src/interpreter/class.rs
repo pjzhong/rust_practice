@@ -7,6 +7,7 @@ use super::{function::LoxCallable, LoxValue};
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     name: Rc<String>,
+    super_cls: Option<Rc<LoxClass>>,
     methods: HashMap<Rc<String>, LoxValue>,
 }
 
@@ -14,18 +15,43 @@ impl From<Rc<String>> for LoxClass {
     fn from(name: Rc<String>) -> Self {
         Self {
             name,
+            super_cls: None,
             methods: HashMap::new(),
         }
     }
 }
 
 impl LoxClass {
-    pub fn new(name: Rc<String>, methods: HashMap<Rc<String>, LoxValue>) -> Self {
-        Self { name, methods }
+    pub fn new(
+        name: Rc<String>,
+        super_cls: Option<Rc<LoxClass>>,
+        methods: HashMap<Rc<String>, LoxValue>,
+    ) -> Self {
+        Self {
+            name,
+            super_cls,
+            methods,
+        }
     }
 
     pub fn find_method(&self, name: &Rc<String>) -> Option<LoxValue> {
-        self.methods.get(name).cloned()
+        if let Some(val) = self.methods.get(name) {
+            return Some(val.clone());
+        }
+
+        if let Some(super_cls) = &self.super_cls {
+            return super_cls.find_method(name);
+        }
+
+        None
+    }
+
+    pub fn super_cls(&self) -> Option<Rc<LoxClass>> {
+        self.super_cls.clone()
+    }
+
+    pub fn name(&self) -> Rc<String> {
+        self.name.clone()
     }
 }
 

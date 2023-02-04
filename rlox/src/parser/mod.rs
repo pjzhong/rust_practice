@@ -265,6 +265,14 @@ impl Parser {
 
     fn class(&mut self) -> Result<Stmt, LoxErr> {
         let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+
+        let superclass = if self.match_type(TokenType::Less).is_some() {
+            let token = self.consume(TokenType::Identifier, "Expect superclass name.")?;
+            Some(Rc::new(Expr::Variable(token)))
+        } else {
+            None
+        };
+
         self.consume(TokenType::LeftBrace, "Class Expect a block")?;
 
         let mut methods = vec![];
@@ -275,7 +283,7 @@ impl Parser {
 
         self.consume(TokenType::RightBrace, "Class Expect a block end")?;
 
-        Ok(Stmt::Class(name, Rc::new(methods)))
+        Ok(Stmt::Class(name, superclass, Rc::new(methods)))
     }
 
     fn function(&mut self, token: &Token) -> Result<Stmt, LoxErr> {
@@ -512,6 +520,12 @@ impl Parser {
                 TokenType::Identifier => Ok(Expr::Variable(token)),
                 TokenType::This => Ok(Expr::This(token)),
                 TokenType::Number | TokenType::String => Ok(Expr::Literal(token.value)),
+                TokenType::Super => {
+                    self.consume(TokenType::Dot, "Expect '.' after 'super'.")?;
+                    let method =
+                        self.consume(TokenType::Identifier, "Expect superclass method name.")?;
+                    Ok(Expr::Super(token, method))
+                }
                 TokenType::LeftParen => {
                     let expr = self.expression()?;
                     self.consume(TokenType::RightParen, "Expect ')' after expression")?;
