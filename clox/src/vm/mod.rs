@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     chunk::{Chunk, OpCode},
     Value,
@@ -6,8 +8,8 @@ use crate::{
 #[derive(Default)]
 pub struct Vm {
     chunk: Chunk,
-    chunk_idx: usize,
     ip: usize,
+    stack: VecDeque<Value>,
 }
 
 pub enum InterpretResult {
@@ -20,8 +22,8 @@ impl Vm {
     pub fn new() -> Self {
         Self {
             chunk: Chunk::default(),
-            chunk_idx: 0,
             ip: 0,
+            stack: VecDeque::new(),
         }
     }
 
@@ -32,22 +34,40 @@ impl Vm {
         self.ip = 0;
         loop {
             #[cfg(debug_assertions)]
-            self.chunk.disassemble_instruction(self.ip);
+            {
+                print!("    ");
+                for val in &self.stack {
+                    print!("[ {:?} ]", val);
+                }
+                println!();
+                self.chunk.disassemble_instruction(self.ip);
+            }
 
             let inst = self.read_byte().into();
             match inst {
-                OpCode::Return => return InterpretResult::Ok,
+                OpCode::Return => {
+                    if let Some(val) = self.pop() {
+                        println!("{:?}", val);
+                    }
+                    return InterpretResult::Ok;
+                }
                 OpCode::Constant => {
-                    let consant = self.read_consnt();
-                    print!("{:?}", consant);
-                    println!();
+                    let constant = self.read_consnt();
+                    self.push(constant);
                 }
+                OpCode::Negate => {
+                    if let Some(val) = self.pop() {
+                        self.push(-val);
+                    }
+                }
+                OpCode::Add => todo!(),
+                OpCode::Subtract => todo!(),
+                OpCode::Multiply => todo!(),
+                OpCode::Divide => todo!(),
                 OpCode::Unknown(a) => {
-                    eprintln!(
-                        "chunk_idx:{:?}, ip:{:?}, byte:{:?}",
-                        self.chunk_idx, self.ip, a
-                    )
+                    eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
                 }
+
             }
         }
     }
@@ -61,5 +81,13 @@ impl Vm {
     fn read_consnt(&mut self) -> Value {
         let idx = self.read_byte();
         self.chunk.read_constant(idx as usize)
+    }
+
+    fn push(&mut self, value: Value) {
+        self.stack.push_back(value);
+    }
+
+    fn pop(&mut self) -> Option<Value> {
+        self.stack.pop_back()
     }
 }
