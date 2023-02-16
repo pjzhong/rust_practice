@@ -60,14 +60,37 @@ impl Vm {
                         self.push(-val);
                     }
                 }
-                OpCode::Add => todo!(),
-                OpCode::Subtract => todo!(),
-                OpCode::Multiply => todo!(),
-                OpCode::Divide => todo!(),
+                OpCode::Add => {
+                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
+                        self.push(a + b);
+                    } else {
+                        todo!("binary op error handle")
+                    }
+                }
+                OpCode::Subtract => {
+                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
+                        self.push(a - b);
+                    } else {
+                        todo!("binary op error handle")
+                    }
+                }
+                OpCode::Multiply => {
+                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
+                        self.push(a * b);
+                    } else {
+                        todo!("binary op error handle")
+                    }
+                }
+                OpCode::Divide => {
+                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
+                        self.push(a / b);
+                    } else {
+                        todo!("binary op error handle")
+                    }
+                }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
                 }
-
             }
         }
     }

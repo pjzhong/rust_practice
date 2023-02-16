@@ -61,7 +61,6 @@ impl Chunk {
                 println!("Unknow opcde {}", inst);
                 offset + 1
             }
-   
         }
     }
 
