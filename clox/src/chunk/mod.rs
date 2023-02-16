@@ -20,8 +20,8 @@ impl Chunk {
         self.constants[offset]
     }
 
-    pub fn write(&mut self, byte: u8, line: u32) {
-        self.code.push(byte);
+    pub fn write(&mut self, byte: impl Into<u8>, line: u32) {
+        self.code.push(byte.into());
         self.lines.push(line);
     }
 
