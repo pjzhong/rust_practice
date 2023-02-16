@@ -1,26 +1,56 @@
-use clox::{Chunk, OpCode, Vm};
+use std::{
+    env, fs,
+    io::{self, Write},
+    process::{self, exit},
+};
+
+use clox::{interpret, InterpretResult, Vm};
 
 fn main() {
-    let mut chunk = Chunk::default();
-    let const_idx = chunk.add_constant(1.2);
-    chunk.write(OpCode::Constant, 123);
-    chunk.write(const_idx as u8, 123);
-
-    let const_idx = chunk.add_constant(3.4);
-    chunk.write(OpCode::Constant, 123);
-    chunk.write(const_idx as u8, 123);
-
-    chunk.write(OpCode::Add, 123);
-
-    let const_idx = chunk.add_constant(5.6);
-    chunk.write(OpCode::Constant, 123);
-    chunk.write(const_idx as u8, 123);
-
-    chunk.write(OpCode::Divide, 123);
-    chunk.write(OpCode::Negate, 123);
-    chunk.write(OpCode::Return, 123);
-
     let mut vm = Vm::new();
 
-    vm.interpret(chunk);
+    let args = env::args().collect::<Vec<String>>();
+
+    if args.len() == 1 {
+        repl(&mut vm)
+    } else if args.len() == 2 {
+        run_file(&mut vm, &args[1])
+    } else {
+        eprintln!(" Usage: clox [path]");
+        process::exit(64);
+    }
+}
+
+fn repl(vm: &mut Vm) {
+    let mut string = String::new();
+    let stdio = io::stdin();
+    loop {
+        print!("> ");
+        let _ = io::stdout().flush();
+        if let Ok(size) = stdio.read_line(&mut string) {
+            if 0 < size {
+                interpret(&string);
+            }
+        }
+        string.clear();
+    }
+}
+
+fn run_file(_vm: &mut Vm, file: &str) {
+    match fs::read_to_string(file) {
+        Ok(file) => {
+            //let result = InterpretResult::Ok;
+            let result = interpret(&file);
+
+            match result {
+                InterpretResult::Ok => (),
+                InterpretResult::CompileError => exit(65),
+                InterpretResult::RuntimeError => exit(70),
+            }
+        }
+        Err(e) => {
+            eprintln!("{:?}", e);
+            exit(65);
+        }
+    }
 }

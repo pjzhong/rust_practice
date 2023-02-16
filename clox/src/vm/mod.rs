@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{
     chunk::{Chunk, OpCode},
+    front::Compiler,
     Value,
 };
 
@@ -113,4 +114,11 @@ impl Vm {
     fn pop(&mut self) -> Option<Value> {
         self.stack.pop_back()
     }
+}
+
+pub fn interpret(source: &str) -> InterpretResult {
+    let compile = Compiler;
+    compile.compile(source);
+
+    InterpretResult::Ok
 }
