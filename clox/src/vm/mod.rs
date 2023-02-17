@@ -30,7 +30,7 @@ impl Vm {
 
     pub fn free() {}
 
-    pub fn interpret(&mut self, chunks: Chunk) -> InterpretResult {
+    pub fn run(&mut self, chunks: Chunk) -> InterpretResult {
         self.chunk = chunks;
         self.ip = 0;
         loop {
@@ -116,9 +116,12 @@ impl Vm {
     }
 }
 
-pub fn interpret(source: &str) -> InterpretResult {
-    let compile = Compiler;
-    compile.compile(source);
-
-    InterpretResult::Ok
+pub fn interpret(source: &str, vm: &mut Vm) -> InterpretResult {
+    let chunk = Chunk::default();
+    let compile = Compiler::default();
+    if let Some(chunk) = compile.compile(source, chunk) {
+        vm.run(chunk)
+    } else {
+        InterpretResult::CompileError
+    }
 }

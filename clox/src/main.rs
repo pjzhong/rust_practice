@@ -29,18 +29,18 @@ fn repl(vm: &mut Vm) {
         let _ = io::stdout().flush();
         if let Ok(size) = stdio.read_line(&mut string) {
             if 0 < size {
-                interpret(&string);
+                interpret(&string, vm);
             }
         }
         string.clear();
     }
 }
 
-fn run_file(_vm: &mut Vm, file: &str) {
+fn run_file(vm: &mut Vm, file: &str) {
     match fs::read_to_string(file) {
         Ok(file) => {
             //let result = InterpretResult::Ok;
-            let result = interpret(&file);
+            let result = interpret(&file, vm);
 
             match result {
                 InterpretResult::Ok => (),

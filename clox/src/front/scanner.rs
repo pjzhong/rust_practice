@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use super::{token::Token, TokenType};
 
+#[derive(Default)]
 pub struct Scanner {
     source: Vec<char>,
     start: usize,
