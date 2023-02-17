@@ -97,7 +97,7 @@ impl Scanner {
                         return;
                     }
                 }
-                _ => {}
+                _ => return,
             }
         }
     }
@@ -164,7 +164,7 @@ impl Scanner {
     }
 
     fn is_at_end(&self) -> bool {
-        self.source.get(self.current).map_or(false, |c| *c == '\0')
+        self.source.get(self.current).map_or(true, |c| *c == '\0')
     }
 
     fn peek(&self) -> char {
