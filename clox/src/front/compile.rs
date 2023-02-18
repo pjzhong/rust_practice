@@ -5,16 +5,42 @@ use super::{scanner::Scanner, token::Token, TokenType};
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum Precedence {
     None,
-    Assignment,// =
+    Assignment, // =
     Or,         // or
     And,        // and
     Equality,   // == !=
     Comparison, // < > <= >=
-    Team,       // + -
+    Term,       // + -
     Factor,     // * /
     Unary,      // ! -
-    Calss,       // . ()
+    Class,      // . ()
     Primary,
+}
+
+impl Precedence {
+    fn heigher(&self) -> Self {
+        match self {
+            Precedence::None => Self::Assignment,
+            Precedence::Assignment => Self::Or,
+            Precedence::Or => Self::And,
+            Precedence::And => Self::Equality,
+            Precedence::Equality => Self::Comparison,
+            Precedence::Comparison => Self::Term,
+            Precedence::Term => Self::Factor,
+            Precedence::Factor => Self::Unary,
+            Precedence::Unary => Self::Class,
+            Precedence::Class => Self::Primary,
+            Precedence::Primary => Self::Primary,
+        }
+    }
+}
+
+type ParseFn = fn(&mut Compiler);
+
+struct ParseRule {
+    prefix: ParseFn,
+    infix: ParseFn,
+    precedence: Precedence,
 }
 
 #[derive(Default)]
@@ -66,7 +92,7 @@ impl Compiler {
     }
 
     fn expression(&mut self) {
-        self.parse_precedence(Precedence::Assignment)   
+        self.parse_precedence(Precedence::Assignment)
     }
 
     fn consume(&mut self, expect: TokenType, msg: &str) {
@@ -83,6 +109,30 @@ impl Compiler {
 
     fn end_compiler(&mut self) {
         self.emit_return();
+
+        #[cfg(debug_assertions)]
+        {
+            if !self.error {
+                self.current_chunk().disassemble_chunk("code");
+            }
+        }
+    }
+
+    fn none(&mut self) {}
+
+    fn binary(&mut self) {
+        if let Some(ty) = self.previous.as_ref().map(|t| t.ty) {
+            let rule = get_rule(ty);
+            self.parse_precedence(rule.precedence.heigher());
+
+            match ty {
+                TokenType::Plus => self.emit_byte(OpCode::Add),
+                TokenType::Minus => self.emit_byte(OpCode::Subtract),
+                TokenType::Star => self.emit_byte(OpCode::Multiply),
+                TokenType::Slash => self.emit_byte(OpCode::Divide),
+                _ => {}
+            }
+        }
     }
 
     fn grouping(&mut self) {
@@ -106,12 +156,30 @@ impl Compiler {
                 ty: TokenType::Minus,
                 ..
             }) => self.emit_byte(OpCode::Negate),
-            _ => {},
+            _ => {}
         }
     }
 
     fn parse_precedence(&mut self, precedence: Precedence) {
+        self.advance();
+        if let Some(rule) = self.previous.as_ref().map(|t| get_rule(t.ty)) {
+            let prefix = rule.prefix;
+            prefix(self);
 
+            while self
+                .current
+                .as_ref()
+                .map_or(false, |t| precedence <= get_rule(t.ty).precedence)
+            {
+                self.advance();
+                if let Some(rule) = self.previous.as_ref().map(|t| get_rule(t.ty)) {
+                    let infix = rule.infix;
+                    infix(self);
+                }
+            }
+        } else {
+            self.error("Expect expression.")
+        }
     }
 
     fn emit_constant(&mut self, value: Value) {
@@ -174,5 +242,52 @@ fn error_at(token: &Option<Token>, message: &str) {
             _ => eprint!(" at {}", token.str),
         }
         eprintln!(": {}", message);
+    }
+}
+
+fn get_rule(ty: TokenType) -> ParseRule {
+    const LEFT_PARAM: ParseRule = ParseRule {
+        prefix: Compiler::grouping,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
+    const MINUS: ParseRule = ParseRule {
+        prefix: Compiler::unary,
+        infix: Compiler::binary,
+        precedence: Precedence::Term,
+    };
+    const PLUS: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Term,
+    };
+    const SLASH: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Factor,
+    };
+    const STAR: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Factor,
+    };
+    const NUMBER: ParseRule = ParseRule {
+        prefix: Compiler::number,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
+    const NONE: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
+    match ty {
+        TokenType::LeftParen => LEFT_PARAM,
+        TokenType::Minus => MINUS,
+        TokenType::Plus => PLUS,
+        TokenType::Slash => SLASH,
+        TokenType::Star => STAR,
+        TokenType::Number => NUMBER,
+        _ => NONE,
     }
 }
