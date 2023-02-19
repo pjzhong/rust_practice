@@ -1,7 +1,8 @@
 mod chunk;
 mod front;
+mod value;
 mod vm;
 
-pub type Value = f64;
-pub use chunk::{Chunk, OpCode};
+use chunk::{Chunk, OpCode};
+use value::Value;
 pub use vm::{interpret, InterpretResult, Vm};

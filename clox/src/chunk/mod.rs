@@ -1,8 +1,7 @@
 pub use crate::chunk::op::OpCode;
+use crate::Value;
 
 mod op;
-
-pub type Value = f64;
 
 #[derive(Default)]
 pub struct Chunk {
@@ -12,6 +11,10 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    pub fn line(&self, offset: usize) -> Option<u32> {
+        self.lines.get(offset).copied()
+    }
+
     pub fn read_byte(&self, offset: usize) -> u8 {
         self.code[offset]
     }
@@ -50,13 +53,20 @@ impl Chunk {
 
         let instruction = self.code[offset].into();
         match instruction {
-            OpCode::Return => self.simple_instruction("OP_RETURN", offset),
+            OpCode::Return
+            | OpCode::Negate
+            | OpCode::Add
+            | OpCode::Subtract
+            | OpCode::Multiply
+            | OpCode::Divide
+            | OpCode::Nil
+            | OpCode::True
+            | OpCode::False
+            | OpCode::Equal
+            | OpCode::Greater
+            | OpCode::Less
+            | OpCode::Bang => self.simple_instruction(&instruction, offset),
             OpCode::Constant => self.constant_instruction("OP_CONSTANT", offset),
-            OpCode::Negate => self.simple_instruction("OP_NEGATE", offset),
-            OpCode::Add => self.simple_instruction("OP_ADD", offset),
-            OpCode::Subtract => self.simple_instruction("OP_SUBSTRACT", offset),
-            OpCode::Multiply => self.simple_instruction("OP_MULTIPLY", offset),
-            OpCode::Divide => self.simple_instruction("OP_DIVIDE", offset),
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1
@@ -64,21 +74,15 @@ impl Chunk {
         }
     }
 
-    fn simple_instruction(&self, name: &str, offset: usize) -> usize {
-        println!("{}", name);
+    fn simple_instruction(&self, name: &OpCode, offset: usize) -> usize {
+        println!("{:?}", name);
         offset + 1
     }
 
     fn constant_instruction(&self, name: &str, offset: usize) -> usize {
         let const_idx = self.code[offset + 1];
         print!("{:-16} {:04} ", name, const_idx);
-        print_value(&self.constants[const_idx as usize]);
-        println!();
-
+        println!("{:?}", &self.constants[const_idx as usize]);
         offset + 2
     }
-}
-
-pub fn print_value(value: &Value) {
-    print!("{:?}", value)
 }

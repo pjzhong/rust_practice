@@ -1,18 +1,19 @@
-use std::collections::VecDeque;
+use std::ops::{Add, Div, Mul, Sub};
 
 use crate::{
     chunk::{Chunk, OpCode},
     front::Compiler,
-    Value,
+    value::Value,
 };
 
 #[derive(Default)]
 pub struct Vm {
     chunk: Chunk,
     ip: usize,
-    stack: VecDeque<Value>,
+    stack: Vec<Value>,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum InterpretResult {
     Ok,
     CompileError,
@@ -24,7 +25,7 @@ impl Vm {
         Self {
             chunk: Chunk::default(),
             ip: 0,
-            stack: VecDeque::new(),
+            stack: Vec::new(),
         }
     }
 
@@ -57,37 +58,64 @@ impl Vm {
                     self.push(constant);
                 }
                 OpCode::Negate => {
-                    if let Some(val) = self.pop() {
+                    if let Some(Value::Number(val)) = self.pop() {
                         self.push(-val);
+                    } else {
+                        self.runtime_error("Operand must be a number");
+                        return InterpretResult::RuntimeError;
                     }
                 }
                 OpCode::Add => {
-                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
-                        self.push(a + b);
-                    } else {
-                        todo!("binary op error handle")
+                    let res = self.binary_op(f64::add);
+                    if res != InterpretResult::Ok {
+                        return res;
                     }
                 }
                 OpCode::Subtract => {
-                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
-                        self.push(a - b);
-                    } else {
-                        todo!("binary op error handle")
+                    let res = self.binary_op(f64::sub);
+                    if res != InterpretResult::Ok {
+                        return res;
                     }
                 }
                 OpCode::Multiply => {
-                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
-                        self.push(a * b);
-                    } else {
-                        todo!("binary op error handle")
+                    let res = self.binary_op(f64::mul);
+                    if res != InterpretResult::Ok {
+                        return res;
                     }
                 }
                 OpCode::Divide => {
-                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
-                        self.push(a / b);
-                    } else {
-                        todo!("binary op error handle")
+                    let res = self.binary_op(f64::div);
+                    if res != InterpretResult::Ok {
+                        return res;
                     }
+                }
+                OpCode::Greater => {
+                    let res = self.binary_op(|a, b| a > b);
+                    if res != InterpretResult::Ok {
+                        return res;
+                    }
+                }
+                OpCode::Less => {
+                    let res = self.binary_op(|a, b| a < b);
+                    if res != InterpretResult::Ok {
+                        return res;
+                    }
+                }
+                OpCode::Nil => self.push(Value::Nil),
+                OpCode::True => self.push(true),
+                OpCode::False => self.push(false),
+                OpCode::Equal => {
+                    if let (Some(b), Some(a)) = (self.pop(), self.pop()) {
+                        self.push(a == b);
+                    } else {
+                        self.runtime_error("equal must have two operands");
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+
+                OpCode::Bang => {
+                    let val = self.pop();
+                    self.push(is_falsely(&val));
                 }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
@@ -107,12 +135,37 @@ impl Vm {
         self.chunk.read_constant(idx as usize)
     }
 
-    fn push(&mut self, value: Value) {
-        self.stack.push_back(value);
+    fn push(&mut self, value: impl Into<Value>) {
+        self.stack.push(value.into());
     }
 
     fn pop(&mut self) -> Option<Value> {
-        self.stack.pop_back()
+        self.stack.pop()
+    }
+
+    fn peak(&self, distance: usize) -> Option<&Value> {
+        self.stack.get(self.stack.len().wrapping_sub(1 + distance))
+    }
+
+    fn binary_op<R>(&mut self, op: fn(f64, f64) -> R) -> InterpretResult
+    where
+        R: Into<Value>,
+    {
+        if let (Some(Value::Number(b)), Some(Value::Number(a))) = (self.peak(0), self.peak(1)) {
+            let res = op(*a, *b);
+            self.pop();
+            self.pop();
+            self.push(res);
+            InterpretResult::Ok
+        } else {
+            self.runtime_error("Operand must be numbers.");
+            InterpretResult::RuntimeError
+        }
+    }
+
+    fn runtime_error(&self, messgae: &str) {
+        eprintln!("{}", messgae);
+        eprintln!("line {:?} in script", self.chunk.line(self.ip));
     }
 }
 
@@ -123,5 +176,14 @@ pub fn interpret(source: &str, vm: &mut Vm) -> InterpretResult {
         vm.run(chunk)
     } else {
         InterpretResult::CompileError
+    }
+}
+
+fn is_falsely(value: &Option<Value>) -> bool {
+    match value {
+        None => true,
+        Some(Value::Nil) => true,
+        Some(Value::Bool(bool)) => !bool,
+        _ => false,
     }
 }

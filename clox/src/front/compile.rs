@@ -2,7 +2,7 @@ use crate::{Chunk, OpCode, Value};
 
 use super::{scanner::Scanner, token::Token, TokenType};
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Precedence {
     None,
     Assignment, // =
@@ -130,8 +130,23 @@ impl Compiler {
                 TokenType::Minus => self.emit_byte(OpCode::Subtract),
                 TokenType::Star => self.emit_byte(OpCode::Multiply),
                 TokenType::Slash => self.emit_byte(OpCode::Divide),
+                TokenType::EqualEqual => self.emit_byte(OpCode::Equal),
+                TokenType::BangEqual => self.emit_bytes(OpCode::Equal, OpCode::Bang),
+                TokenType::Greater => self.emit_byte(OpCode::Greater),
+                TokenType::GreaterEqual => self.emit_bytes(OpCode::Less, OpCode::Bang),
+                TokenType::Less => self.emit_byte(OpCode::Less),
+                TokenType::LessEqual => self.emit_bytes(OpCode::Greater, OpCode::Bang),
                 _ => {}
             }
+        }
+    }
+
+    fn literal(&mut self) {
+        match self.previous.as_ref().map(|t| t.ty) {
+            Some(TokenType::False) => self.emit_byte(OpCode::False),
+            Some(TokenType::Ture) => self.emit_byte(OpCode::True),
+            Some(TokenType::Nil) => self.emit_byte(OpCode::Nil),
+            _ => {}
         }
     }
 
@@ -150,12 +165,11 @@ impl Compiler {
     }
 
     fn unary(&mut self) {
+        let ty = self.previous.as_ref().map(|t| t.ty);
         self.parse_precedence(Precedence::Unary);
-        match self.previous {
-            Some(Token {
-                ty: TokenType::Minus,
-                ..
-            }) => self.emit_byte(OpCode::Negate),
+        match ty {
+            Some(TokenType::Minus) => self.emit_byte(OpCode::Negate),
+            Some(TokenType::Bang) => self.emit_byte(OpCode::Bang),
             _ => {}
         }
     }
@@ -182,8 +196,8 @@ impl Compiler {
         }
     }
 
-    fn emit_constant(&mut self, value: Value) {
-        let const_idx = self.make_constant(value);
+    fn emit_constant(&mut self, value: impl Into<Value>) {
+        let const_idx = self.make_constant(value.into());
         self.emit_bytes(OpCode::Constant, const_idx);
     }
 
@@ -276,6 +290,51 @@ fn get_rule(ty: TokenType) -> ParseRule {
         infix: Compiler::none,
         precedence: Precedence::None,
     };
+    const BOOL: ParseRule = ParseRule {
+        prefix: Compiler::literal,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
+    const NIL: ParseRule = ParseRule {
+        prefix: Compiler::literal,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
+    const BANG: ParseRule = ParseRule {
+        prefix: Compiler::unary,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
+    const BANG_EQUAL: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Equality,
+    };
+    const EQUAL_EQUAL: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Equality,
+    };
+    const GREATER: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Comparison,
+    };
+    const GREATER_EQUAL: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Comparison,
+    };
+    const LESS: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Comparison,
+    };
+    const LESS_EQUAL: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::binary,
+        precedence: Precedence::Comparison,
+    };
     const NONE: ParseRule = ParseRule {
         prefix: Compiler::none,
         infix: Compiler::none,
@@ -288,6 +347,16 @@ fn get_rule(ty: TokenType) -> ParseRule {
         TokenType::Slash => SLASH,
         TokenType::Star => STAR,
         TokenType::Number => NUMBER,
+        TokenType::Ture => BOOL,
+        TokenType::False => BOOL,
+        TokenType::Nil => NIL,
+        TokenType::Bang => BANG,
+        TokenType::BangEqual => BANG_EQUAL,
+        TokenType::EqualEqual => EQUAL_EQUAL,
+        TokenType::Greater => GREATER,
+        TokenType::GreaterEqual => GREATER_EQUAL,
+        TokenType::Less => LESS,
+        TokenType::LessEqual => LESS_EQUAL,
         _ => NONE,
     }
 }
