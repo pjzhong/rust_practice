@@ -1,9 +1,9 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Div, Mul, Sub};
 
 use crate::{
     chunk::{Chunk, OpCode},
     front::Compiler,
-    value::Value,
+    value::{Object, Value},
 };
 
 #[derive(Default)]
@@ -65,12 +65,28 @@ impl Vm {
                         return InterpretResult::RuntimeError;
                     }
                 }
-                OpCode::Add => {
-                    let res = self.binary_op(f64::add);
-                    if res != InterpretResult::Ok {
-                        return res;
+                OpCode::Add => match (self.peak(0), self.peak(1)) {
+                    (Some(Value::Number(b)), Some(Value::Number(a))) => {
+                        let res = a + b;
+                        self.pop();
+                        self.pop();
+                        self.push(res)
                     }
-                }
+                    (Some(Value::Obj(Object::Str(b))), Some(Value::Obj(Object::Str(a)))) => {
+                        let new_str = {
+                            let mut a = a.as_ref().clone();
+                            a.push_str(b);
+                            a
+                        };
+                        self.pop();
+                        self.pop();
+                        self.push(new_str)
+                    }
+                    _ => {
+                        self.runtime_error("Operands must be two numbers or two strings.");
+                        return InterpretResult::RuntimeError;
+                    }
+                },
                 OpCode::Subtract => {
                     let res = self.binary_op(f64::sub);
                     if res != InterpretResult::Ok {

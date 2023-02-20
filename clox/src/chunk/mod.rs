@@ -20,7 +20,7 @@ impl Chunk {
     }
 
     pub fn read_constant(&self, offset: usize) -> Value {
-        self.constants[offset]
+        self.constants[offset].clone()
     }
 
     pub fn write(&mut self, byte: impl Into<u8>, line: u32) {

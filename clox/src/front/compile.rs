@@ -164,6 +164,12 @@ impl Compiler {
         }
     }
 
+    fn string(&mut self) {
+        if let Some(str) = self.previous.as_ref().map(|t| t.str.clone()) {
+            self.emit_constant(&str[1..(str.len() - 1)]);
+        }
+    }
+
     fn unary(&mut self) {
         let ty = self.previous.as_ref().map(|t| t.ty);
         self.parse_precedence(Precedence::Unary);
@@ -260,7 +266,7 @@ fn error_at(token: &Option<Token>, message: &str) {
 }
 
 fn get_rule(ty: TokenType) -> ParseRule {
-    const LEFT_PARAM: ParseRule = ParseRule {
+    const LEFT_PAREN: ParseRule = ParseRule {
         prefix: Compiler::grouping,
         infix: Compiler::none,
         precedence: Precedence::None,
@@ -335,13 +341,18 @@ fn get_rule(ty: TokenType) -> ParseRule {
         infix: Compiler::binary,
         precedence: Precedence::Comparison,
     };
+    const STRING: ParseRule = ParseRule {
+        prefix: Compiler::string,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
     const NONE: ParseRule = ParseRule {
         prefix: Compiler::none,
         infix: Compiler::none,
         precedence: Precedence::None,
     };
     match ty {
-        TokenType::LeftParen => LEFT_PARAM,
+        TokenType::LeftParen => LEFT_PAREN,
         TokenType::Minus => MINUS,
         TokenType::Plus => PLUS,
         TokenType::Slash => SLASH,
@@ -357,6 +368,7 @@ fn get_rule(ty: TokenType) -> ParseRule {
         TokenType::GreaterEqual => GREATER_EQUAL,
         TokenType::Less => LESS,
         TokenType::LessEqual => LESS_EQUAL,
+        TokenType::String => STRING,
         _ => NONE,
     }
 }
