@@ -58,6 +58,9 @@ impl Compiler {
         self.init_scanner(source);
         self.compiling_chunk = chunk;
         self.advance();
+        while self.match_advance(TokenType::Eof).is_none() {
+            self.declaration()
+        }
         self.expression();
         self.consume(TokenType::Eof, "Expect end of expression.");
         self.end_compiler();
@@ -93,6 +96,30 @@ impl Compiler {
 
     fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
+    }
+
+    fn declaration(&mut self) {
+        self.statement();
+
+        if self.panic {
+            
+        }
+    }
+
+    fn statement(&mut self) {
+        match self.match_advance(TokenType::Print) {
+            Some(Token {
+                ty: TokenType::Print,
+                ..
+            }) => self.print_statement(),
+            _ => {}
+        }
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after value");
+        self.emit_byte(OpCode::Print)
     }
 
     fn consume(&mut self, expect: TokenType, msg: &str) {
@@ -229,6 +256,19 @@ impl Compiler {
     fn emit_byte(&mut self, byte: impl Into<u8>) {
         let line = self.previous.as_ref().map_or(0, |t| t.line);
         self.current_chunk().write(byte, line);
+    }
+
+    fn check(&self, ty: TokenType) -> bool {
+        self.current.as_ref().map_or(false, |t| t.ty == ty)
+    }
+
+    fn match_advance(&mut self, ty: TokenType) -> Option<&Token> {
+        if self.check(ty) {
+            self.advance();
+            self.previous.as_ref()
+        } else {
+            None
+        }
     }
 
     fn error(&mut self, message: &str) {

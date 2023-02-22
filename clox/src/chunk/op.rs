@@ -14,6 +14,8 @@ pub enum OpCode {
     Equal,
     Greater,
     Less,
+    Print,
+    Pop,
     Unknown(u8),
 }
 
@@ -34,6 +36,8 @@ impl From<u8> for OpCode {
             11 => Self::Equal,
             12 => Self::Greater,
             13 => Self::Less,
+            14 => Self::Print,
+            15 => Self::Pop,
             _ => Self::Unknown(byte),
         }
     }
@@ -56,6 +60,8 @@ impl From<OpCode> for u8 {
             OpCode::Equal => 11,
             OpCode::Greater => 12,
             OpCode::Less => 13,
+            OpCode::Print => 14,
+            OpCode::Pop => 15,
             OpCode::Unknown(a) => a,
         }
     }

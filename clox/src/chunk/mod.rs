@@ -53,24 +53,12 @@ impl Chunk {
 
         let instruction = self.code[offset].into();
         match instruction {
-            OpCode::Return
-            | OpCode::Negate
-            | OpCode::Add
-            | OpCode::Subtract
-            | OpCode::Multiply
-            | OpCode::Divide
-            | OpCode::Nil
-            | OpCode::True
-            | OpCode::False
-            | OpCode::Equal
-            | OpCode::Greater
-            | OpCode::Less
-            | OpCode::Bang => self.simple_instruction(&instruction, offset),
             OpCode::Constant => self.constant_instruction("OP_CONSTANT", offset),
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1
             }
+            _ => self.simple_instruction(&instruction, offset),
         }
     }
 

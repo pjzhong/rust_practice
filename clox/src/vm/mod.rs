@@ -48,9 +48,6 @@ impl Vm {
             let inst = self.read_byte().into();
             match inst {
                 OpCode::Return => {
-                    if let Some(val) = self.pop() {
-                        println!("{:?}", val);
-                    }
                     return InterpretResult::Ok;
                 }
                 OpCode::Constant => {
@@ -128,10 +125,17 @@ impl Vm {
                         return InterpretResult::RuntimeError;
                     }
                 }
-
                 OpCode::Bang => {
                     let val = self.pop();
                     self.push(is_falsely(&val));
+                }
+                OpCode::Print => {
+                    if let Some(val) = self.pop() {
+                        println!("{}", val);
+                    }
+                }
+                OpCode::Pop => {
+                    self.pop();
                 }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
