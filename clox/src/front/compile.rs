@@ -99,10 +99,52 @@ impl Compiler {
     }
 
     fn declaration(&mut self) {
+
+        match self.match_advance(TokenType::Var) {
+            Some(Token {
+                ty: TokenType::Var,
+                ..
+            }) => {
+
+            }
+            _ => self.statement(),
+        }
         self.statement();
 
         if self.panic {
-            
+            self.synchronize()
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.panic = false;
+
+        while self
+            .current
+            .as_ref()
+            .map_or(false, |t| t.ty != TokenType::Eof)
+        {
+            if self
+                .previous
+                .as_ref()
+                .map_or(false, |t| t.ty == TokenType::Semicolon)
+            {
+                return;
+            }
+
+            match self.current.as_ref().map(|t| t.ty) {
+                Some(
+                    TokenType::Class
+                    | TokenType::Fn
+                    | TokenType::Var
+                    | TokenType::For
+                    | TokenType::If
+                    | TokenType::While
+                    | TokenType::Print
+                    | TokenType::Return,
+                ) => return,
+                _ => {}
+            }
         }
     }
 
