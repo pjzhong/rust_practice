@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{Chunk, OpCode, Value};
 
 use super::{scanner::Scanner, token::Token, TokenType};
@@ -124,7 +126,6 @@ impl Compiler {
             }) => self.var_declaration(),
             _ => self.statement(),
         }
-        self.statement();
 
         if self.panic {
             self.synchronize()
@@ -257,6 +258,13 @@ impl Compiler {
         }
     }
 
+    fn varaible(&mut self) {
+        if let Some(token) = self.previous.as_ref() {
+            let arg = self.identifier_constant(token.str.clone());
+            self.emit_bytes(OpCode::GetGlobal, arg);
+        }
+    }
+
     fn unary(&mut self) {
         let ty = self.previous.as_ref().map(|t| t.ty);
         self.parse_precedence(Precedence::Unary);
@@ -291,11 +299,14 @@ impl Compiler {
 
     fn parse_variable(&mut self, message: &str) -> Option<u8> {
         self.consume(TokenType::Identifier, message);
-        if let Some(token) = self.previous.as_ref() {
-            Some(self.make_constant(token.str.clone()))
-        } else {
-            None
-        }
+        self.previous
+            .as_ref()
+            .map(|t| t.str.clone())
+            .map(|name| self.identifier_constant(name))
+    }
+
+    fn identifier_constant(&mut self, str: Rc<String>) -> u8 {
+        self.make_constant(str)
     }
 
     fn define_variable(&mut self, global: u8) {
@@ -459,6 +470,11 @@ fn get_rule(ty: TokenType) -> ParseRule {
         infix: Compiler::none,
         precedence: Precedence::None,
     };
+    const IDENTIFIER: ParseRule = ParseRule {
+        prefix: Compiler::varaible,
+        infix: Compiler::none,
+        precedence: Precedence::None,
+    };
     const NONE: ParseRule = ParseRule {
         prefix: Compiler::none,
         infix: Compiler::none,
@@ -481,6 +497,7 @@ fn get_rule(ty: TokenType) -> ParseRule {
         TokenType::GreaterEqual => GREATER_EQUAL,
         TokenType::Less => LESS,
         TokenType::LessEqual => LESS_EQUAL,
+        TokenType::Identifier => IDENTIFIER,
         TokenType::String => STRING,
         _ => NONE,
     }

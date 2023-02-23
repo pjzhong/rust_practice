@@ -17,6 +17,7 @@ pub enum OpCode {
     Print,
     Pop,
     DefineGlobal,
+    GetGlobal,
     Unknown(u8),
 }
 
@@ -40,6 +41,7 @@ impl From<u8> for OpCode {
             14 => Self::Print,
             15 => Self::Pop,
             16 => Self::DefineGlobal,
+            17 => Self::GetGlobal,
             _ => Self::Unknown(byte),
         }
     }
@@ -65,6 +67,7 @@ impl From<OpCode> for u8 {
             OpCode::Print => 14,
             OpCode::Pop => 15,
             OpCode::DefineGlobal => 16,
+            OpCode::GetGlobal => 17,
             OpCode::Unknown(a) => a,
         }
     }

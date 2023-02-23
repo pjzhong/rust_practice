@@ -157,6 +157,19 @@ impl Vm {
                         return InterpretResult::RuntimeError;
                     }
                 }
+                OpCode::GetGlobal => {
+                    if let Value::Obj(Object::Str(name)) = self.read_consnt() {
+                        if let Some(value) = self.globals.get(&name) {
+                            self.push(value.clone())
+                        } else {
+                            self.runtime_error(&format!("Undefined varaible {}", name));
+                            return InterpretResult::RuntimeError;
+                        }
+                    } else {
+                        self.runtime_error("variable name must be a string");
+                        return InterpretResult::RuntimeError;
+                    }
+                }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
                 }

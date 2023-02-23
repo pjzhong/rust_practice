@@ -53,7 +53,7 @@ impl Chunk {
 
         let instruction = self.code[offset].into();
         match instruction {
-            OpCode::Constant | OpCode::DefineGlobal => {
+            OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal => {
                 self.constant_instruction(instruction, offset)
             }
             OpCode::Unknown(inst) => {
