@@ -51,7 +51,7 @@ impl Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Bool(bool) => write!(f, "{}", bool),
             Value::Number(num) => write!(f, "{}", num),
-            obj @ Value::Obj(_) => obj.fmt(f),
+            Value::Obj(a) => a.fmt(f),
         }
     }
 }

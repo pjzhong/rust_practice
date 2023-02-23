@@ -29,6 +29,11 @@ impl Chunk {
     }
 
     pub fn add_constant(&mut self, value: Value) -> usize {
+        for (idx, val) in self.constants.iter().enumerate() {
+            if val == &value {
+                return idx;
+            }
+        }
         self.constants.push(value);
         self.constants.len() - 1
     }
@@ -53,14 +58,28 @@ impl Chunk {
 
         let instruction = self.code[offset].into();
         match instruction {
-            OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal => {
+            OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal => {
                 self.constant_instruction(instruction, offset)
             }
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1
             }
-            _ => self.simple_instruction(&instruction, offset),
+            OpCode::Return
+            | OpCode::Negate
+            | OpCode::Add
+            | OpCode::Subtract
+            | OpCode::Multiply
+            | OpCode::Divide
+            | OpCode::Nil
+            | OpCode::True
+            | OpCode::False
+            | OpCode::Bang
+            | OpCode::Equal
+            | OpCode::Greater
+            | OpCode::Less
+            | OpCode::Print
+            | OpCode::Pop => self.simple_instruction(&instruction, offset),
         }
     }
 

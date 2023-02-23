@@ -37,7 +37,7 @@ impl Precedence {
     }
 }
 
-type ParseFn = fn(&mut Compiler);
+type ParseFn = fn(&mut Compiler, bool);
 
 struct ParseRule {
     prefix: ParseFn,
@@ -63,7 +63,6 @@ impl Compiler {
         while self.match_advance(TokenType::Eof).is_none() {
             self.declaration()
         }
-        self.expression();
         self.consume(TokenType::Eof, "Expect end of expression.");
         self.end_compiler();
         if self.error {
@@ -98,6 +97,12 @@ impl Compiler {
 
     fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
+    }
+
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.");
+        self.emit_byte(OpCode::Pop);
     }
 
     fn var_declaration(&mut self) {
@@ -159,7 +164,7 @@ impl Compiler {
                     | TokenType::Print
                     | TokenType::Return,
                 ) => return,
-                _ => {}
+                _ => self.advance(),
             }
         }
     }
@@ -170,7 +175,9 @@ impl Compiler {
                 ty: TokenType::Print,
                 ..
             }) => self.print_statement(),
-            _ => {}
+            _ => {
+                self.expression_statement();
+            }
         }
     }
 
@@ -206,9 +213,9 @@ impl Compiler {
         }
     }
 
-    fn none(&mut self) {}
+    fn none(&mut self, _: bool) {}
 
-    fn binary(&mut self) {
+    fn binary(&mut self, _: bool) {
         if let Some(ty) = self.previous.as_ref().map(|t| t.ty) {
             let rule = get_rule(ty);
             self.parse_precedence(rule.precedence.heigher());
@@ -229,7 +236,7 @@ impl Compiler {
         }
     }
 
-    fn literal(&mut self) {
+    fn literal(&mut self, _: bool) {
         match self.previous.as_ref().map(|t| t.ty) {
             Some(TokenType::False) => self.emit_byte(OpCode::False),
             Some(TokenType::Ture) => self.emit_byte(OpCode::True),
@@ -238,12 +245,12 @@ impl Compiler {
         }
     }
 
-    fn grouping(&mut self) {
+    fn grouping(&mut self, _: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
     }
 
-    fn number(&mut self) {
+    fn number(&mut self, _: bool) {
         if let Some(token) = self.previous.as_ref() {
             match token.str.parse::<f64>() {
                 Ok(value) => self.emit_constant(value),
@@ -252,20 +259,29 @@ impl Compiler {
         }
     }
 
-    fn string(&mut self) {
+    fn string(&mut self, _: bool) {
         if let Some(str) = self.previous.as_ref().map(|t| t.str.clone()) {
             self.emit_constant(&str[1..(str.len() - 1)]);
         }
     }
 
-    fn varaible(&mut self) {
+    fn varaible(&mut self, can_assign: bool) {
         if let Some(token) = self.previous.as_ref() {
-            let arg = self.identifier_constant(token.str.clone());
-            self.emit_bytes(OpCode::GetGlobal, arg);
+            self.named_varaible(token.str.clone(), can_assign);
         }
     }
 
-    fn unary(&mut self) {
+    fn named_varaible(&mut self, name: Rc<String>, can_assign: bool) {
+        let arg = self.identifier_constant(name);
+        if can_assign && self.match_advance(TokenType::Equal).is_some() {
+            self.expression();
+            self.emit_bytes(OpCode::SetGlobal, arg);
+        } else {
+            self.emit_bytes(OpCode::GetGlobal, arg)
+        }
+    }
+
+    fn unary(&mut self, _: bool) {
         let ty = self.previous.as_ref().map(|t| t.ty);
         self.parse_precedence(Precedence::Unary);
         match ty {
@@ -279,7 +295,8 @@ impl Compiler {
         self.advance();
         if let Some(rule) = self.previous.as_ref().map(|t| get_rule(t.ty)) {
             let prefix = rule.prefix;
-            prefix(self);
+            let can_assign = precedence <= Precedence::Assignment;
+            prefix(self, can_assign);
 
             while self
                 .current
@@ -289,7 +306,11 @@ impl Compiler {
                 self.advance();
                 if let Some(rule) = self.previous.as_ref().map(|t| get_rule(t.ty)) {
                     let infix = rule.infix;
-                    infix(self);
+                    infix(self, can_assign);
+                }
+
+                if can_assign && self.match_advance(TokenType::Equal).is_some() {
+                    self.error("Invalid assignment target.");
                 }
             }
         } else {
