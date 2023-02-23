@@ -98,15 +98,30 @@ impl Compiler {
         self.parse_precedence(Precedence::Assignment)
     }
 
-    fn declaration(&mut self) {
+    fn var_declaration(&mut self) {
+        let global = self.parse_variable("Expect variable name.");
 
+        if self.match_advance(TokenType::Equal).is_some() {
+            self.expression();
+        } else {
+            self.emit_byte(OpCode::Nil)
+        }
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        );
+
+        if let Some(global) = global {
+            self.define_variable(global);
+        }
+    }
+
+    fn declaration(&mut self) {
         match self.match_advance(TokenType::Var) {
             Some(Token {
-                ty: TokenType::Var,
-                ..
-            }) => {
-
-            }
+                ty: TokenType::Var, ..
+            }) => self.var_declaration(),
             _ => self.statement(),
         }
         self.statement();
@@ -164,15 +179,18 @@ impl Compiler {
         self.emit_byte(OpCode::Print)
     }
 
-    fn consume(&mut self, expect: TokenType, msg: &str) {
+    fn consume(&mut self, expect: TokenType, msg: &str) -> Option<&Token> {
         if let Some(token) = &self.current {
             if token.ty == expect {
                 self.advance();
+                self.previous.as_ref()
             } else {
                 self.error_at_current(msg);
+                None
             }
         } else {
             self.error_at_current(msg);
+            None
         }
     }
 
@@ -271,13 +289,26 @@ impl Compiler {
         }
     }
 
+    fn parse_variable(&mut self, message: &str) -> Option<u8> {
+        self.consume(TokenType::Identifier, message);
+        if let Some(token) = self.previous.as_ref() {
+            Some(self.make_constant(token.str.clone()))
+        } else {
+            None
+        }
+    }
+
+    fn define_variable(&mut self, global: u8) {
+        self.emit_bytes(OpCode::DefineGlobal, global);
+    }
+
     fn emit_constant(&mut self, value: impl Into<Value>) {
         let const_idx = self.make_constant(value.into());
         self.emit_bytes(OpCode::Constant, const_idx);
     }
 
-    fn make_constant(&mut self, value: Value) -> u8 {
-        let constant = self.current_chunk().add_constant(value);
+    fn make_constant(&mut self, value: impl Into<Value>) -> u8 {
+        let constant = self.current_chunk().add_constant(value.into());
         if constant > u8::MAX as usize {
             self.error("Too many constant in one chunk.");
             return 0;

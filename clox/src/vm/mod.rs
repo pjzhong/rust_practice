@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::ops::{Div, Mul, Sub};
+use std::rc::Rc;
 
 use crate::{
     chunk::{Chunk, OpCode},
@@ -11,6 +13,7 @@ pub struct Vm {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    globals: HashMap<Rc<String>, Value>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -26,6 +29,7 @@ impl Vm {
             chunk: Chunk::default(),
             ip: 0,
             stack: Vec::new(),
+            globals: HashMap::new(),
         }
     }
 
@@ -136,6 +140,22 @@ impl Vm {
                 }
                 OpCode::Pop => {
                     self.pop();
+                }
+                OpCode::DefineGlobal => {
+                    if let Value::Obj(Object::Str(name)) = self.read_consnt() {
+                        if let Some(value) = self.pop() {
+                            self.globals.insert(name.clone(), value);
+                        } else {
+                            self.runtime_error(&format!(
+                                "value not exists, define global:{} error",
+                                name
+                            ));
+                            return InterpretResult::RuntimeError;
+                        }
+                    } else {
+                        self.runtime_error("variable name must be a string");
+                        return InterpretResult::RuntimeError;
+                    }
                 }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)

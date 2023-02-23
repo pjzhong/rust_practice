@@ -53,7 +53,9 @@ impl Chunk {
 
         let instruction = self.code[offset].into();
         match instruction {
-            OpCode::Constant => self.constant_instruction("OP_CONSTANT", offset),
+            OpCode::Constant | OpCode::DefineGlobal => {
+                self.constant_instruction(instruction, offset)
+            }
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1
@@ -67,9 +69,9 @@ impl Chunk {
         offset + 1
     }
 
-    fn constant_instruction(&self, name: &str, offset: usize) -> usize {
+    fn constant_instruction(&self, name: OpCode, offset: usize) -> usize {
         let const_idx = self.code[offset + 1];
-        print!("{:-16} {:04} ", name, const_idx);
+        print!("{:-16} {:04} ", format!("{:?}", name), const_idx);
         println!("{:?}", &self.constants[const_idx as usize]);
         offset + 2
     }
