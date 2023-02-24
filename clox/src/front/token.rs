@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct Token {
     pub ty: TokenType,
     pub str: Rc<String>,

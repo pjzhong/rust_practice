@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::ops::{Div, Mul, Sub};
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ use crate::{
 pub struct Vm {
     chunk: Chunk,
     ip: usize,
-    stack: Vec<Value>,
+    stack: VecDeque<Value>,
     globals: HashMap<Rc<String>, Value>,
 }
 
@@ -28,7 +28,7 @@ impl Vm {
         Self {
             chunk: Chunk::default(),
             ip: 0,
-            stack: Vec::new(),
+            stack: VecDeque::new(),
             globals: HashMap::new(),
         }
     }
@@ -202,11 +202,11 @@ impl Vm {
     }
 
     fn push(&mut self, value: impl Into<Value>) {
-        self.stack.push(value.into());
+        self.stack.push_back(value.into());
     }
 
     fn pop(&mut self) -> Option<Value> {
-        self.stack.pop()
+        self.stack.pop_back()
     }
 
     fn peak(&self, distance: usize) -> Option<&Value> {

@@ -45,14 +45,21 @@ struct ParseRule {
     precedence: Precedence,
 }
 
+struct Local {
+    name: Token,
+    depth: i32,
+}
+
 #[derive(Default)]
 pub struct Compiler {
-    scanner: Scanner,
-    previous: Option<Token>,
-    current: Option<Token>,
     error: bool,
     panic: bool,
+    previous: Option<Token>,
+    current: Option<Token>,
+    scanner: Scanner,
     compiling_chunk: Chunk,
+    locals: Vec<Local>,
+    scope_depth: i32,
 }
 
 impl Compiler {
@@ -170,15 +177,50 @@ impl Compiler {
     }
 
     fn statement(&mut self) {
-        match self.match_advance(TokenType::Print) {
+        match self.match_advances(&[TokenType::Print, TokenType::LeftBrace]) {
             Some(Token {
                 ty: TokenType::Print,
                 ..
             }) => self.print_statement(),
+            Some(Token {
+                ty: TokenType::LeftBrace,
+                ..
+            }) => {
+                self.begin_scope();
+                self.block();
+                self.end_scope();
+            }
             _ => {
                 self.expression_statement();
             }
         }
+    }
+
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+
+        let count = self
+            .locals
+            .iter()
+            .rev()
+            .filter(|local| local.depth > self.scope_depth)
+            .count();
+        for _ in 0..count {
+            self.locals.pop();
+            self.emit_byte(OpCode::Pop);
+        }
+    }
+
+    fn block(&mut self) {
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            self.declaration();
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block");
     }
 
     fn print_statement(&mut self) {
@@ -320,6 +362,12 @@ impl Compiler {
 
     fn parse_variable(&mut self, message: &str) -> Option<u8> {
         self.consume(TokenType::Identifier, message);
+
+        self.declare_varaible();
+        if self.scope_depth > 0 {
+            return None;
+        }
+
         self.previous
             .as_ref()
             .map(|t| t.str.clone())
@@ -330,7 +378,36 @@ impl Compiler {
         self.make_constant(str)
     }
 
+    fn declare_varaible(&mut self) {
+        if self.scope_depth == 0 {
+            return;
+        }
+
+        if let Some(token) = self.previous.as_ref() {
+            self.add_local(token.clone())
+        } else {
+            self.error("Uknow know varaible");
+        }
+    }
+
+    fn add_local(&mut self, name: Token) {
+        if self.locals.len() >= u8::MAX.into() {
+            self.error("Too many local varaibles in fucntion.");
+            return;
+        }
+
+        let local = Local {
+            name,
+            depth: self.scope_depth,
+        };
+        self.locals.push(local);
+    }
+
     fn define_variable(&mut self, global: u8) {
+        if self.scope_depth > 0 {
+            return;
+        }
+
         self.emit_bytes(OpCode::DefineGlobal, global);
     }
 
@@ -363,17 +440,27 @@ impl Compiler {
         self.current_chunk().write(byte, line);
     }
 
-    fn check(&self, ty: TokenType) -> bool {
-        self.current.as_ref().map_or(false, |t| t.ty == ty)
+    fn check(&self, ty: &TokenType) -> bool {
+        self.current.as_ref().map_or(false, |t| t.ty == *ty)
     }
 
     fn match_advance(&mut self, ty: TokenType) -> Option<&Token> {
-        if self.check(ty) {
+        if self.check(&ty) {
             self.advance();
             self.previous.as_ref()
         } else {
             None
         }
+    }
+
+    fn match_advances(&mut self, tys: &[TokenType]) -> Option<&Token> {
+        for ty in tys {
+            if self.check(ty) {
+                self.advance();
+                return self.previous.as_ref();
+            }
+        }
+        None
     }
 
     fn error(&mut self, message: &str) {
