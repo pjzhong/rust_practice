@@ -314,12 +314,23 @@ impl Compiler {
     }
 
     fn named_varaible(&mut self, name: Rc<String>, can_assign: bool) {
-        let arg = self.identifier_constant(name);
+        let arg = self.resolve_local(name.as_ref());
+
+        let (arg, get_op, set_op) = if arg != -1 {
+            (arg as u8, OpCode::GetLocal, OpCode::SetLocal)
+        } else {
+            (
+                self.identifier_constant(name),
+                OpCode::GetGlobal,
+                OpCode::SetGlobal,
+            )
+        };
+
         if can_assign && self.match_advance(TokenType::Equal).is_some() {
             self.expression();
-            self.emit_bytes(OpCode::SetGlobal, arg);
+            self.emit_bytes(set_op, arg);
         } else {
-            self.emit_bytes(OpCode::GetGlobal, arg)
+            self.emit_bytes(get_op, arg)
         }
     }
 
@@ -376,6 +387,16 @@ impl Compiler {
 
     fn identifier_constant(&mut self, str: Rc<String>) -> u8 {
         self.make_constant(str)
+    }
+
+    fn resolve_local(&self, name: &String) -> i32 {
+        for (idx, local) in self.locals.iter().enumerate().rev() {
+            if local.name.str.as_str() == name {
+                return idx as i32;
+            }
+        }
+
+        -1
     }
 
     fn declare_varaible(&mut self) {

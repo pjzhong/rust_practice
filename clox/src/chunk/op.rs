@@ -19,6 +19,8 @@ pub enum OpCode {
     DefineGlobal,
     GetGlobal,
     SetGlobal,
+    GetLocal,
+    SetLocal,
     Unknown(u8),
 }
 
@@ -44,6 +46,8 @@ impl From<u8> for OpCode {
             16 => Self::DefineGlobal,
             17 => Self::GetGlobal,
             18 => Self::SetGlobal,
+            19 => Self::GetLocal,
+            20 => Self::SetLocal,
             _ => Self::Unknown(byte),
         }
     }
@@ -71,6 +75,8 @@ impl From<OpCode> for u8 {
             OpCode::DefineGlobal => 16,
             OpCode::GetGlobal => 17,
             OpCode::SetGlobal => 18,
+            OpCode::GetLocal => 19,
+            OpCode::SetLocal => 20,
             OpCode::Unknown(a) => a,
         }
     }

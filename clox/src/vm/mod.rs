@@ -38,6 +38,7 @@ impl Vm {
     pub fn run(&mut self, chunks: Chunk) -> InterpretResult {
         self.chunk = chunks;
         self.ip = 0;
+        self.stack.clear();
         loop {
             #[cfg(debug_assertions)]
             {
@@ -180,6 +181,31 @@ impl Vm {
                         self.globals.insert(name, val.clone());
                     } else {
                         self.runtime_error("variable name must be a string");
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                OpCode::GetLocal => {
+                    let slot = self.read_byte();
+                    if let Some(val) = self.stack.get(slot as usize) {
+                        self.push(val.clone())
+                    } else {
+                        self.runtime_error("getLocal operand error");
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                OpCode::SetLocal => {
+                    let slot = self.read_byte();
+                    let val = if let Some(val) = self.peak(0) {
+                        val.clone()
+                    } else {
+                        self.runtime_error("setLocal no operand");
+                        return InterpretResult::RuntimeError;
+                    };
+
+                    if let Some(local) = self.stack.get_mut(slot as usize) {
+                        *local = val.clone();
+                    } else {
+                        self.runtime_error("setLocal target not exits");
                         return InterpretResult::RuntimeError;
                     }
                 }
