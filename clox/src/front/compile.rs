@@ -112,6 +112,22 @@ impl Compiler {
         self.emit_byte(OpCode::Pop);
     }
 
+    fn if_statement(&mut self) {
+        self.expression();
+
+        let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+
+        if self.match_advance(TokenType::LeftBrace).is_some() {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
+        } else {
+            self.error_at_current("If expect a block");
+        }
+
+        self.patch_jump(then_jump);
+    }
+
     fn var_declaration(&mut self) {
         let global = self.parse_variable("Expect variable name.");
 
@@ -177,7 +193,7 @@ impl Compiler {
     }
 
     fn statement(&mut self) {
-        match self.match_advances(&[TokenType::Print, TokenType::LeftBrace]) {
+        match self.match_advances(&[TokenType::Print, TokenType::LeftBrace, TokenType::If]) {
             Some(Token {
                 ty: TokenType::Print,
                 ..
@@ -190,6 +206,9 @@ impl Compiler {
                 self.block();
                 self.end_scope();
             }
+            Some(Token {
+                ty: TokenType::If, ..
+            }) => self.if_statement(),
             _ => {
                 self.expression_statement();
             }
@@ -437,6 +456,18 @@ impl Compiler {
         self.emit_bytes(OpCode::Constant, const_idx);
     }
 
+    fn patch_jump(&mut self, offset: usize) {
+        let jump = self.current_chunk().code().len() - offset - 2;
+
+        if jump >= u16::MAX.into() {
+            self.error("Too much code jump over.")
+        }
+
+        let code = self.current_chunk().code();
+        code[offset] = ((jump >> 8) & 0xff) as u8;
+        code[offset + 1] = (jump & 0xff) as u8
+    }
+
     fn make_constant(&mut self, value: impl Into<Value>) -> u8 {
         let constant = self.current_chunk().add_constant(value.into());
         if constant > u8::MAX as usize {
@@ -454,6 +485,13 @@ impl Compiler {
     fn emit_bytes(&mut self, byte1: impl Into<u8>, byte2: impl Into<u8>) {
         self.emit_byte(byte1.into());
         self.emit_byte(byte2.into());
+    }
+
+    fn emit_jump(&mut self, instruction: impl Into<u8>) -> usize {
+        self.emit_byte(instruction.into());
+        self.emit_byte(0xff);
+        self.emit_byte(0xff);
+        self.current_chunk().code().len() - 2
     }
 
     fn emit_byte(&mut self, byte: impl Into<u8>) {

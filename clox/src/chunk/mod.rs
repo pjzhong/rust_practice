@@ -11,6 +11,10 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    pub fn code(&mut self) -> &mut [u8] {
+        &mut self.code
+    }
+
     pub fn line(&self, offset: usize) -> Option<u32> {
         self.lines.get(offset).copied()
     }
@@ -62,6 +66,7 @@ impl Chunk {
                 self.constant_instruction(instruction, offset)
             }
             OpCode::GetLocal | OpCode::SetLocal => self.byte_instruction(instruction, offset),
+            OpCode::JumpIfFalse => self.short_instruction(instruction, offset),
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1
@@ -100,5 +105,10 @@ impl Chunk {
         let const_idx = self.code[offset + 1];
         println!("{:-16} {:04} ", format!("{:?}", name), const_idx);
         offset + 2
+    }
+
+    fn short_instruction(&self, name: OpCode, offset: usize) -> usize {
+        println!("{:-16}", format!("{:?}", name));
+        offset + 3
     }
 }

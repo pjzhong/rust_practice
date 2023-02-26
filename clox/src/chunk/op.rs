@@ -21,6 +21,7 @@ pub enum OpCode {
     SetGlobal,
     GetLocal,
     SetLocal,
+    JumpIfFalse,
     Unknown(u8),
 }
 
@@ -48,6 +49,7 @@ impl From<u8> for OpCode {
             18 => Self::SetGlobal,
             19 => Self::GetLocal,
             20 => Self::SetLocal,
+            21 => Self::JumpIfFalse,
             _ => Self::Unknown(byte),
         }
     }
@@ -77,6 +79,7 @@ impl From<OpCode> for u8 {
             OpCode::SetGlobal => 18,
             OpCode::GetLocal => 19,
             OpCode::SetLocal => 20,
+            OpCode::JumpIfFalse => 21,
             OpCode::Unknown(a) => a,
         }
     }

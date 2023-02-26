@@ -132,7 +132,7 @@ impl Vm {
                 }
                 OpCode::Bang => {
                     let val = self.pop();
-                    self.push(is_falsely(&val));
+                    self.push(is_falsely(val.as_ref()));
                 }
                 OpCode::Print => {
                     if let Some(val) = self.pop() {
@@ -209,6 +209,12 @@ impl Vm {
                         return InterpretResult::RuntimeError;
                     }
                 }
+                OpCode::JumpIfFalse => {
+                    let offset = self.read_short() as usize;
+                    if is_falsely(self.peak(0)) {
+                        self.ip += offset;
+                    }
+                }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
                 }
@@ -219,6 +225,14 @@ impl Vm {
     fn read_byte(&mut self) -> u8 {
         let res = self.chunk.read_byte(self.ip);
         self.ip += 1;
+        res
+    }
+
+    fn read_short(&mut self) -> u16 {
+        self.ip += 2;
+        let first = self.chunk.code()[self.ip - 2] as u16;
+        let second = self.chunk.code()[self.ip - 1] as u16;
+        let res: u16 = first << 8 | second;
         res
     }
 
@@ -271,7 +285,7 @@ pub fn interpret(source: &str, vm: &mut Vm) -> InterpretResult {
     }
 }
 
-fn is_falsely(value: &Option<Value>) -> bool {
+fn is_falsely(value: Option<&Value>) -> bool {
     match value {
         None => true,
         Some(Value::Nil) => true,
