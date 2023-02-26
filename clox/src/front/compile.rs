@@ -116,6 +116,7 @@ impl Compiler {
         self.expression();
 
         let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
 
         if self.match_advance(TokenType::LeftBrace).is_some() {
             self.begin_scope();
@@ -125,7 +126,28 @@ impl Compiler {
             self.error_at_current("If expect a block");
         }
 
+        let else_jump = self.emit_jump(OpCode::Jump);
         self.patch_jump(then_jump);
+
+        //if condition is false, it would execute en implicit pop
+        self.emit_byte(OpCode::Pop);
+        if self.match_advance(TokenType::Else).is_some() {
+            match self.match_advances(&[TokenType::LeftBrace, TokenType::If]) {
+                Some(Token {
+                    ty: TokenType::LeftBrace,
+                    ..
+                }) => {
+                    self.begin_scope();
+                    self.block();
+                    self.end_scope();
+                }
+                Some(Token {
+                    ty: TokenType::If, ..
+                }) => self.if_statement(),
+                _ => self.error_at_current("else expect a block"),
+            }
+        }
+        self.patch_jump(else_jump);
     }
 
     fn var_declaration(&mut self) {

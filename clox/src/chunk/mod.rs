@@ -1,5 +1,6 @@
 pub use crate::chunk::op::OpCode;
 use crate::Value;
+use std::ops::Add;
 
 mod op;
 
@@ -66,7 +67,9 @@ impl Chunk {
                 self.constant_instruction(instruction, offset)
             }
             OpCode::GetLocal | OpCode::SetLocal => self.byte_instruction(instruction, offset),
-            OpCode::JumpIfFalse => self.short_instruction(instruction, offset),
+            OpCode::JumpIfFalse | OpCode::Jump => {
+                self.jump_instruction(instruction, usize::add, offset)
+            }
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1
@@ -107,8 +110,23 @@ impl Chunk {
         offset + 2
     }
 
-    fn short_instruction(&self, name: OpCode, offset: usize) -> usize {
-        println!("{:-16}", format!("{:?}", name));
+    fn jump_instruction(
+        &self,
+        name: OpCode,
+        op: fn(usize, usize) -> usize,
+        offset: usize,
+    ) -> usize {
+        let jump = {
+            let first = (self.code[offset + 1] as u16) << 8;
+            let second = (self.code[offset + 2]) as u16;
+            (first | second) as usize
+        };
+        println!(
+            "{:-16} {:04} -> {:?}",
+            format!("{:?}", name),
+            offset,
+            op(offset + 3, jump)
+        );
         offset + 3
     }
 }
