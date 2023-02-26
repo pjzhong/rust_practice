@@ -67,7 +67,7 @@ impl Chunk {
                 self.constant_instruction(instruction, offset)
             }
             OpCode::GetLocal | OpCode::SetLocal => self.byte_instruction(instruction, offset),
-            OpCode::JumpIfFalse | OpCode::Jump => {
+            OpCode::JumpIfFalse | OpCode::JumpIfTrue |OpCode::Jump => {
                 self.jump_instruction(instruction, usize::add, offset)
             }
             OpCode::Unknown(inst) => {

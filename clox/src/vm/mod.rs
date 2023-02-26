@@ -215,6 +215,12 @@ impl Vm {
                         self.ip += offset;
                     }
                 }
+                OpCode::JumpIfTrue => {
+                    let offset = self.read_short() as usize;
+                    if is_truely(self.peak(0)) {
+                        self.ip += offset;
+                    }
+                }
                 OpCode::Jump => {
                     let offset = self.read_short() as usize;
                     self.ip += offset;
@@ -294,6 +300,16 @@ fn is_falsely(value: Option<&Value>) -> bool {
         None => true,
         Some(Value::Nil) => true,
         Some(Value::Bool(bool)) => !bool,
-        _ => false,
+        Some(_) => false,
+    }
+}
+
+
+fn is_truely(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::Nil) => false,
+        Some(Value::Bool(bool)) => *bool,
+        Some(_) => true,
+        None => false,
     }
 }

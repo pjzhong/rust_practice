@@ -473,6 +473,22 @@ impl Compiler {
         self.emit_bytes(OpCode::DefineGlobal, global);
     }
 
+    fn and(&mut self, _: bool) {
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
+        self.parse_precedence(Precedence::And);
+
+        self.patch_jump(end_jump);
+    }
+
+    fn or(&mut self, _: bool) {
+        let end_jump = self.emit_jump(OpCode::JumpIfTrue);
+        self.emit_byte(OpCode::Pop);
+        self.parse_precedence(Precedence::Or);
+
+        self.patch_jump(end_jump);
+    }
+
     fn emit_constant(&mut self, value: impl Into<Value>) {
         let const_idx = self.make_constant(value.into());
         self.emit_bytes(OpCode::Constant, const_idx);
@@ -664,6 +680,16 @@ fn get_rule(ty: TokenType) -> ParseRule {
         infix: Compiler::none,
         precedence: Precedence::None,
     };
+    const AND: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::and,
+        precedence: Precedence::And,
+    };
+    const OR: ParseRule = ParseRule {
+        prefix: Compiler::none,
+        infix: Compiler::or,
+        precedence: Precedence::And,
+    };
     const NONE: ParseRule = ParseRule {
         prefix: Compiler::none,
         infix: Compiler::none,
@@ -688,6 +714,8 @@ fn get_rule(ty: TokenType) -> ParseRule {
         TokenType::LessEqual => LESS_EQUAL,
         TokenType::Identifier => IDENTIFIER,
         TokenType::String => STRING,
+        TokenType::And => AND,
+        TokenType::Or => OR,
         _ => NONE,
     }
 }

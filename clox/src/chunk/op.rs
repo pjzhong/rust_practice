@@ -22,6 +22,7 @@ pub enum OpCode {
     GetLocal,
     SetLocal,
     JumpIfFalse,
+    JumpIfTrue,
     Jump,
     Unknown(u8),
 }
@@ -51,7 +52,8 @@ impl From<u8> for OpCode {
             19 => Self::GetLocal,
             20 => Self::SetLocal,
             21 => Self::JumpIfFalse,
-            22 => Self::Jump,
+            22 => Self::JumpIfTrue,
+            23 => Self::Jump,
             _ => Self::Unknown(byte),
         }
     }
@@ -82,7 +84,8 @@ impl From<OpCode> for u8 {
             OpCode::GetLocal => 19,
             OpCode::SetLocal => 20,
             OpCode::JumpIfFalse => 21,
-            OpCode::Jump => 22,
+            OpCode::JumpIfTrue => 22,
+            OpCode::Jump => 23,
             OpCode::Unknown(a) => a,
         }
     }

@@ -1,0 +1,17 @@
+var a = 1;
+//if a != 1 and a != 6 {
+//    print "error!!!!!!!!!!!!!!!";
+//}
+//
+//if a != 5 and a != 6 {
+//    print "either";
+//}
+
+
+//if a == 1 or a == 2 {
+//    print "or1";
+//}
+
+if a == 2 or a == 1 {
+    print "or2";
+}
