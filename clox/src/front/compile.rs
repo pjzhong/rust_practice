@@ -170,6 +170,26 @@ impl Compiler {
         self.emit_byte(OpCode::Pop);
     }
 
+    fn for_statement(&mut self) {
+        let loop_start = self.current_chunk().code().len();
+        self.expression();
+
+        let expt_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
+
+        if self.match_advance(TokenType::LeftBrace).is_some() {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
+        } else {
+            self.error_at_current("while expect a block");
+        }
+
+        self.emit_loop(loop_start);
+        self.patch_jump(expt_jump);
+        self.emit_byte(OpCode::Pop);
+    }
+
     fn var_declaration(&mut self) {
         let global = self.parse_variable("Expect variable name.");
 
@@ -240,6 +260,7 @@ impl Compiler {
             TokenType::LeftBrace,
             TokenType::If,
             TokenType::While,
+            TokenType::For,
         ]) {
             Some(Token {
                 ty: TokenType::Print,
@@ -260,6 +281,10 @@ impl Compiler {
                 ty: TokenType::While,
                 ..
             }) => self.while_statement(),
+            Some(Token {
+                ty: TokenType::For,
+                ..
+            }) => self.for_statement(),
             _ => {
                 self.expression_statement();
             }
