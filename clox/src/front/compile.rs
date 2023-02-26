@@ -150,6 +150,26 @@ impl Compiler {
         self.patch_jump(else_jump);
     }
 
+    fn while_statement(&mut self) {
+        let loop_start = self.current_chunk().code().len();
+        self.expression();
+
+        let expt_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
+
+        if self.match_advance(TokenType::LeftBrace).is_some() {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
+        } else {
+            self.error_at_current("while expect a block");
+        }
+
+        self.emit_loop(loop_start);
+        self.patch_jump(expt_jump);
+        self.emit_byte(OpCode::Pop);
+    }
+
     fn var_declaration(&mut self) {
         let global = self.parse_variable("Expect variable name.");
 
@@ -215,7 +235,12 @@ impl Compiler {
     }
 
     fn statement(&mut self) {
-        match self.match_advances(&[TokenType::Print, TokenType::LeftBrace, TokenType::If]) {
+        match self.match_advances(&[
+            TokenType::Print,
+            TokenType::LeftBrace,
+            TokenType::If,
+            TokenType::While,
+        ]) {
             Some(Token {
                 ty: TokenType::Print,
                 ..
@@ -231,6 +256,10 @@ impl Compiler {
             Some(Token {
                 ty: TokenType::If, ..
             }) => self.if_statement(),
+            Some(Token {
+                ty: TokenType::While,
+                ..
+            }) => self.while_statement(),
             _ => {
                 self.expression_statement();
             }
@@ -292,6 +321,7 @@ impl Compiler {
         {
             if !self.error {
                 self.current_chunk().disassemble_chunk("code");
+                println!()
             }
         }
     }
@@ -530,6 +560,15 @@ impl Compiler {
         self.emit_byte(0xff);
         self.emit_byte(0xff);
         self.current_chunk().code().len() - 2
+    }
+
+    fn emit_loop(&mut self, loop_start: usize)  {
+        self.emit_byte(OpCode::Loop);
+
+        let offset = (self.current_chunk().code().len() - loop_start + 2) as u16;
+
+        self.emit_byte(((offset >> 8) & 0xff) as u8);
+        self.emit_byte((offset & 0xff) as u8);
     }
 
     fn emit_byte(&mut self, byte: impl Into<u8>) {

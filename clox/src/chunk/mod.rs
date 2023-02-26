@@ -1,6 +1,6 @@
 pub use crate::chunk::op::OpCode;
 use crate::Value;
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 mod op;
 
@@ -67,8 +67,11 @@ impl Chunk {
                 self.constant_instruction(instruction, offset)
             }
             OpCode::GetLocal | OpCode::SetLocal => self.byte_instruction(instruction, offset),
-            OpCode::JumpIfFalse | OpCode::JumpIfTrue |OpCode::Jump => {
+            OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Jump => {
                 self.jump_instruction(instruction, usize::add, offset)
+            }
+            OpCode::Loop => {
+                self.jump_instruction(instruction, usize::sub, offset)
             }
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);

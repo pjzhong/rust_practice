@@ -46,6 +46,9 @@ impl Vm {
                 for val in &self.stack {
                     print!("[ {:?} ]", val);
                 }
+                if self.stack.is_empty() {
+                    print!("[]");
+                }
                 println!();
                 self.chunk.disassemble_instruction(self.ip);
             }
@@ -225,9 +228,14 @@ impl Vm {
                     let offset = self.read_short() as usize;
                     self.ip += offset;
                 }
+                OpCode::Loop => {
+                    let offset = self.read_short();
+                    self.ip -= offset as usize;
+                },
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
                 }
+               
             }
         }
     }
@@ -303,7 +311,6 @@ fn is_falsely(value: Option<&Value>) -> bool {
         Some(_) => false,
     }
 }
-
 
 fn is_truely(value: Option<&Value>) -> bool {
     match value {
