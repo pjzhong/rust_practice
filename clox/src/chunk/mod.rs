@@ -70,9 +70,7 @@ impl Chunk {
             OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Jump => {
                 self.jump_instruction(instruction, usize::add, offset)
             }
-            OpCode::Loop => {
-                self.jump_instruction(instruction, usize::sub, offset)
-            }
+            OpCode::Loop => self.jump_instruction(instruction, usize::sub, offset),
             OpCode::Unknown(inst) => {
                 println!("Unknow opcde {}", inst);
                 offset + 1

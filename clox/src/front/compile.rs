@@ -119,7 +119,7 @@ impl Compiler {
         self.emit_byte(OpCode::Pop);
 
         if self.match_advance(TokenType::LeftBrace).is_some() {
-            self.begin_scope();
+
             self.block();
             self.end_scope();
         } else {
@@ -171,23 +171,63 @@ impl Compiler {
     }
 
     fn for_statement(&mut self) {
-        let loop_start = self.current_chunk().code().len();
-        self.expression();
+        self.begin_scope();
+        // initializer
+        match self.match_advances(&[TokenType::Semicolon, TokenType::Var]) {
+            Some(Token {
+                ty: TokenType::Semicolon,
+                ..
+            }) => {
+                // no initliazer
+            }
+            Some(Token {
+                ty: TokenType::Var, ..
+            }) => self.var_declaration(),
 
-        let expt_jump = self.emit_jump(OpCode::JumpIfFalse);
-        self.emit_byte(OpCode::Pop);
-
-        if self.match_advance(TokenType::LeftBrace).is_some() {
-            self.begin_scope();
-            self.block();
-            self.end_scope();
-        } else {
-            self.error_at_current("while expect a block");
+            _ => self.expression_statement(),
         }
 
+        let mut loop_start = self.current_chunk().code().len();
+
+        // condition
+        let exit_jump = if self.match_advance(TokenType::Semicolon).is_none() {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after loop condition");
+
+            let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+            self.emit_byte(OpCode::Pop);
+            Some(exit_jump)
+        } else {
+            None
+        };
+
+
+        // todo incrementer
+        if !self.check(&TokenType::LeftBrace) {
+            let body_jump = self.emit_jump(OpCode::Jump);
+            let increment_start = self.current_chunk().code().len();
+            self.expression();
+            self.emit_byte(OpCode::Pop);
+
+            self.emit_loop(loop_start);
+
+            loop_start = increment_start;
+            self.patch_jump(body_jump);
+        }
+
+        //body
+        if self.match_advance(TokenType::LeftBrace).is_some() {
+            self.block();
+        } else {
+            self.error_at_current("for expect a block");
+        }
+     
         self.emit_loop(loop_start);
-        self.patch_jump(expt_jump);
-        self.emit_byte(OpCode::Pop);
+        if let Some(exit_jump) =  exit_jump {
+            self.patch_jump(exit_jump);
+            self.emit_byte(OpCode::Pop);
+        }
+        self.end_scope();
     }
 
     fn var_declaration(&mut self) {
@@ -282,8 +322,7 @@ impl Compiler {
                 ..
             }) => self.while_statement(),
             Some(Token {
-                ty: TokenType::For,
-                ..
+                ty: TokenType::For, ..
             }) => self.for_statement(),
             _ => {
                 self.expression_statement();
@@ -587,7 +626,7 @@ impl Compiler {
         self.current_chunk().code().len() - 2
     }
 
-    fn emit_loop(&mut self, loop_start: usize)  {
+    fn emit_loop(&mut self, loop_start: usize) {
         self.emit_byte(OpCode::Loop);
 
         let offset = (self.current_chunk().code().len() - loop_start + 2) as u16;

@@ -231,11 +231,10 @@ impl Vm {
                 OpCode::Loop => {
                     let offset = self.read_short();
                     self.ip -= offset as usize;
-                },
+                }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
                 }
-               
             }
         }
     }
