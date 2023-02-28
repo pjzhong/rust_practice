@@ -202,15 +202,17 @@ impl Compiler {
         };
 
 
-        // todo incrementer
+        // incrementer
         if !self.check(&TokenType::LeftBrace) {
             let body_jump = self.emit_jump(OpCode::Jump);
             let increment_start = self.current_chunk().code().len();
             self.expression();
             self.emit_byte(OpCode::Pop);
 
+            // jump to the condition clause
             self.emit_loop(loop_start);
 
+            // change the last last of loop body, make it jump to the incrementer
             loop_start = increment_start;
             self.patch_jump(body_jump);
         }
@@ -221,7 +223,8 @@ impl Compiler {
         } else {
             self.error_at_current("for expect a block");
         }
-     
+
+        // jump to start of body, condition(if exists) clause incrementer(if exists), modify me if the code change
         self.emit_loop(loop_start);
         if let Some(exit_jump) =  exit_jump {
             self.patch_jump(exit_jump);
