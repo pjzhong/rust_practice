@@ -1,11 +1,11 @@
-use std::rc::Rc;
-use crate::front::precedence::{Precedence, ParseRule};
+use crate::front::precedence::Precedence;
 use crate::{value::Function, Chunk, OpCode, Value};
+use std::rc::Rc;
 
+use super::precedence::get_rule;
 use super::{scanner::Scanner, token::Token, TokenType};
 
 pub type ParseFn = fn(&mut Compiler, bool);
-
 
 struct Local {
     name: Token,
@@ -17,6 +17,13 @@ enum FunctionType {
     Script,
 }
 
+impl Default for FunctionType {
+    fn default() -> Self {
+        Self::Script
+    }
+}
+
+#[derive(Default)]
 pub struct Compiler {
     error: bool,
     panic: bool,
@@ -28,23 +35,6 @@ pub struct Compiler {
     scope_depth: i32,
     function: Function,
     fun_type: FunctionType,
-}
-
-impl Default for Compiler {
-    fn default() -> Self {
-        Self {
-            error: Default::default(),
-            panic: Default::default(),
-            previous: Default::default(),
-            current: Default::default(),
-            scanner: Default::default(),
-            compiling_chunk: Default::default(),
-            locals: Default::default(),
-            scope_depth: Default::default(),
-            function: Default::default(),
-            fun_type: FunctionType::Script,
-        }
-    }
 }
 
 impl Compiler {
@@ -376,9 +366,7 @@ impl Compiler {
         }
     }
 
-    fn none(&mut self, _: bool) {}
-
-    fn binary(&mut self, _: bool) {
+    pub fn binary(&mut self, _: bool) {
         if let Some(ty) = self.previous.as_ref().map(|t| t.ty) {
             let rule = get_rule(ty);
             self.parse_precedence(rule.precedence.heigher());
@@ -399,7 +387,7 @@ impl Compiler {
         }
     }
 
-    fn literal(&mut self, _: bool) {
+    pub fn literal(&mut self, _: bool) {
         match self.previous.as_ref().map(|t| t.ty) {
             Some(TokenType::False) => self.emit_byte(OpCode::False),
             Some(TokenType::Ture) => self.emit_byte(OpCode::True),
@@ -408,12 +396,12 @@ impl Compiler {
         }
     }
 
-    fn grouping(&mut self, _: bool) {
+    pub fn grouping(&mut self, _: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
     }
 
-    fn number(&mut self, _: bool) {
+    pub fn number(&mut self, _: bool) {
         if let Some(token) = self.previous.as_ref() {
             match token.str.parse::<f64>() {
                 Ok(value) => self.emit_constant(value),
@@ -422,13 +410,13 @@ impl Compiler {
         }
     }
 
-    fn string(&mut self, _: bool) {
+    pub fn string(&mut self, _: bool) {
         if let Some(str) = self.previous.as_ref().map(|t| t.str.clone()) {
             self.emit_constant(&str[1..(str.len() - 1)]);
         }
     }
 
-    fn varaible(&mut self, can_assign: bool) {
+    pub fn varaible(&mut self, can_assign: bool) {
         if let Some(token) = self.previous.as_ref() {
             self.named_varaible(token.str.clone(), can_assign);
         }
@@ -455,7 +443,7 @@ impl Compiler {
         }
     }
 
-    fn unary(&mut self, _: bool) {
+    pub fn unary(&mut self, _: bool) {
         let ty = self.previous.as_ref().map(|t| t.ty);
         self.parse_precedence(Precedence::Unary);
         match ty {
@@ -553,7 +541,7 @@ impl Compiler {
         self.emit_bytes(OpCode::DefineGlobal, global);
     }
 
-    fn and(&mut self, _: bool) {
+    pub fn and(&mut self, _: bool) {
         let end_jump = self.emit_jump(OpCode::JumpIfFalse);
         self.emit_byte(OpCode::Pop);
         self.parse_precedence(Precedence::And);
@@ -561,7 +549,7 @@ impl Compiler {
         self.patch_jump(end_jump);
     }
 
-    fn or(&mut self, _: bool) {
+    pub fn or(&mut self, _: bool) {
         let end_jump = self.emit_jump(OpCode::JumpIfTrue);
         self.emit_byte(OpCode::Pop);
         self.parse_precedence(Precedence::Or);
@@ -680,131 +668,5 @@ fn error_at(token: &Option<Token>, message: &str) {
             _ => eprint!(" at {}", token.str),
         }
         eprintln!(": {}", message);
-    }
-}
-
-fn get_rule(ty: TokenType) -> ParseRule {
-    const LEFT_PAREN: ParseRule = ParseRule {
-        prefix: Compiler::grouping,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const MINUS: ParseRule = ParseRule {
-        prefix: Compiler::unary,
-        infix: Compiler::binary,
-        precedence: Precedence::Term,
-    };
-    const PLUS: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Term,
-    };
-    const SLASH: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Factor,
-    };
-    const STAR: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Factor,
-    };
-    const NUMBER: ParseRule = ParseRule {
-        prefix: Compiler::number,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const BOOL: ParseRule = ParseRule {
-        prefix: Compiler::literal,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const NIL: ParseRule = ParseRule {
-        prefix: Compiler::literal,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const BANG: ParseRule = ParseRule {
-        prefix: Compiler::unary,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const BANG_EQUAL: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Equality,
-    };
-    const EQUAL_EQUAL: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Equality,
-    };
-    const GREATER: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Comparison,
-    };
-    const GREATER_EQUAL: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Comparison,
-    };
-    const LESS: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Comparison,
-    };
-    const LESS_EQUAL: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::binary,
-        precedence: Precedence::Comparison,
-    };
-    const STRING: ParseRule = ParseRule {
-        prefix: Compiler::string,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const IDENTIFIER: ParseRule = ParseRule {
-        prefix: Compiler::varaible,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    const AND: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::and,
-        precedence: Precedence::And,
-    };
-    const OR: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::or,
-        precedence: Precedence::And,
-    };
-    const NONE: ParseRule = ParseRule {
-        prefix: Compiler::none,
-        infix: Compiler::none,
-        precedence: Precedence::None,
-    };
-    match ty {
-        TokenType::LeftParen => LEFT_PAREN,
-        TokenType::Minus => MINUS,
-        TokenType::Plus => PLUS,
-        TokenType::Slash => SLASH,
-        TokenType::Star => STAR,
-        TokenType::Number => NUMBER,
-        TokenType::Ture => BOOL,
-        TokenType::False => BOOL,
-        TokenType::Nil => NIL,
-        TokenType::Bang => BANG,
-        TokenType::BangEqual => BANG_EQUAL,
-        TokenType::EqualEqual => EQUAL_EQUAL,
-        TokenType::Greater => GREATER,
-        TokenType::GreaterEqual => GREATER_EQUAL,
-        TokenType::Less => LESS,
-        TokenType::LessEqual => LESS_EQUAL,
-        TokenType::Identifier => IDENTIFIER,
-        TokenType::String => STRING,
-        TokenType::And => AND,
-        TokenType::Or => OR,
-        _ => NONE,
     }
 }
