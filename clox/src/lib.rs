@@ -4,5 +4,5 @@ mod value;
 mod vm;
 
 use chunk::{Chunk, OpCode};
-use value::Value;
+use value::{Value};
 pub use vm::{interpret, InterpretResult, Vm};

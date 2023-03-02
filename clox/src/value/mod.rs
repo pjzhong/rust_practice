@@ -1,3 +1,5 @@
+use crate::chunk::Chunk;
+use std::fmt::Debug;
 use std::{fmt::Display, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,9 +10,32 @@ pub enum Value {
     Obj(Object),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Object {
     Str(Rc<String>),
+    Fun(Rc<Function>),
+}
+
+#[derive(Default)]
+pub struct Function {
+    pub arity: i32,
+    pub chunk: Chunk,
+    pub name: Rc<String>,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.arity == other.arity && self.name == other.name
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Function")
+            .field("arity", &self.arity)
+            .field("name", &self.name)
+            .finish()
+    }
 }
 
 impl Eq for Value {}
@@ -51,7 +76,7 @@ impl Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Bool(bool) => write!(f, "{}", bool),
             Value::Number(num) => write!(f, "{}", num),
-            Value::Obj(a) => a.fmt(f),
+            Value::Obj(a) => std::fmt::Display::fmt(&a, f),
         }
     }
 }
@@ -60,6 +85,7 @@ impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Str(str) => write!(f, "{}", str),
+            Self::Fun(fun) => write!(f, "fn {}", fun.name),
         }
     }
 }

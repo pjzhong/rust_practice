@@ -1,56 +1,22 @@
 use std::rc::Rc;
-
-use crate::{Chunk, OpCode, Value};
+use crate::front::precedence::{Precedence, ParseRule};
+use crate::{value::Function, Chunk, OpCode, Value};
 
 use super::{scanner::Scanner, token::Token, TokenType};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum Precedence {
-    None,
-    Assignment, // =
-    Or,         // or
-    And,        // and
-    Equality,   // == !=
-    Comparison, // < > <= >=
-    Term,       // + -
-    Factor,     // * /
-    Unary,      // ! -
-    Class,      // . ()
-    Primary,
-}
+pub type ParseFn = fn(&mut Compiler, bool);
 
-impl Precedence {
-    fn heigher(&self) -> Self {
-        match self {
-            Precedence::None => Self::Assignment,
-            Precedence::Assignment => Self::Or,
-            Precedence::Or => Self::And,
-            Precedence::And => Self::Equality,
-            Precedence::Equality => Self::Comparison,
-            Precedence::Comparison => Self::Term,
-            Precedence::Term => Self::Factor,
-            Precedence::Factor => Self::Unary,
-            Precedence::Unary => Self::Class,
-            Precedence::Class => Self::Primary,
-            Precedence::Primary => Self::Primary,
-        }
-    }
-}
-
-type ParseFn = fn(&mut Compiler, bool);
-
-struct ParseRule {
-    prefix: ParseFn,
-    infix: ParseFn,
-    precedence: Precedence,
-}
 
 struct Local {
     name: Token,
     depth: i32,
 }
 
-#[derive(Default)]
+enum FunctionType {
+    Fun,
+    Script,
+}
+
 pub struct Compiler {
     error: bool,
     panic: bool,
@@ -60,6 +26,25 @@ pub struct Compiler {
     compiling_chunk: Chunk,
     locals: Vec<Local>,
     scope_depth: i32,
+    function: Function,
+    fun_type: FunctionType,
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self {
+            error: Default::default(),
+            panic: Default::default(),
+            previous: Default::default(),
+            current: Default::default(),
+            scanner: Default::default(),
+            compiling_chunk: Default::default(),
+            locals: Default::default(),
+            scope_depth: Default::default(),
+            function: Default::default(),
+            fun_type: FunctionType::Script,
+        }
+    }
 }
 
 impl Compiler {
@@ -80,7 +65,7 @@ impl Compiler {
     }
 
     fn current_chunk(&mut self) -> &mut Chunk {
-        &mut self.compiling_chunk
+        &mut self.function.chunk
     }
 
     fn init_scanner(&mut self, source: &str) {
@@ -119,7 +104,6 @@ impl Compiler {
         self.emit_byte(OpCode::Pop);
 
         if self.match_advance(TokenType::LeftBrace).is_some() {
-
             self.block();
             self.end_scope();
         } else {
@@ -201,7 +185,6 @@ impl Compiler {
             None
         };
 
-
         // incrementer
         if !self.check(&TokenType::LeftBrace) {
             let body_jump = self.emit_jump(OpCode::Jump);
@@ -226,7 +209,7 @@ impl Compiler {
 
         // jump to start of body, condition(if exists) clause incrementer(if exists), modify me if the code change
         self.emit_loop(loop_start);
-        if let Some(exit_jump) =  exit_jump {
+        if let Some(exit_jump) = exit_jump {
             self.patch_jump(exit_jump);
             self.emit_byte(OpCode::Pop);
         }
