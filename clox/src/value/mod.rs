@@ -85,7 +85,15 @@ impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Str(str) => write!(f, "{}", str),
-            Self::Fun(fun) => write!(f, "fn {}", fun.name),
+            Self::Fun(fun) => write!(
+                f,
+                "fn {}",
+                if fun.name.as_ref() != "" {
+                    &fun.name
+                } else {
+                    "<script>"
+                }
+            ),
         }
     }
 }

@@ -2,18 +2,55 @@ use std::collections::{HashMap, VecDeque};
 use std::ops::{Div, Mul, Sub};
 use std::rc::Rc;
 
+use crate::value::Function;
 use crate::{
-    chunk::{Chunk, OpCode},
+    chunk::OpCode,
     front::Compiler,
     value::{Object, Value},
 };
 
 #[derive(Default)]
 pub struct Vm {
-    chunk: Chunk,
-    ip: usize,
     stack: VecDeque<Value>,
+    frames: VecDeque<CallFrame>,
+    cur_frame: CallFrame,
     globals: HashMap<Rc<String>, Value>,
+}
+
+#[derive(Default)]
+struct CallFrame {
+    function: Function,
+    ip: usize,
+    slot_idx: usize,
+}
+
+impl CallFrame {
+    fn new(function: Function) -> Self {
+        Self {
+            function,
+            ip: 0,
+            slot_idx: 0,
+        }
+    }
+
+    fn read_byte(&mut self) -> u8 {
+        let res = self.function.chunk.read_byte(self.ip);
+        self.ip += 1;
+        res
+    }
+
+    fn read_short(&mut self) -> u16 {
+        self.ip += 2;
+        let first = self.function.chunk.code()[self.ip - 2] as u16;
+        let second = self.function.chunk.code()[self.ip - 1] as u16;
+        let res: u16 = first << 8 | second;
+        res
+    }
+
+    fn read_consnt(&mut self) -> Value {
+        let idx = self.read_byte();
+        self.function.chunk.read_constant(idx as usize)
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -26,19 +63,24 @@ pub enum InterpretResult {
 impl Vm {
     pub fn new() -> Self {
         Self {
-            chunk: Chunk::default(),
-            ip: 0,
             stack: VecDeque::new(),
+            frames: VecDeque::new(),
             globals: HashMap::new(),
+            cur_frame: CallFrame::default(),
         }
     }
 
     pub fn free() {}
 
-    pub fn run(&mut self, chunks: Chunk) -> InterpretResult {
-        self.chunk = chunks;
-        self.ip = 0;
-        self.stack.clear();
+    pub fn run(&mut self, function: Function) -> InterpretResult {
+        self.reset_stack();
+        self.frames.push_back(CallFrame::new(function));
+        self.cur_frame = if let Some(frame) = self.frames.pop_back() {
+            frame
+        } else {
+            self.runtime_error("Empty Call frame");
+            return InterpretResult::RuntimeError;
+        };
         loop {
             #[cfg(debug_assertions)]
             {
@@ -50,7 +92,10 @@ impl Vm {
                     print!("[]");
                 }
                 println!();
-                self.chunk.disassemble_instruction(self.ip);
+                self.cur_frame
+                    .function
+                    .chunk
+                    .disassemble_instruction(self.cur_frame.ip);
             }
 
             let inst = self.read_byte().into();
@@ -189,10 +234,10 @@ impl Vm {
                 }
                 OpCode::GetLocal => {
                     let slot = self.read_byte();
-                    if let Some(val) = self.stack.get(slot as usize) {
+                    if let Some(val) = self.stack.get(self.cur_frame.slot_idx + slot as usize) {
                         self.push(val.clone())
                     } else {
-                        self.runtime_error("getLocal operand error");
+                        self.runtime_error(&format!("getLocal operand error, slot:{}", slot));
                         return InterpretResult::RuntimeError;
                     }
                 }
@@ -205,7 +250,8 @@ impl Vm {
                         return InterpretResult::RuntimeError;
                     };
 
-                    if let Some(local) = self.stack.get_mut(slot as usize) {
+                    if let Some(local) = self.stack.get_mut(self.cur_frame.slot_idx + slot as usize)
+                    {
                         *local = val.clone();
                     } else {
                         self.runtime_error("setLocal target not exits");
@@ -215,47 +261,33 @@ impl Vm {
                 OpCode::JumpIfFalse => {
                     let offset = self.read_short() as usize;
                     if is_falsely(self.peak(0)) {
-                        self.ip += offset;
+                        self.cur_frame.ip += offset;
                     }
                 }
                 OpCode::JumpIfTrue => {
                     let offset = self.read_short() as usize;
                     if is_truely(self.peak(0)) {
-                        self.ip += offset;
+                        self.cur_frame.ip += offset;
                     }
                 }
                 OpCode::Jump => {
                     let offset = self.read_short() as usize;
-                    self.ip += offset;
+                    self.cur_frame.ip += offset;
                 }
                 OpCode::Loop => {
                     let offset = self.read_short();
-                    self.ip -= offset as usize;
+                    self.cur_frame.ip -= offset as usize;
                 }
                 OpCode::Unknown(a) => {
-                    eprintln!("ip:{:?}, byte:{:?}", self.ip, a)
+                    eprintln!("ip:{:?}, byte:{:?}", self.cur_frame.ip, a)
                 }
             }
         }
     }
 
-    fn read_byte(&mut self) -> u8 {
-        let res = self.chunk.read_byte(self.ip);
-        self.ip += 1;
-        res
-    }
-
-    fn read_short(&mut self) -> u16 {
-        self.ip += 2;
-        let first = self.chunk.code()[self.ip - 2] as u16;
-        let second = self.chunk.code()[self.ip - 1] as u16;
-        let res: u16 = first << 8 | second;
-        res
-    }
-
-    fn read_consnt(&mut self) -> Value {
-        let idx = self.read_byte();
-        self.chunk.read_constant(idx as usize)
+    fn reset_stack(&mut self) {
+        self.stack.clear();
+        self.frames.clear();
     }
 
     fn push(&mut self, value: impl Into<Value>) {
@@ -286,17 +318,31 @@ impl Vm {
         }
     }
 
+    fn read_byte(&mut self) -> u8 {
+        self.cur_frame.read_byte()
+    }
+
+    fn read_short(&mut self) -> u16 {
+        self.cur_frame.read_short()
+    }
+
+    fn read_consnt(&mut self) -> Value {
+        self.cur_frame.read_consnt()
+    }
+
     fn runtime_error(&self, messgae: &str) {
         eprintln!("{}", messgae);
-        eprintln!("line {:?} in script", self.chunk.line(self.ip));
+        eprintln!(
+            "line {:?} in script",
+            self.cur_frame.function.chunk.line(self.cur_frame.ip)
+        );
     }
 }
 
 pub fn interpret(source: &str, vm: &mut Vm) -> InterpretResult {
-    let chunk = Chunk::default();
     let compile = Compiler::default();
-    if let Some(chunk) = compile.compile(source, chunk) {
-        vm.run(chunk)
+    if let Some(function) = compile.compile(source) {
+        vm.run(function)
     } else {
         InterpretResult::CompileError
     }

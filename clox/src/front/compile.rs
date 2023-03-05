@@ -30,7 +30,6 @@ pub struct Compiler {
     previous: Option<Token>,
     current: Option<Token>,
     scanner: Scanner,
-    compiling_chunk: Chunk,
     locals: Vec<Local>,
     scope_depth: i32,
     function: Function,
@@ -38,9 +37,9 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn compile(mut self, source: &str, chunk: Chunk) -> Option<Chunk> {
+    pub fn compile(mut self, source: &str) -> Option<Function> {
         self.init_scanner(source);
-        self.compiling_chunk = chunk;
+        self.init_compiler();
         self.advance();
         while self.match_advance(TokenType::Eof).is_none() {
             self.declaration()
@@ -50,8 +49,20 @@ impl Compiler {
         if self.error {
             None
         } else {
-            Some(self.compiling_chunk)
+            Some(self.function)
         }
+    }
+
+    fn init_compiler(&mut self) {
+        // self.scope_depth = 0;
+        // self.locals.push(Local {
+        //     depth: 0,
+        //     name: Token {
+        //         ty: TokenType::None,
+        //         str: Rc::new(String::new()),
+        //         line: 0,
+        //     },
+        // })
     }
 
     fn current_chunk(&mut self) -> &mut Chunk {
@@ -360,7 +371,12 @@ impl Compiler {
         #[cfg(debug_assertions)]
         {
             if !self.error {
-                self.current_chunk().disassemble_chunk("code");
+                let name = if self.function.name.as_ref() != "" {
+                    self.function.name.clone()
+                } else {
+                    Rc::new(String::from("<script>"))
+                };
+                self.current_chunk().disassemble_chunk(name.as_ref());
                 println!()
             }
         }
