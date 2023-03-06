@@ -13,7 +13,7 @@ struct Local {
 }
 
 enum FunctionType {
-    Fun,
+    Fn,
     Script,
 }
 
@@ -236,11 +236,22 @@ impl Compiler {
         }
     }
 
+    fn fn_declaration(&mut self) {
+        let global = self.parse_variable("Expect function name.");
+        self.function(FunctionType::Fn);
+        if let Some(global) = global {
+            self.define_variable(global);
+        }
+    }
+
     fn declaration(&mut self) {
-        match self.match_advance(TokenType::Var) {
+        match self.match_advances(&[TokenType::Var, TokenType::Fn]) {
             Some(Token {
                 ty: TokenType::Var, ..
             }) => self.var_declaration(),
+            Some(Token {
+                ty: TokenType::Fn, ..
+            }) => self.fn_declaration(),
             _ => self.statement(),
         }
 
