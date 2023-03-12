@@ -1,0 +1,7 @@
+fn hello() {
+    print "Hello World";
+}
+
+
+print hello;
+hello();

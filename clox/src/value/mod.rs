@@ -2,14 +2,6 @@ use crate::chunk::Chunk;
 use std::fmt::Debug;
 use std::{fmt::Display, rc::Rc};
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    Nil,
-    Bool(bool),
-    Number(f64),
-    Obj(Object),
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum Object {
     Str(Rc<String>),
@@ -36,6 +28,14 @@ impl Debug for Function {
             .field("name", &self.name)
             .finish()
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    Nil,
+    Bool(bool),
+    Number(f64),
+    Obj(Object),
 }
 
 impl Eq for Value {}
@@ -67,6 +67,12 @@ impl From<String> for Value {
 impl From<Rc<String>> for Value {
     fn from(val: Rc<String>) -> Self {
         Value::Obj(Object::Str(val))
+    }
+}
+
+impl From<Function> for Value {
+    fn from(function: Function) -> Self {
+        Value::Obj(Object::Fun(Rc::new(function)))
     }
 }
 

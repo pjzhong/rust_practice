@@ -10,14 +10,6 @@ use crate::{
 };
 
 #[derive(Default)]
-pub struct Vm {
-    stack: VecDeque<Value>,
-    frames: VecDeque<CallFrame>,
-    cur_frame: CallFrame,
-    globals: HashMap<Rc<String>, Value>,
-}
-
-#[derive(Default)]
 struct CallFrame {
     function: Function,
     ip: usize,
@@ -58,6 +50,14 @@ pub enum InterpretResult {
     Ok,
     CompileError,
     RuntimeError,
+}
+
+#[derive(Default)]
+pub struct Vm {
+    stack: VecDeque<Value>,
+    frames: VecDeque<CallFrame>,
+    cur_frame: CallFrame,
+    globals: HashMap<Rc<String>, Value>,
 }
 
 impl Vm {

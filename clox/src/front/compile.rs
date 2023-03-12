@@ -24,68 +24,100 @@ impl Default for FunctionType {
 }
 
 #[derive(Default)]
-pub struct Compiler {
+struct Parser {
     error: bool,
     panic: bool,
     previous: Option<Token>,
     current: Option<Token>,
-    scanner: Scanner,
+}
+
+impl Parser {
+    fn error_at_current(&mut self, message: &str) {
+        if self.panic {
+            return;
+        }
+        self.panic = true;
+        error_at(&self.current, message);
+        self.error = true;
+    }
+}
+
+#[derive(Default)]
+pub struct Compiler {
+    parser: Option<Parser>,
+    scanner: Option<Scanner>,
     locals: Vec<Local>,
     scope_depth: i32,
     function: Function,
-    fun_type: FunctionType,
+    fn_type: FunctionType,
 }
 
 impl Compiler {
     pub fn compile(mut self, source: &str) -> Option<Function> {
-        self.init_scanner(source);
-        self.init_compiler();
+        let scanner = self.init_scanner(source);
+        self.init_compiler(Some(Parser::default()), Some(scanner), FunctionType::Script);
         self.advance();
         while self.match_advance(TokenType::Eof).is_none() {
             self.declaration()
         }
         self.consume(TokenType::Eof, "Expect end of expression.");
-        self.end_compiler();
-        if self.error {
-            None
-        } else {
-            Some(self.function)
-        }
+        self.end_compiler()
     }
 
-    fn init_compiler(&mut self) {
-        // self.scope_depth = 0;
-        // self.locals.push(Local {
-        //     depth: 0,
-        //     name: Token {
-        //         ty: TokenType::None,
-        //         str: Rc::new(String::new()),
-        //         line: 0,
-        //     },
-        // })
+    fn init_compiler(
+        &mut self,
+        parser: Option<Parser>,
+        scanner: Option<Scanner>,
+        fn_type: FunctionType,
+    ) {
+        self.scanner = scanner;
+        self.fn_type = fn_type;
+        self.scope_depth = 0;
+        self.locals.push(Local {
+            depth: 0,
+            name: Token {
+                ty: TokenType::None,
+                str: Rc::new(String::new()),
+                line: 0,
+            },
+        })
     }
 
     fn current_chunk(&mut self) -> &mut Chunk {
         &mut self.function.chunk
     }
 
-    fn init_scanner(&mut self, source: &str) {
-        self.scanner = Scanner::new(source)
+    fn init_scanner(&mut self, source: &str) -> Scanner {
+        Scanner::new(source)
     }
 
-    fn advance(&mut self) {
-        self.previous = self.current.take();
+    fn advance(&mut self) -> Option<&Token> {
+        let parser = self.parser.as_mut()?;
 
-        loop {
-            self.current = Some(self.scanner.scan_token());
-            if let Some(token) = &self.current {
-                if token.ty != TokenType::Error {
-                    break;
+        parser.previous = parser.current.take();
+
+        if let Some(scanner) = self.scanner.as_mut() {
+            loop {
+                let current = scanner.scan_token();
+                let token_ty = current.ty;
+                if token_ty == TokenType::Error {
+                    parser.error_at_current(&current.str);
                 }
 
-                self.error_at_current(token.str.clone().as_ref())
+                parser.current = Some(current);
+                if token_ty != TokenType::Error {
+                    break;
+                }
             }
+        } else {
+            parser.current = Some(Token {
+                ty: TokenType::Eof,
+                str: Rc::new(String::new()),
+                line: 0,
+            });
         }
+
+        parser.previous.as_ref()
     }
 
     fn expression(&mut self) {
@@ -255,28 +287,30 @@ impl Compiler {
             _ => self.statement(),
         }
 
-        if self.panic {
+        if self.parser.as_ref().map_or(false, |f| f.panic) {
             self.synchronize()
         }
     }
 
     fn synchronize(&mut self) {
-        self.panic = false;
+        if let Some(parser) = self.parser.as_mut() {
+            parser.panic = false;
+        }
 
         while self
-            .current
+            .current()
             .as_ref()
             .map_or(false, |t| t.ty != TokenType::Eof)
         {
             if self
-                .previous
+                .previous()
                 .as_ref()
                 .map_or(false, |t| t.ty == TokenType::Semicolon)
             {
                 return;
             }
 
-            match self.current.as_ref().map(|t| t.ty) {
+            match self.current().as_ref().map(|t| t.ty) {
                 Some(
                     TokenType::Class
                     | TokenType::Fn
@@ -287,7 +321,9 @@ impl Compiler {
                     | TokenType::Print
                     | TokenType::Return,
                 ) => return,
-                _ => self.advance(),
+                _ => {
+                    self.advance();
+                }
             }
         }
     }
@@ -355,6 +391,25 @@ impl Compiler {
         self.consume(TokenType::RightBrace, "Expect '}' after block");
     }
 
+    fn function(&mut self, fn_type: FunctionType) {
+        let mut compiler = Compiler::default();
+        compiler.init_compiler(self.parser.take(), self.scanner.take(), fn_type);
+        compiler.begin_scope();
+
+        compiler.consume(TokenType::LeftParen, "Expect '(' after function name.");
+        compiler.consume(TokenType::RightParen, "Expect ')' after parameters.");
+        compiler.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+
+        // collect info
+        self.parser = compiler.parser.take();
+        self.scanner = compiler.scanner.take();
+        // return to current compiler
+        if let Some(function) = compiler.end_compiler() {
+            let idx = self.make_constant(function);
+            self.emit_bytes(OpCode::Constant, idx);
+        }
+    }
+
     fn print_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value");
@@ -362,10 +417,9 @@ impl Compiler {
     }
 
     fn consume(&mut self, expect: TokenType, msg: &str) -> Option<&Token> {
-        if let Some(token) = &self.current {
+        if let Some(token) = &self.current() {
             if token.ty == expect {
-                self.advance();
-                self.previous.as_ref()
+                self.advance()
             } else {
                 self.error_at_current(msg);
                 None
@@ -376,12 +430,12 @@ impl Compiler {
         }
     }
 
-    fn end_compiler(&mut self) {
+    fn end_compiler(mut self) -> Option<Function> {
         self.emit_return();
 
         #[cfg(debug_assertions)]
         {
-            if !self.error {
+            if !self.is_error() {
                 let name = if self.function.name.as_ref() != "" {
                     self.function.name.clone()
                 } else {
@@ -391,10 +445,16 @@ impl Compiler {
                 println!()
             }
         }
+
+        if self.is_error() {
+            None
+        } else {
+            Some(self.function)
+        }
     }
 
     pub fn binary(&mut self, _: bool) {
-        if let Some(ty) = self.previous.as_ref().map(|t| t.ty) {
+        if let Some(ty) = self.previous().map(|t| t.ty) {
             let rule = get_rule(ty);
             self.parse_precedence(rule.precedence.heigher());
 
@@ -415,7 +475,7 @@ impl Compiler {
     }
 
     pub fn literal(&mut self, _: bool) {
-        match self.previous.as_ref().map(|t| t.ty) {
+        match self.previous().map(|t| t.ty) {
             Some(TokenType::False) => self.emit_byte(OpCode::False),
             Some(TokenType::Ture) => self.emit_byte(OpCode::True),
             Some(TokenType::Nil) => self.emit_byte(OpCode::Nil),
@@ -429,7 +489,7 @@ impl Compiler {
     }
 
     pub fn number(&mut self, _: bool) {
-        if let Some(token) = self.previous.as_ref() {
+        if let Some(token) = self.previous() {
             match token.str.parse::<f64>() {
                 Ok(value) => self.emit_constant(value),
                 Err(_) => self.error("Illegal number"),
@@ -438,13 +498,13 @@ impl Compiler {
     }
 
     pub fn string(&mut self, _: bool) {
-        if let Some(str) = self.previous.as_ref().map(|t| t.str.clone()) {
+        if let Some(str) = self.previous().map(|t| t.str.clone()) {
             self.emit_constant(&str[1..(str.len() - 1)]);
         }
     }
 
     pub fn varaible(&mut self, can_assign: bool) {
-        if let Some(token) = self.previous.as_ref() {
+        if let Some(token) = self.previous() {
             self.named_varaible(token.str.clone(), can_assign);
         }
     }
@@ -471,7 +531,7 @@ impl Compiler {
     }
 
     pub fn unary(&mut self, _: bool) {
-        let ty = self.previous.as_ref().map(|t| t.ty);
+        let ty = self.previous().map(|t| t.ty);
         self.parse_precedence(Precedence::Unary);
         match ty {
             Some(TokenType::Minus) => self.emit_byte(OpCode::Negate),
@@ -482,18 +542,18 @@ impl Compiler {
 
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
-        if let Some(rule) = self.previous.as_ref().map(|t| get_rule(t.ty)) {
+        if let Some(rule) = self.previous().map(|t| get_rule(t.ty)) {
             let prefix = rule.prefix;
             let can_assign = precedence <= Precedence::Assignment;
             prefix(self, can_assign);
 
             while self
-                .current
+                .current()
                 .as_ref()
                 .map_or(false, |t| precedence <= get_rule(t.ty).precedence)
             {
                 self.advance();
-                if let Some(rule) = self.previous.as_ref().map(|t| get_rule(t.ty)) {
+                if let Some(rule) = self.previous().map(|t| get_rule(t.ty)) {
                     let infix = rule.infix;
                     infix(self, can_assign);
                 }
@@ -515,7 +575,7 @@ impl Compiler {
             return None;
         }
 
-        self.previous
+        self.previous()
             .as_ref()
             .map(|t| t.str.clone())
             .map(|name| self.identifier_constant(name))
@@ -540,7 +600,7 @@ impl Compiler {
             return;
         }
 
-        if let Some(token) = self.previous.as_ref() {
+        if let Some(token) = self.previous() {
             self.add_local(token.clone())
         } else {
             self.error("Uknow know varaible");
@@ -637,18 +697,29 @@ impl Compiler {
     }
 
     fn emit_byte(&mut self, byte: impl Into<u8>) {
-        let line = self.previous.as_ref().map_or(0, |t| t.line);
+        let line = self.previous().map_or(0, |t| t.line);
         self.current_chunk().write(byte, line);
     }
 
     fn check(&self, ty: &TokenType) -> bool {
-        self.current.as_ref().map_or(false, |t| t.ty == *ty)
+        self.current().as_ref().map_or(false, |t| t.ty == *ty)
+    }
+
+    fn current(&self) -> Option<&Token> {
+        self.parser.as_ref().and_then(|f| f.current.as_ref())
+    }
+
+    fn previous(&self) -> Option<&Token> {
+        self.parser.as_ref().and_then(|f| f.previous.as_ref())
+    }
+
+    fn is_error(&self) -> bool {
+        self.parser.as_ref().map_or(false, |f| f.error)
     }
 
     fn match_advance(&mut self, ty: TokenType) -> Option<&Token> {
         if self.check(&ty) {
-            self.advance();
-            self.previous.as_ref()
+            self.advance()
         } else {
             None
         }
@@ -657,31 +728,33 @@ impl Compiler {
     fn match_advances(&mut self, tys: &[TokenType]) -> Option<&Token> {
         for ty in tys {
             if self.check(ty) {
-                self.advance();
-                return self.previous.as_ref();
+                return self.advance();
             }
         }
         None
     }
 
     fn error(&mut self, message: &str) {
-        if self.panic {
-            return;
-        }
-        self.panic = true;
+        if let Some(parser) = self.parser.as_mut() {
+            if parser.panic {
+                return;
+            }
+            parser.panic = true;
 
-        error_at(&self.previous, message);
-        self.error = true;
+            error_at(&parser.previous, message);
+            parser.error = true;
+        }
     }
 
     fn error_at_current(&mut self, message: &str) {
-        if self.panic {
-            return;
+        if let Some(parser) = self.parser.as_mut() {
+            if parser.panic {
+                return;
+            }
+            parser.panic = true;
+            error_at(&parser.current, message);
+            parser.error = true;
         }
-        self.panic = true;
-
-        error_at(&self.current, message);
-        self.error = true;
     }
 }
 
