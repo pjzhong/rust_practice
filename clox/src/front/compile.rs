@@ -57,7 +57,7 @@ impl Compiler {
         let scanner = self.init_scanner(source);
         self.init_compiler(Some(Parser::default()), Some(scanner), FunctionType::Script);
         self.advance();
-        while self.match_advance(TokenType::Eof).is_none() {
+        while self.match_advance(TokenType::Eof).is_none()  && self.current().is_some() {
             self.declaration()
         }
         self.consume(TokenType::Eof, "Expect end of expression.");
@@ -71,16 +71,17 @@ impl Compiler {
         fn_type: FunctionType,
     ) {
         self.scanner = scanner;
+        self.parser = parser;
         self.fn_type = fn_type;
         self.scope_depth = 0;
-        self.locals.push(Local {
-            depth: 0,
-            name: Token {
-                ty: TokenType::None,
-                str: Rc::new(String::new()),
-                line: 0,
-            },
-        })
+        // self.locals.push(Local {
+        //     depth: 0,
+        //     name: Token {
+        //         ty: TokenType::None,
+        //         str: Rc::new(String::new()),
+        //         line: 0,
+        //     },
+        // })
     }
 
     fn current_chunk(&mut self) -> &mut Chunk {
