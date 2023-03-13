@@ -12,6 +12,7 @@ struct Local {
     depth: i32,
 }
 
+#[derive(PartialEq)]
 enum FunctionType {
     Fn,
     Script,
@@ -57,7 +58,7 @@ impl Compiler {
         let scanner = self.init_scanner(source);
         self.init_compiler(Some(Parser::default()), Some(scanner), FunctionType::Script);
         self.advance();
-        while self.match_advance(TokenType::Eof).is_none()  && self.current().is_some() {
+        while self.match_advance(TokenType::Eof).is_none() && self.current().is_some() {
             self.declaration()
         }
         self.consume(TokenType::Eof, "Expect end of expression.");
@@ -74,6 +75,13 @@ impl Compiler {
         self.parser = parser;
         self.fn_type = fn_type;
         self.scope_depth = 0;
+        if self.fn_type != FunctionType::Script {
+            self.function.name = self
+                .parser
+                .as_ref()
+                .and_then(|p| p.previous.as_ref())
+                .map_or_else(|| Rc::new(String::new()), |prev| prev.str.clone())
+        }
         // self.locals.push(Local {
         //     depth: 0,
         //     name: Token {
@@ -220,7 +228,7 @@ impl Compiler {
         };
 
         // incrementer
-        if !self.check(&TokenType::LeftBrace) {
+        if !self.check(TokenType::LeftBrace) {
             let body_jump = self.emit_jump(OpCode::Jump);
             let increment_start = self.current_chunk().code().len();
             self.expression();
@@ -385,7 +393,7 @@ impl Compiler {
     }
 
     fn block(&mut self) {
-        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
             self.declaration();
         }
 
@@ -398,8 +406,26 @@ impl Compiler {
         compiler.begin_scope();
 
         compiler.consume(TokenType::LeftParen, "Expect '(' after function name.");
+        if !compiler.check(TokenType::RightParen) {
+            compiler.function.arity += 1;
+            if compiler.function.arity > 255 {
+                compiler.error_at_current("Can't have more than 255 parameters.");
+            }
+
+            let constant = compiler.parse_variable("Expect parameter name.");
+            loop {
+                if let Some(constant) = constant {
+                    compiler.define_variable(constant);
+                }
+
+                if compiler.match_advance(TokenType::Comma).is_none() {
+                    break;
+                }
+            }
+        }
         compiler.consume(TokenType::RightParen, "Expect ')' after parameters.");
         compiler.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+        compiler.block();
 
         // collect info
         self.parser = compiler.parser.take();
@@ -473,6 +499,33 @@ impl Compiler {
                 _ => {}
             }
         }
+    }
+
+
+    pub fn call(&mut self, _: bool) {
+        let arg_count = self.argument_list();
+        self.emit_bytes(OpCode::Call, arg_count);
+    }
+
+    fn argument_list(&mut self) -> u8 {
+        let mut count = 0;
+        if !self.check(TokenType::RightParen) {
+            loop {
+                self.expression();
+                if count >= 255 {
+                    self.error("Can't have more than 255 arguments.")
+                }
+                count += 1;
+
+                if self.match_advance(TokenType::Comma).is_none() {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after arguments");
+
+        count
     }
 
     pub fn literal(&mut self, _: bool) {
@@ -702,8 +755,8 @@ impl Compiler {
         self.current_chunk().write(byte, line);
     }
 
-    fn check(&self, ty: &TokenType) -> bool {
-        self.current().as_ref().map_or(false, |t| t.ty == *ty)
+    fn check(&self, ty: TokenType) -> bool {
+        self.current().as_ref().map_or(false, |t| t.ty == ty)
     }
 
     fn current(&self) -> Option<&Token> {
@@ -719,7 +772,7 @@ impl Compiler {
     }
 
     fn match_advance(&mut self, ty: TokenType) -> Option<&Token> {
-        if self.check(&ty) {
+        if self.check(ty) {
             self.advance()
         } else {
             None
@@ -728,7 +781,7 @@ impl Compiler {
 
     fn match_advances(&mut self, tys: &[TokenType]) -> Option<&Token> {
         for ty in tys {
-            if self.check(ty) {
+            if self.check(*ty) {
                 return self.advance();
             }
         }

@@ -278,6 +278,9 @@ impl Vm {
                     let offset = self.read_short();
                     self.cur_frame.ip -= offset as usize;
                 }
+                OpCode::Call => {
+                    
+                }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.cur_frame.ip, a)
                 }

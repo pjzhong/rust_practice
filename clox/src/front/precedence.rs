@@ -44,7 +44,7 @@ fn nothing(_: &mut Compiler, _: bool) {}
 pub fn get_rule(ty: TokenType) -> ParseRule {
     const LEFT_PAREN: ParseRule = ParseRule {
         prefix: Compiler::grouping,
-        infix: nothing,
+        infix: Compiler::call,
         precedence: Precedence::None,
     };
     const MINUS: ParseRule = ParseRule {

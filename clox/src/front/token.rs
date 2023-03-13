@@ -64,5 +64,4 @@ pub enum TokenType {
 
     Eof,
     Error,
-    None,
 }

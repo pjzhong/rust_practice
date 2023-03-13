@@ -25,6 +25,7 @@ pub enum OpCode {
     JumpIfTrue,
     Jump,
     Loop,
+    Call,
     Unknown(u8),
 }
 
@@ -56,6 +57,7 @@ impl From<u8> for OpCode {
             22 => Self::JumpIfTrue,
             23 => Self::Jump,
             24 => Self::Loop,
+            25 => Self::Call,
             _ => Self::Unknown(byte),
         }
     }
@@ -89,6 +91,7 @@ impl From<OpCode> for u8 {
             OpCode::JumpIfTrue => 22,
             OpCode::Jump => 23,
             OpCode::Loop => 24,
+            OpCode::Call => 25,
             OpCode::Unknown(a) => a,
         }
     }
