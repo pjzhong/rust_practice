@@ -2,6 +2,10 @@ fn hello() {
     print "Hello World";
 }
 
+fn sum(a, b) {
+    var c = a + b;
+    return c;
+}
 
-print hello;
 hello();
+print sum(10, 2);

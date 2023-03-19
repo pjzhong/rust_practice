@@ -129,6 +129,20 @@ impl Compiler {
         parser.previous.as_ref()
     }
 
+    fn return_statment(&mut self) {
+        if self.fn_type == FunctionType::Script {
+            self.error("Can't return from top-level code.");
+        }
+
+        if self.match_advance(TokenType::Semicolon).is_some() {
+            self.emit_return();
+        } else {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after return value");
+            self.emit_byte(OpCode::Return);
+        }
+    }
+
     fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
     }
@@ -344,6 +358,7 @@ impl Compiler {
             TokenType::If,
             TokenType::While,
             TokenType::For,
+            TokenType::Return,
         ]) {
             Some(Token {
                 ty: TokenType::Print,
@@ -367,6 +382,9 @@ impl Compiler {
             Some(Token {
                 ty: TokenType::For, ..
             }) => self.for_statement(),
+            Some(Token {
+                ty: TokenType::Return, ..
+            }) => self.return_statment(),
             _ => {
                 self.expression_statement();
             }
@@ -407,13 +425,14 @@ impl Compiler {
 
         compiler.consume(TokenType::LeftParen, "Expect '(' after function name.");
         if !compiler.check(TokenType::RightParen) {
-            compiler.function.arity += 1;
-            if compiler.function.arity > 255 {
-                compiler.error_at_current("Can't have more than 255 parameters.");
-            }
-
-            let constant = compiler.parse_variable("Expect parameter name.");
             loop {
+                compiler.function.arity += 1;
+                if compiler.function.arity > 255 {
+                    compiler.error_at_current("Can't have more than 255 parameters.");
+                }
+
+                let constant = compiler.parse_variable("Expect parameter name.");
+
                 if let Some(constant) = constant {
                     compiler.define_variable(constant);
                 }

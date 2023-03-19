@@ -11,7 +11,7 @@ pub enum Precedence {
     Term,       // + -
     Factor,     // * /
     Unary,      // ! -
-    Call,      // . ()
+    Call,       // . ()
     Primary,
 }
 

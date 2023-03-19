@@ -98,9 +98,24 @@ impl Vm {
 
             let inst = self.read_byte().into();
             match inst {
-                OpCode::Return => {
-                    return InterpretResult::Ok;
-                }
+                OpCode::Return => match self.pop() {
+                    Some(val) => match self.frames.pop_back() {
+                        Some(frame) => {
+                            let slot_idx = self.cur_frame.slot_idx;
+                            self.stack.drain(slot_idx..);
+                            self.push(val);
+                            self.cur_frame = frame;
+                        }
+                        None => {
+                            self.pop();
+                            return InterpretResult::Ok;
+                        }
+                    },
+                    None => {
+                        self.runtime_error("method return, stack too short");
+                        return InterpretResult::RuntimeError;
+                    }
+                },
                 OpCode::Constant => {
                     let constant = self.read_consnt();
                     self.push(constant);
@@ -186,7 +201,10 @@ impl Vm {
                     }
                 }
                 OpCode::Pop => {
-                    self.pop();
+                    if let None = self.pop() {
+                        self.runtime_error("Stack to too short");
+                        return InterpretResult::RuntimeError;
+                    }
                 }
                 OpCode::DefineGlobal => {
                     if let Value::Obj(Object::Str(name)) = self.read_consnt() {
@@ -382,10 +400,10 @@ impl Vm {
     }
 }
 
-fn frame_error_location(frame: &CallFrame)  {
+fn frame_error_location(frame: &CallFrame) {
     let fun = &frame.function;
     if fun.chunk.code().is_empty() {
-      return;
+        return;
     }
     let offset = frame.ip - 1;
     eprint!("[line {}] in ", fun.chunk.line(offset).unwrap_or(0));
