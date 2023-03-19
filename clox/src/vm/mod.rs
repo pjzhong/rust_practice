@@ -11,13 +11,13 @@ use crate::{
 
 #[derive(Default)]
 struct CallFrame {
-    function: Function,
+    function: Rc<Function>,
     ip: usize,
     slot_idx: usize,
 }
 
 impl CallFrame {
-    fn new(function: Function) -> Self {
+    fn new(function: Rc<Function>) -> Self {
         Self {
             function,
             ip: 0,
@@ -73,14 +73,12 @@ impl Vm {
     pub fn free() {}
 
     pub fn run(&mut self, function: Function) -> InterpretResult {
-        self.reset_stack();
-        self.frames.push_back(CallFrame::new(function));
-        self.cur_frame = if let Some(frame) = self.frames.pop_back() {
-            frame
-        } else {
-            self.runtime_error("Empty Call frame");
-            return InterpretResult::RuntimeError;
-        };
+        let function = Rc::new(function);
+        self.push(function.clone());
+        match self.call_fun(function, 0) {
+            Ok(frame) => self.cur_frame = frame,
+            Err(err) => return err,
+        }
         loop {
             #[cfg(debug_assertions)]
             {
@@ -279,7 +277,11 @@ impl Vm {
                     self.cur_frame.ip -= offset as usize;
                 }
                 OpCode::Call => {
-                    
+                    let arg_count = self.read_byte() as usize;
+                    match self.call(arg_count) {
+                        Ok(()) => {}
+                        Err(res) => return res,
+                    }
                 }
                 OpCode::Unknown(a) => {
                     eprintln!("ip:{:?}, byte:{:?}", self.cur_frame.ip, a)
@@ -288,7 +290,7 @@ impl Vm {
         }
     }
 
-    fn reset_stack(&mut self) {
+    pub fn reset_stack(&mut self) {
         self.stack.clear();
         self.frames.clear();
     }
@@ -303,6 +305,43 @@ impl Vm {
 
     fn peak(&self, distance: usize) -> Option<&Value> {
         self.stack.get(self.stack.len().wrapping_sub(1 + distance))
+    }
+
+    fn call(&mut self, arg_count: usize) -> Result<(), InterpretResult> {
+        if let Some(val) = self.peak(arg_count) {
+            match val {
+                Value::Obj(Object::Fun(val)) => {
+                    let mut frame = self.call_fun(val.clone(), arg_count)?;
+                    std::mem::swap(&mut self.cur_frame, &mut frame);
+                    self.frames.push_back(frame);
+                }
+                _ => {
+                    self.runtime_error("Can only call functions and classes.");
+                    return Err(InterpretResult::RuntimeError);
+                }
+            }
+        } else {
+            self.runtime_error("call no operand");
+            return Err(InterpretResult::RuntimeError);
+        }
+        Ok(())
+    }
+
+    fn call_fun(
+        &mut self,
+        fun: Rc<Function>,
+        arg_count: usize,
+    ) -> Result<CallFrame, InterpretResult> {
+        if fun.arity != arg_count {
+            self.runtime_error(&format!(
+                "Expected {} arguments but got {}.",
+                fun.arity, arg_count
+            ));
+            return Err(InterpretResult::RuntimeError);
+        }
+        let mut frame = CallFrame::new(fun);
+        frame.slot_idx = self.stack.len() - arg_count - 1;
+        Ok(frame)
     }
 
     fn binary_op<R>(&mut self, op: fn(f64, f64) -> R) -> InterpretResult
@@ -335,16 +374,32 @@ impl Vm {
 
     fn runtime_error(&self, messgae: &str) {
         eprintln!("{}", messgae);
-        eprintln!(
-            "line {:?} in script",
-            self.cur_frame.function.chunk.line(self.cur_frame.ip)
-        );
+
+        frame_error_location(&self.cur_frame);
+        for frame in self.frames.iter().rev() {
+            frame_error_location(frame);
+        }
+    }
+}
+
+fn frame_error_location(frame: &CallFrame)  {
+    let fun = &frame.function;
+    if fun.chunk.code().is_empty() {
+      return;
+    }
+    let offset = frame.ip - 1;
+    eprint!("[line {}] in ", fun.chunk.line(offset).unwrap_or(0));
+    if fun.name.as_ref() == "" {
+        eprintln!("script");
+    } else {
+        eprintln!("{}()", fun.name);
     }
 }
 
 pub fn interpret(source: &str, vm: &mut Vm) -> InterpretResult {
     let compile = Compiler::default();
     if let Some(function) = compile.compile(source) {
+        vm.reset_stack();
         vm.run(function)
     } else {
         InterpretResult::CompileError

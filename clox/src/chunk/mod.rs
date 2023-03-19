@@ -12,7 +12,11 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn code(&mut self) -> &mut [u8] {
+    pub fn code(&self) -> &[u8] {
+        &self.code
+    }
+
+    pub fn code_mut(&mut self) -> &mut [u8] {
         &mut self.code
     }
 
@@ -54,6 +58,10 @@ impl Chunk {
     }
 
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
+        if self.code.is_empty() {
+            return 0;
+        }
+
         print!("{:04} ", offset);
         if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
             print!("   | ");
@@ -66,7 +74,9 @@ impl Chunk {
             OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal => {
                 self.constant_instruction(instruction, offset)
             }
-            OpCode::GetLocal | OpCode::SetLocal => self.byte_instruction(instruction, offset),
+            OpCode::GetLocal | OpCode::SetLocal | OpCode::Call => {
+                self.byte_instruction(instruction, offset)
+            }
             OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Jump => {
                 self.jump_instruction(instruction, usize::add, offset)
             }

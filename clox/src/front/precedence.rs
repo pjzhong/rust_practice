@@ -11,7 +11,7 @@ pub enum Precedence {
     Term,       // + -
     Factor,     // * /
     Unary,      // ! -
-    Class,      // . ()
+    Call,      // . ()
     Primary,
 }
 
@@ -32,8 +32,8 @@ impl Precedence {
             Precedence::Comparison => Self::Term,
             Precedence::Term => Self::Factor,
             Precedence::Factor => Self::Unary,
-            Precedence::Unary => Self::Class,
-            Precedence::Class => Self::Primary,
+            Precedence::Unary => Self::Call,
+            Precedence::Call => Self::Primary,
             Precedence::Primary => Self::Primary,
         }
     }
@@ -45,7 +45,7 @@ pub fn get_rule(ty: TokenType) -> ParseRule {
     const LEFT_PAREN: ParseRule = ParseRule {
         prefix: Compiler::grouping,
         infix: Compiler::call,
-        precedence: Precedence::None,
+        precedence: Precedence::Call,
     };
     const MINUS: ParseRule = ParseRule {
         prefix: Compiler::unary,

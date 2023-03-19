@@ -10,7 +10,7 @@ pub enum Object {
 
 #[derive(Default)]
 pub struct Function {
-    pub arity: i32,
+    pub arity: usize,
     pub chunk: Chunk,
     pub name: Rc<String>,
 }
@@ -73,6 +73,12 @@ impl From<Rc<String>> for Value {
 impl From<Function> for Value {
     fn from(function: Function) -> Self {
         Value::Obj(Object::Fun(Rc::new(function)))
+    }
+}
+
+impl From<Rc<Function>> for Value {
+    fn from(function: Rc<Function>) -> Self {
+        Value::Obj(Object::Fun(function))
     }
 }
 
