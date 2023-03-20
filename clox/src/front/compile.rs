@@ -5,8 +5,6 @@ use std::rc::Rc;
 use super::precedence::get_rule;
 use super::{scanner::Scanner, token::Token, TokenType};
 
-pub type ParseFn = fn(&mut Compiler, bool);
-
 struct Local {
     name: Token,
     depth: i32,
@@ -160,6 +158,7 @@ impl Compiler {
         self.emit_byte(OpCode::Pop);
 
         if self.match_advance(TokenType::LeftBrace).is_some() {
+            self.begin_scope();
             self.block();
             self.end_scope();
         } else {
@@ -383,7 +382,8 @@ impl Compiler {
                 ty: TokenType::For, ..
             }) => self.for_statement(),
             Some(Token {
-                ty: TokenType::Return, ..
+                ty: TokenType::Return,
+                ..
             }) => self.return_statment(),
             _ => {
                 self.expression_statement();

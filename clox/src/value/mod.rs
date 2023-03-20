@@ -1,11 +1,13 @@
 use crate::chunk::Chunk;
+use crate::InterpretResult;
 use std::fmt::Debug;
 use std::{fmt::Display, rc::Rc};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Object {
     Str(Rc<String>),
-    Fun(Rc<Function>),
+    Fn(Rc<Function>),
+    NativeFn(Rc<NativeFunction>),
 }
 
 #[derive(Default)]
@@ -27,6 +29,24 @@ impl Debug for Function {
             .field("arity", &self.arity)
             .field("name", &self.name)
             .finish()
+    }
+}
+
+pub type NativeFn = fn(args: &[Value]) -> Result<Value, InterpretResult>;
+
+pub struct NativeFunction {
+    pub function: NativeFn,
+}
+
+impl PartialEq for NativeFunction {
+    fn eq(&self, _: &Self) -> bool {
+        false
+    }
+}
+
+impl Debug for NativeFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<native fn>")
     }
 }
 
@@ -72,13 +92,19 @@ impl From<Rc<String>> for Value {
 
 impl From<Function> for Value {
     fn from(function: Function) -> Self {
-        Value::Obj(Object::Fun(Rc::new(function)))
+        Value::Obj(Object::Fn(Rc::new(function)))
     }
 }
 
 impl From<Rc<Function>> for Value {
     fn from(function: Rc<Function>) -> Self {
-        Value::Obj(Object::Fun(function))
+        Value::Obj(Object::Fn(function))
+    }
+}
+
+impl From<NativeFunction> for Value {
+    fn from(function: NativeFunction) -> Self {
+        Value::Obj(Object::NativeFn(Rc::new(function)))
     }
 }
 
@@ -97,7 +123,7 @@ impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Str(str) => write!(f, "{}", str),
-            Self::Fun(fun) => write!(
+            Self::Fn(fun) => write!(
                 f,
                 "fn {}",
                 if fun.name.as_ref() != "" {
@@ -106,6 +132,7 @@ impl Display for Object {
                     "<script>"
                 }
             ),
+            Self::NativeFn(_) => write!(f, "<native fn>"),
         }
     }
 }

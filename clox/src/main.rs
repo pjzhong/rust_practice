@@ -46,6 +46,7 @@ fn run_file(vm: &mut Vm, file: &str) {
                 InterpretResult::Ok => (),
                 InterpretResult::CompileError => exit(65),
                 InterpretResult::RuntimeError => exit(70),
+                InterpretResult::NativeFunctionError(_) => exit(70),
             }
         }
         Err(e) => {

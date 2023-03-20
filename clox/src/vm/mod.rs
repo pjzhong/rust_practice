@@ -1,8 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 use std::ops::{Div, Mul, Sub};
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::value::Function;
+use crate::value::{Function, NativeFn, NativeFunction};
 use crate::{
     chunk::OpCode,
     front::Compiler,
@@ -50,6 +51,7 @@ pub enum InterpretResult {
     Ok,
     CompileError,
     RuntimeError,
+    NativeFunctionError(String),
 }
 
 #[derive(Default)]
@@ -69,8 +71,6 @@ impl Vm {
             cur_frame: CallFrame::default(),
         }
     }
-
-    pub fn free() {}
 
     pub fn run(&mut self, function: Function) -> InterpretResult {
         let function = Rc::new(function);
@@ -308,9 +308,14 @@ impl Vm {
         }
     }
 
-    pub fn reset_stack(&mut self) {
+    fn reset_stack(&mut self) {
         self.stack.clear();
         self.frames.clear();
+    }
+
+    pub fn init(&mut self) {
+        self.reset_stack();
+        self.define_native("clock", clock_native)
     }
 
     fn push(&mut self, value: impl Into<Value>) {
@@ -325,13 +330,39 @@ impl Vm {
         self.stack.get(self.stack.len().wrapping_sub(1 + distance))
     }
 
+    fn define_native(&mut self, name: &str, function: NativeFn) {
+        let name = Rc::new(name.to_string());
+        let function: Value = NativeFunction { function }.into();
+        self.globals.insert(name, function);
+    }
+
     fn call(&mut self, arg_count: usize) -> Result<(), InterpretResult> {
         if let Some(val) = self.peak(arg_count) {
             match val {
-                Value::Obj(Object::Fun(val)) => {
+                Value::Obj(Object::Fn(val)) => {
                     let mut frame = self.call_fun(val.clone(), arg_count)?;
                     std::mem::swap(&mut self.cur_frame, &mut frame);
                     self.frames.push_back(frame);
+                }
+                Value::Obj(Object::NativeFn(val)) => {
+                    let arg_idx = self.stack.len() - arg_count;
+                    let args = &self.stack.as_slices().0[arg_idx..];
+                    let result = match (val.function)(args) {
+                        Ok(val) => val,
+                        Err(err) => match err {
+                            InterpretResult::NativeFunctionError(str) => {
+                                self.runtime_error(&str);
+                                Value::Nil
+                            }
+                            InterpretResult::RuntimeError => {
+                                self.runtime_error("Invoke Native fn, unknow error");
+                                Value::Nil
+                            }
+                            _ => Value::Nil,
+                        },
+                    };
+                    self.stack.drain(arg_idx..);
+                    self.push(result);
                 }
                 _ => {
                     self.runtime_error("Can only call functions and classes.");
@@ -400,6 +431,16 @@ impl Vm {
     }
 }
 
+fn clock_native(_: &[Value]) -> Result<Value, InterpretResult> {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(e) => Ok((e.as_millis() as f64).into()),
+        Err(e) => Err(InterpretResult::NativeFunctionError(format!(
+            "getTime error, {}",
+            e
+        ))),
+    }
+}
+
 fn frame_error_location(frame: &CallFrame) {
     let fun = &frame.function;
     if fun.chunk.code().is_empty() {
@@ -417,7 +458,7 @@ fn frame_error_location(frame: &CallFrame) {
 pub fn interpret(source: &str, vm: &mut Vm) -> InterpretResult {
     let compile = Compiler::default();
     if let Some(function) = compile.compile(source) {
-        vm.reset_stack();
+        vm.init();
         vm.run(function)
     } else {
         InterpretResult::CompileError

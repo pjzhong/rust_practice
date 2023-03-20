@@ -1,4 +1,6 @@
-use super::{compile::ParseFn, Compiler, TokenType};
+use super::{Compiler, TokenType};
+
+pub type ParseFn = fn(&mut Compiler, bool);
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Precedence {
