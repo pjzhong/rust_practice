@@ -26,6 +26,9 @@ pub enum OpCode {
     Jump,
     Loop,
     Call,
+    Closure,
+    GetUpValue,
+    SetUpValue,
     Unknown(u8),
 }
 
@@ -58,6 +61,9 @@ impl From<u8> for OpCode {
             23 => Self::Jump,
             24 => Self::Loop,
             25 => Self::Call,
+            26 => Self::Closure,
+            27 => Self::GetUpValue,
+            28 => Self::SetUpValue,
             _ => Self::Unknown(byte),
         }
     }
@@ -92,6 +98,9 @@ impl From<OpCode> for u8 {
             OpCode::Jump => 23,
             OpCode::Loop => 24,
             OpCode::Call => 25,
+            OpCode::Closure => 26,
+            OpCode::GetUpValue => 27,
+            OpCode::SetUpValue => 28,
             OpCode::Unknown(a) => a,
         }
     }

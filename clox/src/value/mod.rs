@@ -1,54 +1,9 @@
-use crate::chunk::Chunk;
-use crate::InterpretResult;
+mod object;
+
 use std::fmt::Debug;
 use std::{fmt::Display, rc::Rc};
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum Object {
-    Str(Rc<String>),
-    Fn(Rc<Function>),
-    NativeFn(Rc<NativeFunction>),
-}
-
-#[derive(Default)]
-pub struct Function {
-    pub arity: usize,
-    pub chunk: Chunk,
-    pub name: Rc<String>,
-}
-
-impl PartialEq for Function {
-    fn eq(&self, other: &Self) -> bool {
-        self.arity == other.arity && self.name == other.name
-    }
-}
-
-impl Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Function")
-            .field("arity", &self.arity)
-            .field("name", &self.name)
-            .finish()
-    }
-}
-
-pub type NativeFn = fn(args: &[Value]) -> Result<Value, InterpretResult>;
-
-pub struct NativeFunction {
-    pub function: NativeFn,
-}
-
-impl PartialEq for NativeFunction {
-    fn eq(&self, _: &Self) -> bool {
-        false
-    }
-}
-
-impl Debug for NativeFunction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<native fn>")
-    }
-}
+pub use self::object::{Closure, Function, NativeFn, NativeFunction, Object, UpValue};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -58,7 +13,9 @@ pub enum Value {
     Obj(Object),
 }
 
-impl Eq for Value {}
+impl Eq for Value {
+    fn assert_receiver_is_total_eq(&self) {}
+}
 
 impl From<f64> for Value {
     fn from(val: f64) -> Self {
@@ -96,6 +53,12 @@ impl From<Function> for Value {
     }
 }
 
+impl From<Closure> for Value {
+    fn from(cl: Closure) -> Self {
+        Value::Obj(Object::Closure(cl))
+    }
+}
+
 impl From<Rc<Function>> for Value {
     fn from(function: Rc<Function>) -> Self {
         Value::Obj(Object::Fn(function))
@@ -115,24 +78,6 @@ impl Display for Value {
             Value::Bool(bool) => write!(f, "{}", bool),
             Value::Number(num) => write!(f, "{}", num),
             Value::Obj(a) => std::fmt::Display::fmt(&a, f),
-        }
-    }
-}
-
-impl Display for Object {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Str(str) => write!(f, "{}", str),
-            Self::Fn(fun) => write!(
-                f,
-                "fn {}",
-                if fun.name.as_ref() != "" {
-                    &fun.name
-                } else {
-                    "<script>"
-                }
-            ),
-            Self::NativeFn(_) => write!(f, "<native fn>"),
         }
     }
 }

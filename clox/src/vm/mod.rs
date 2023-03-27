@@ -3,7 +3,7 @@ use std::ops::{Div, Mul, Sub};
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::value::{Function, NativeFn, NativeFunction};
+use crate::value::{Closure, Function, NativeFn, NativeFunction, UpValue};
 use crate::{
     chunk::OpCode,
     front::Compiler,
@@ -12,37 +12,37 @@ use crate::{
 
 #[derive(Default)]
 struct CallFrame {
-    function: Rc<Function>,
+    closure: Closure,
     ip: usize,
     slot_idx: usize,
 }
 
 impl CallFrame {
-    fn new(function: Rc<Function>) -> Self {
+    fn new(closure: Closure) -> Self {
         Self {
-            function,
+            closure,
             ip: 0,
             slot_idx: 0,
         }
     }
 
     fn read_byte(&mut self) -> u8 {
-        let res = self.function.chunk.read_byte(self.ip);
+        let res = self.closure.function.chunk.read_byte(self.ip);
         self.ip += 1;
         res
     }
 
     fn read_short(&mut self) -> u16 {
         self.ip += 2;
-        let first = self.function.chunk.code()[self.ip - 2] as u16;
-        let second = self.function.chunk.code()[self.ip - 1] as u16;
+        let first = self.closure.function.chunk.code()[self.ip - 2] as u16;
+        let second = self.closure.function.chunk.code()[self.ip - 1] as u16;
         let res: u16 = first << 8 | second;
         res
     }
 
     fn read_consnt(&mut self) -> Value {
         let idx = self.read_byte();
-        self.function.chunk.read_constant(idx as usize)
+        self.closure.function.chunk.read_constant(idx as usize)
     }
 }
 
@@ -73,9 +73,9 @@ impl Vm {
     }
 
     pub fn run(&mut self, function: Function) -> InterpretResult {
-        let function = Rc::new(function);
-        self.push(function.clone());
-        match self.call_fun(function, 0) {
+        let closure = Closure::new(Rc::new(function));
+        self.push(Closure::new(closure.function.clone()));
+        match self.call_fun(closure, 0) {
             Ok(frame) => self.cur_frame = frame,
             Err(err) => return err,
         }
@@ -84,13 +84,14 @@ impl Vm {
             {
                 print!("    ");
                 for val in &self.stack {
-                    print!("[ {:?} ]", val);
+                    print!("[ {} ]", val);
                 }
                 if self.stack.is_empty() {
                     print!("[]");
                 }
                 println!();
                 self.cur_frame
+                    .closure
                     .function
                     .chunk
                     .disassemble_instruction(self.cur_frame.ip);
@@ -301,11 +302,54 @@ impl Vm {
                         Err(res) => return res,
                     }
                 }
+                OpCode::Closure => {
+                    if let Value::Obj(Object::Fn(function)) = self.read_consnt() {
+                        let mut closure = Closure::new(function);
+                        for _ in 0..closure.function.upvalue_count {
+                            let is_local = self.read_byte() == 1;
+                            let index = self.read_byte() as usize;
+
+                            if is_local {
+                                closure
+                                    .upvalues
+                                    .push(Vm::capture_upvalue(self.cur_frame.slot_idx + index));
+                            } else {
+                                closure
+                                    .upvalues
+                                    .push(self.cur_frame.closure.upvalues[index]);
+                            }
+                        }
+                        self.push(closure);
+                    } else {
+                        self.runtime_error("can' only create closure from function");
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                OpCode::GetUpValue => {
+                    let slot = self.read_byte() as usize;
+                    let slot = self.cur_frame.closure.upvalues[slot].location;
+                    if let Some(val) = self.stack.get(slot) {
+                        self.push(val.clone())
+                    } else {
+                        self.runtime_error(&format!("GetUpValue operand error, slot:{}", slot));
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                OpCode::SetUpValue => {
+                    let idx = self.stack.len() - 1;
+                    let slot = self.read_byte() as usize;
+                    self.cur_frame.closure.upvalues[slot].location = idx;
+                },
                 OpCode::Unknown(a) => {
-                    eprintln!("ip:{:?}, byte:{:?}", self.cur_frame.ip, a)
+                    eprintln!("Unknow opcode ip:{:?}, byte:{:?}", self.cur_frame.ip, a);
+                    return InterpretResult::RuntimeError;
                 }
             }
         }
+    }
+
+    fn capture_upvalue(location: usize) -> UpValue {
+        UpValue { location }
     }
 
     fn reset_stack(&mut self) {
@@ -339,7 +383,7 @@ impl Vm {
     fn call(&mut self, arg_count: usize) -> Result<(), InterpretResult> {
         if let Some(val) = self.peak(arg_count) {
             match val {
-                Value::Obj(Object::Fn(val)) => {
+                Value::Obj(Object::Closure(val)) => {
                     let mut frame = self.call_fun(val.clone(), arg_count)?;
                     std::mem::swap(&mut self.cur_frame, &mut frame);
                     self.frames.push_back(frame);
@@ -376,19 +420,15 @@ impl Vm {
         Ok(())
     }
 
-    fn call_fun(
-        &mut self,
-        fun: Rc<Function>,
-        arg_count: usize,
-    ) -> Result<CallFrame, InterpretResult> {
-        if fun.arity != arg_count {
+    fn call_fun(&mut self, clo: Closure, arg_count: usize) -> Result<CallFrame, InterpretResult> {
+        if clo.function.arity != arg_count {
             self.runtime_error(&format!(
                 "Expected {} arguments but got {}.",
-                fun.arity, arg_count
+                clo.function.arity, arg_count
             ));
             return Err(InterpretResult::RuntimeError);
         }
-        let mut frame = CallFrame::new(fun);
+        let mut frame = CallFrame::new(clo);
         frame.slot_idx = self.stack.len() - arg_count - 1;
         Ok(frame)
     }
@@ -442,16 +482,19 @@ fn clock_native(_: &[Value]) -> Result<Value, InterpretResult> {
 }
 
 fn frame_error_location(frame: &CallFrame) {
-    let fun = &frame.function;
-    if fun.chunk.code().is_empty() {
+    let clo = &frame.closure;
+    if clo.function.chunk.code().is_empty() {
         return;
     }
     let offset = frame.ip - 1;
-    eprint!("[line {}] in ", fun.chunk.line(offset).unwrap_or(0));
-    if fun.name.as_ref() == "" {
+    eprint!(
+        "[line {}] in ",
+        clo.function.chunk.line(offset).unwrap_or(0)
+    );
+    if clo.function.name.as_ref() == "" {
         eprintln!("script");
     } else {
-        eprintln!("{}()", fun.name);
+        eprintln!("{}()", clo.function.name);
     }
 }
 

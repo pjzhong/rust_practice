@@ -1,5 +1,5 @@
 pub use crate::chunk::op::OpCode;
-use crate::Value;
+use crate::{value::Object, Value};
 use std::ops::{Add, Sub};
 
 mod op;
@@ -74,15 +74,42 @@ impl Chunk {
             OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal => {
                 self.constant_instruction(instruction, offset)
             }
-            OpCode::GetLocal | OpCode::SetLocal | OpCode::Call => {
-                self.byte_instruction(instruction, offset)
-            }
+            OpCode::GetLocal
+            | OpCode::SetLocal
+            | OpCode::Call
+            | OpCode::GetUpValue
+            | OpCode::SetUpValue => self.byte_instruction(instruction, offset),
             OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Jump => {
                 self.jump_instruction(instruction, usize::add, offset)
             }
             OpCode::Loop => self.jump_instruction(instruction, usize::sub, offset),
+            OpCode::Closure => {
+                let mut offset = offset + 2;
+                let cosntant = self.code[offset - 1];
+                let val = &self.constants[cosntant as usize];
+                println!("{:-16} {:04} {}", "Closure", cosntant, val);
+
+                if let Value::Obj(Object::Fn(val)) = val {
+                    for _ in 0..val.upvalue_count {
+                        offset += 2;
+                        let local = if self.code[offset - 2] == 1 {
+                            "local"
+                        } else {
+                            "upvalue"
+                        };
+                        let index = self.code[offset - 1];
+                        println!(
+                            "{:04}      |                     {:?} {:?}",
+                            offset - 2,
+                            local,
+                            index
+                        );
+                    }
+                }
+                return offset;
+            }
             OpCode::Unknown(inst) => {
-                println!("Unknow opcde {}", inst);
+                eprintln!("Unknow opcde {}", inst);
                 offset + 1
             }
             OpCode::Return
@@ -111,7 +138,7 @@ impl Chunk {
     fn constant_instruction(&self, name: OpCode, offset: usize) -> usize {
         let const_idx = self.code[offset + 1];
         print!("{:-16} {:04} ", format!("{:?}", name), const_idx);
-        println!("{:?}", &self.constants[const_idx as usize]);
+        println!("{}", &self.constants[const_idx as usize]);
         offset + 2
     }
 

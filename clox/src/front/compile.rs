@@ -10,7 +10,7 @@ struct Local {
     depth: i32,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 enum FunctionType {
     Fn,
     Script,
@@ -22,30 +22,21 @@ impl Default for FunctionType {
     }
 }
 
-#[derive(Default)]
-struct Parser {
-    error: bool,
-    panic: bool,
-    previous: Option<Token>,
-    current: Option<Token>,
-}
-
-impl Parser {
-    fn error_at_current(&mut self, message: &str) {
-        if self.panic {
-            return;
-        }
-        self.panic = true;
-        error_at(&self.current, message);
-        self.error = true;
-    }
+struct Upvalue {
+    index: u8,
+    local: bool,
 }
 
 #[derive(Default)]
 pub struct Compiler {
-    parser: Option<Parser>,
+    enclosing: Option<Box<Compiler>>,
     scanner: Option<Scanner>,
     locals: Vec<Local>,
+    upvalues: Vec<Upvalue>,
+    previous: Option<Token>,
+    current: Option<Token>,
+    error: bool,
+    panic: bool,
     scope_depth: i32,
     function: Function,
     fn_type: FunctionType,
@@ -53,31 +44,24 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn compile(mut self, source: &str) -> Option<Function> {
-        let scanner = self.init_scanner(source);
-        self.init_compiler(Some(Parser::default()), Some(scanner), FunctionType::Script);
+        self.init_compiler(None, FunctionType::Script);
+        self.init_scanner(source);
         self.advance();
         while self.match_advance(TokenType::Eof).is_none() && self.current().is_some() {
             self.declaration()
         }
         self.consume(TokenType::Eof, "Expect end of expression.");
-        self.end_compiler()
+        self.end_compiler().map(|c| c.function)
     }
 
-    fn init_compiler(
-        &mut self,
-        parser: Option<Parser>,
-        scanner: Option<Scanner>,
-        fn_type: FunctionType,
-    ) {
-        self.scanner = scanner;
-        self.parser = parser;
+    fn init_compiler(&mut self, enclosing: Option<Box<Compiler>>, fn_type: FunctionType) {
+        self.enclosing = enclosing;
         self.fn_type = fn_type;
         self.scope_depth = 0;
         if self.fn_type != FunctionType::Script {
             self.function.name = self
-                .parser
+                .previous
                 .as_ref()
-                .and_then(|p| p.previous.as_ref())
                 .map_or_else(|| Rc::new(String::new()), |prev| prev.str.clone())
         }
         self.locals.push(Local {
@@ -94,37 +78,28 @@ impl Compiler {
         &mut self.function.chunk
     }
 
-    fn init_scanner(&mut self, source: &str) -> Scanner {
-        Scanner::new(source)
+    fn init_scanner(&mut self, source: &str) {
+        self.scanner = Some(Scanner::new(source));
     }
 
     fn advance(&mut self) -> Option<&Token> {
-        let parser = self.parser.as_mut()?;
-
-        parser.previous = parser.current.take();
-
-        if let Some(scanner) = self.scanner.as_mut() {
-            loop {
-                let current = scanner.scan_token();
-                let token_ty = current.ty;
-                if token_ty == TokenType::Error {
-                    parser.error_at_current(&current.str);
-                }
-
-                parser.current = Some(current);
-                if token_ty != TokenType::Error {
+        self.previous = self.current.take();
+        let scanner = self.scanner.as_mut()?;
+        loop {
+            self.current = Some(scanner.scan_token());
+            if let Some(current) = self.current.as_ref() {
+                if current.ty != TokenType::Error {
                     break;
                 }
-            }
-        } else {
-            parser.current = Some(Token {
-                ty: TokenType::Eof,
-                str: Rc::new(String::new()),
-                line: 0,
-            });
-        }
 
-        parser.previous.as_ref()
+                if !self.panic {
+                    self.panic = true;
+                    error_at(&self.current, &current.str);
+                    self.error = true;
+                }
+            }
+        }
+        self.previous.as_ref()
     }
 
     fn return_statment(&mut self) {
@@ -309,15 +284,13 @@ impl Compiler {
             _ => self.statement(),
         }
 
-        if self.parser.as_ref().map_or(false, |f| f.panic) {
+        if self.panic {
             self.synchronize()
         }
     }
 
     fn synchronize(&mut self) {
-        if let Some(parser) = self.parser.as_mut() {
-            parser.panic = false;
-        }
+        self.panic = false;
 
         while self
             .current()
@@ -420,7 +393,7 @@ impl Compiler {
 
     fn function(&mut self, fn_type: FunctionType) {
         let mut compiler = Compiler::default();
-        compiler.init_compiler(self.parser.take(), self.scanner.take(), fn_type);
+        compiler.enclosing(self, fn_type);
         compiler.begin_scope();
 
         compiler.consume(TokenType::LeftParen, "Expect '(' after function name.");
@@ -447,13 +420,47 @@ impl Compiler {
         compiler.block();
 
         // collect info
-        self.parser = compiler.parser.take();
-        self.scanner = compiler.scanner.take();
+        compiler.declosing(self);
         // return to current compiler
-        if let Some(function) = compiler.end_compiler() {
-            let idx = self.make_constant(function);
-            self.emit_bytes(OpCode::Constant, idx);
+        if let Some(mut compiler) = compiler.end_compiler() {
+            compiler.function.upvalue_count = compiler.upvalues.len();
+            let idx = self.make_constant(compiler.function);
+            self.emit_bytes(OpCode::Closure, idx);
+
+            for up_val in compiler.upvalues {
+                self.emit_byte(if up_val.local { 1 } else { 0 });
+                self.emit_byte(up_val.index);
+            }
         }
+    }
+
+    fn enclosing(&mut self, enclosing: &mut Compiler, fn_type: FunctionType) {
+        let mut enclosing_copy = Compiler::default();
+        enclosing_copy.fn_type = enclosing.fn_type;
+        enclosing_copy.enclosing = enclosing.enclosing.take();
+        std::mem::swap(&mut enclosing_copy.locals, &mut enclosing.locals);
+        std::mem::swap(&mut enclosing_copy.upvalues, &mut enclosing.upvalues);
+
+        self.panic = enclosing.panic;
+        self.error = enclosing.error;
+        self.previous = enclosing.previous.take();
+        self.current = enclosing.current.take();
+        self.scanner = enclosing.scanner.take();
+        self.init_compiler(Some(Box::new(enclosing_copy)), fn_type);
+    }
+
+    fn declosing(&mut self, enclosing: &mut Compiler) {
+        if let Some(mut enclosing_copy) = self.enclosing.take() {
+            enclosing.enclosing = enclosing_copy.enclosing.take();
+            std::mem::swap(&mut enclosing.locals, &mut enclosing_copy.locals);
+            std::mem::swap(&mut enclosing.upvalues, &mut enclosing_copy.upvalues);
+        }
+
+        enclosing.panic = self.panic;
+        enclosing.error = self.error;
+        enclosing.previous = self.previous.take();
+        enclosing.current = self.current.take();
+        enclosing.scanner = self.scanner.take();
     }
 
     fn print_statement(&mut self) {
@@ -476,7 +483,7 @@ impl Compiler {
         }
     }
 
-    fn end_compiler(mut self) -> Option<Function> {
+    fn end_compiler(mut self) -> Option<Compiler> {
         self.emit_return();
 
         #[cfg(debug_assertions)]
@@ -495,7 +502,7 @@ impl Compiler {
         if self.is_error() {
             None
         } else {
-            Some(self.function)
+            Some(self)
         }
     }
 
@@ -589,11 +596,16 @@ impl Compiler {
         let (arg, get_op, set_op) = if arg != -1 {
             (arg as u8, OpCode::GetLocal, OpCode::SetLocal)
         } else {
-            (
-                self.identifier_constant(name),
-                OpCode::GetGlobal,
-                OpCode::SetGlobal,
-            )
+            let arg = self.resolve_upvalue(&name);
+            if arg != -1 {
+                (arg as u8, OpCode::GetUpValue, OpCode::SetUpValue)
+            } else {
+                (
+                    self.identifier_constant(name),
+                    OpCode::GetGlobal,
+                    OpCode::SetGlobal,
+                )
+            }
         };
 
         if can_assign && self.match_advance(TokenType::Equal).is_some() {
@@ -602,6 +614,35 @@ impl Compiler {
         } else {
             self.emit_bytes(get_op, arg)
         }
+    }
+
+    fn resolve_upvalue(&mut self, name: &str) -> i32 {
+        if let Some(enclsoing) = self.enclosing.as_mut() {
+            let local = enclsoing.resolve_local(name);
+            if local != -1 {
+                return self.add_upvalue(local as u8, true);
+            }
+
+            let upvalue = enclsoing.resolve_upvalue(name);
+            if upvalue != -1 {
+                return self.add_upvalue(upvalue as u8, false);
+            }
+            return -1;
+        } else {
+            return -1;
+        }
+    }
+
+    fn add_upvalue(&mut self, index: u8, local: bool) -> i32 {
+        for (idx, val) in self.upvalues.iter().enumerate() {
+            if val.index == index && val.local == local {
+                return idx as i32;
+            }
+        }
+
+        let upvalue = Upvalue { index, local };
+        self.upvalues.push(upvalue);
+        (self.upvalues.len() - 1) as i32
     }
 
     pub fn unary(&mut self, _: bool) {
@@ -659,7 +700,7 @@ impl Compiler {
         self.make_constant(str)
     }
 
-    fn resolve_local(&self, name: &String) -> i32 {
+    fn resolve_local(&self, name: &str) -> i32 {
         for (idx, local) in self.locals.iter().enumerate().rev() {
             if local.name.str.as_str() == name {
                 return idx as i32;
@@ -780,15 +821,15 @@ impl Compiler {
     }
 
     fn current(&self) -> Option<&Token> {
-        self.parser.as_ref().and_then(|f| f.current.as_ref())
+        self.current.as_ref()
     }
 
     fn previous(&self) -> Option<&Token> {
-        self.parser.as_ref().and_then(|f| f.previous.as_ref())
+        self.previous.as_ref()
     }
 
     fn is_error(&self) -> bool {
-        self.parser.as_ref().map_or(false, |f| f.error)
+        self.error
     }
 
     fn match_advance(&mut self, ty: TokenType) -> Option<&Token> {
@@ -809,26 +850,22 @@ impl Compiler {
     }
 
     fn error(&mut self, message: &str) {
-        if let Some(parser) = self.parser.as_mut() {
-            if parser.panic {
-                return;
-            }
-            parser.panic = true;
-
-            error_at(&parser.previous, message);
-            parser.error = true;
+        if self.panic {
+            return;
         }
+
+        self.panic = true;
+        error_at(&self.previous, message);
+        self.error = true;
     }
 
     fn error_at_current(&mut self, message: &str) {
-        if let Some(parser) = self.parser.as_mut() {
-            if parser.panic {
-                return;
-            }
-            parser.panic = true;
-            error_at(&parser.current, message);
-            parser.error = true;
+        if self.panic {
+            return;
         }
+        self.panic = true;
+        error_at(&self.current, message);
+        self.error = true;
     }
 }
 
