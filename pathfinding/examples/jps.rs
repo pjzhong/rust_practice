@@ -4,34 +4,34 @@ use noise::{
 };
 use std::{
     cmp::{Ordering, Reverse},
-    collections::{BinaryHeap, HashSet},
-    rc::Rc,
+    collections::{BinaryHeap, HashSet, BTreeSet},
+    rc::Rc, f32::consts::SQRT_2,
 };
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-enum GrapNode {
+enum GraphNode {
     Node(i32, i32),
     Wall(i32, i32),
 }
 
-impl GrapNode {
+impl GraphNode {
     fn get_x(&self) -> i32 {
         match self {
-            GrapNode::Node(x, _) => *x,
-            GrapNode::Wall(x, _) => *x,
+            GraphNode::Node(x, _) => *x,
+            GraphNode::Wall(x, _) => *x,
         }
     }
 
     fn get_y(&self) -> i32 {
         match self {
-            GrapNode::Node(_, y) => *y,
-            GrapNode::Wall(_, y) => *y,
+            GraphNode::Node(_, y) => *y,
+            GraphNode::Wall(_, y) => *y,
         }
     }
 }
 
 pub struct Graph {
-    nodes: Vec<Rc<GrapNode>>,
+    nodes: Vec<Rc<GraphNode>>,
     width: usize,
 }
 
@@ -40,7 +40,7 @@ impl Graph {
         let mut nodes = Vec::with_capacity(width * height);
         for w in 0..width {
             for h in 0..height {
-                nodes.push(Rc::new(GrapNode::Node(w as i32, h as i32)));
+                nodes.push(Rc::new(GraphNode::Node(w as i32, h as i32)));
             }
         }
 
@@ -75,11 +75,11 @@ impl Graph {
         graph
     }
 
-    fn walkable_node(&self, x: i32, y: i32) -> Option<Rc<GrapNode>> {
+    fn walkable_node(&self, x: i32, y: i32) -> Option<Rc<GraphNode>> {
         let idx = self.get_idx(x, y);
         match self.nodes.get(idx) {
             Some(rc) => match rc.as_ref() {
-                node @ GrapNode::Node(..) => Some(rc.clone()),
+                node @ GraphNode::Node(..) => Some(rc.clone()),
                 _ => None,
             },
             _ => None,
@@ -98,7 +98,7 @@ impl Graph {
         let idx = self.get_idx(x, y);
 
         if let Some(node) = self.nodes.get_mut(idx) {
-            *node = Rc::new(GrapNode::Wall(x as i32, y as i32));
+            *node = Rc::new(GraphNode::Wall(x as i32, y as i32));
         }
     }
 
@@ -106,28 +106,45 @@ impl Graph {
         let idx = self.get_idx(x, y);
 
         if let Some(node) = self.nodes.get_mut(idx) {
-            *node = Rc::new(GrapNode::Node(x as i32, y as i32));
+            *node = Rc::new(GraphNode::Node(x as i32, y as i32));
         }
+    }
+}
+
+struct Heuristic;
+
+impl Heuristic {
+    pub fn octile(dx: f32, dy:f32) -> f32 {
+        let squart2 = SQRT_2;
+        if dx < dy {
+            squart2 * dx + dy
+        } else {
+            squart2 * dy + dx
+        }
+    }
+
+    pub fn manhattan(dx: f32, dy:f32) -> f32 {
+        dx + dy
     }
 }
 
 struct Jps;
 
 struct PathNode {
-    node: Rc<GrapNode>,
+    node: Rc<GraphNode>,
     parent: Option<Rc<PathNode>>,
     // distance to start + estimate to end
-    f: f64,
+    f: f32,
     // distance to start (parent's g + distance from parent)
-    g: f64,
+    g: f32,
     // estimate to end
-    h: f64,
+    h: f32,
 }
 
 impl PathNode {
-    fn new(node: GrapNode) -> Self {
+    fn new(node: Rc<GraphNode>) -> Self {
         Self {
-            node: Rc::new(node),
+            node,
             parent: None,
             f: 0.0,
             g: 0.0,
@@ -141,6 +158,10 @@ impl PathNode {
 
     fn get_y(&self) -> i32 {
         self.node.get_y()
+    }
+
+    fn set_parent(&mut self, parent: Rc<PathNode>) {
+        self.parent = Some(parent);
     }
 }
 
@@ -165,44 +186,128 @@ impl Ord for PathNode {
 }
 
 impl Jps {
-    pub fn find_path(grpah: &Graph, start: GrapNode, end: GrapNode) {
-        if grpah.is_not_walkable(end.get_x(), end.get_y()) {
+    pub fn find_path(graph: &Graph, start: GraphNode, end: GraphNode) {
+        if graph.is_not_walkable(end.get_x(), end.get_y()) {
             return;
         }
 
-        let mut open: BinaryHeap<Reverse<PathNode>> = BinaryHeap::new();
+        let mut open: BTreeSet<PathNode> = BTreeSet::new();
 
-        open.push(Reverse(PathNode::new(start)));
+        open.insert(PathNode::new(Rc::new(start)));
 
-        let mut closed: HashSet<Rc<GrapNode>> = HashSet::new();
-        while let Some(Reverse(path_node)) = open.pop() {
+        let mut closed: HashSet<Rc<GraphNode>> = HashSet::new();
+        while let Some(path_node) = open.pop_first() {
             closed.insert(path_node.node.clone());
 
             if path_node.node.as_ref() == &end {
+                //TODO backtrace
                 return;
             }
+
+            Jps::identify_successors(graph, Rc::new(path_node), &end, &mut closed, &mut open)
         }
     }
 
     fn identify_successors(
-        grpah: &Graph,
-        path_node: Rc<PathNode>,
-        end: &GrapNode,
-        closed: &mut HashSet<GrapNode>,
-        open: &mut BinaryHeap<Reverse<PathNode>>,
+        graph: &Graph,
+        node: Rc<PathNode>,
+        end: &GraphNode,
+        closed: &mut HashSet<Rc<GraphNode>>,
+        open: &mut BTreeSet<PathNode>,
     ) {
+        let neighbors = Jps::find_neighbors(graph, node.clone());
+        for neighbor in neighbors {
+            let jump_point = Jps::jump(graph, neighbor.node.as_ref(), &node.node, end);
+            if let Some(jump_point) = jump_point {
+                if closed.contains(&jump_point) {
+                    continue;
+                }
+
+                let dx = (jump_point.get_x() - node.get_x()).abs() as f32;
+                let dy = (jump_point.get_y() - node.get_y()).abs() as f32;
+                let d = Heuristic::octile(dx, dy);
+                let ng = node.g + d;//next 'g' value
+
+                open
+            }
+        }
     }
 
-    fn jump(graph: &Graph, current: &GrapNode, neighbor: &GrapNode) {
-        if graph.is_not_walkable(neighbor.get_x(), neighbor.get_y()) {
-            return;
+    fn jump(
+        graph: &Graph,
+        current: &GraphNode,
+        neighbor: &GraphNode,
+        goal: &GraphNode,
+    ) -> Option<Rc<GraphNode>> {
+        if graph.is_not_walkable(current.get_x(), current.get_y()) {
+            return None;
+        }
+
+        if current == goal {
+            return graph.walkable_node(current.get_x(), current.get_y());
+        }
+
+        let (x, y) = (current.get_x(), current.get_y());
+        let (dx, dy) = (
+            current.get_x() - neighbor.get_x(),
+            current.get_y() - neighbor.get_y(),
+        );
+
+        // check for forced neighbors
+        // along the diagonal
+        if dx != 0 && dy != 0 {
+            if (graph.is_walkable(x - dx, y + dy) && graph.is_not_walkable(x - dx, y))
+                || (graph.is_walkable(x + dx, y - dy) && graph.is_not_walkable(x, y - dy))
+            {
+                return graph.walkable_node(x, y);
+            }
+
+            for next in vec![
+                graph.walkable_node(x + dx, y),
+                graph.walkable_node(x, y + dy),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if Jps::jump(graph, &next, current, goal).is_some() {
+                    return graph.walkable_node(x, y);
+                }
+            }
+        } else {
+            // check horizontally/vertically
+
+            if dx != 0 {
+                if graph.is_walkable(x + dx, y + 1) && graph.is_not_walkable(x, y + 1)
+                    || graph.is_walkable(x + dx, y - 1) && graph.is_not_walkable(x, y - 1)
+                {
+                    return graph.walkable_node(x, y);
+                }
+            } else {
+                if graph.is_walkable(x + 1, y + dy) && graph.is_not_walkable(x, y + 1)
+                    || graph.is_walkable(x + -1, y + dy) && graph.is_not_walkable(x, y - 1)
+                {
+                    return graph.walkable_node(x, y);
+                }
+            }
+        }
+
+        // moving diagonally, must make sure one of the vertical/hhorizontal
+        // neighbors is open to allow the path
+        if graph.is_walkable(x + dx, y) || graph.is_walkable(x, y + dy) {
+            if let Some(next) = graph.walkable_node(x + dx, y + dy) {
+                Jps::jump(graph, &next, current, goal)
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 
     /// https://zerowidth.com/2013/a-visual-explanation-of-jump-point-search.html
-    fn find_neighbors(graph: &Graph, node: &PathNode) -> Vec<Rc<GrapNode>> {
-        if let Some(parent) = node.parent.as_ref() {
-            let (x, y) = (node.get_x(), node.get_y());
+    fn find_neighbors(graph: &Graph, parent: Rc<PathNode>) -> Vec<PathNode> {
+        if let Some(parent) = parent.parent.as_ref() {
+            let (x, y) = (parent.get_x(), parent.get_y());
 
             let (dx, dy) = (
                 (x - parent.get_x()) / 1.max((x - parent.get_x()).abs()),
@@ -241,11 +346,13 @@ impl Jps {
                         vec.push(node);
                     }
                 }
+
+                to_path_node(vec, parent)
             } else {
                 // search horizonetally
                 if dx == 0 {
+                    let mut vec = vec![];
                     if let Some(node) = graph.walkable_node(x, y + dy) {
-                        let mut vec = vec![];
                         vec.push(node);
 
                         //down is force neighbors
@@ -261,9 +368,9 @@ impl Jps {
                                 vec.push(node);
                             }
                         }
-
-                        return vec;
                     }
+
+                    to_path_node(vec, parent)
                 }
                 // search vertically
                 else if let Some(node) = graph.walkable_node(x + dx, y) {
@@ -284,18 +391,20 @@ impl Jps {
                         }
                     }
 
-                    return vec;
+                    to_path_node(vec, parent)
+                } else {
+                    vec![]
                 }
             }
 
             // no neighbors
-            vec![]
         } else {
-            Jps::get_all_neightbors(graph, &node.node)
+            let vec = Jps::get_all_neightbors(graph, &parent.node);
+            to_path_node(vec, &parent)
         }
     }
 
-    fn get_all_neightbors(graph: &Graph, node: &GrapNode) -> Vec<Rc<GrapNode>> {
+    fn get_all_neightbors(graph: &Graph, node: &GraphNode) -> Vec<Rc<GraphNode>> {
         let (x, y) = (node.get_x(), node.get_y());
 
         let n = graph.walkable_node(x, y - 1);
@@ -331,10 +440,21 @@ impl Jps {
     }
 }
 
+fn to_path_node(vec: Vec<Rc<GraphNode>>, parent: &Rc<PathNode>) -> Vec<PathNode> {
+    let mut res = vec![];
+    for graph_node in vec {
+        let mut path_node = PathNode::new(graph_node);
+        path_node.set_parent(parent.clone());
+
+        res.push(path_node);
+    }
+    res
+}
+
 fn main() {
     let mut graph = Graph::auto_build(255, 255);
-    graph.set_node(33, 033);
+    graph.set_node(33, 33);
     graph.set_node(99, 99);
 
-    Jps::find_path(&graph, GrapNode::Node(33, 33), GrapNode::Node(99, 99))
+    Jps::find_path(&graph, GraphNode::Node(33, 33), GraphNode::Node(99, 99))
 }

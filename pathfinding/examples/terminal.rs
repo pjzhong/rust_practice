@@ -74,7 +74,7 @@ enum InputCommand {
 }
 
 fn setup(mut commands: Commands) {
-    let size = [256, 128];
+    let size = [128, 128];
     commands.spawn_bundle(TerminalBundle::new().with_size(size));
     commands.spawn_bundle(TiledCameraBundle::new().with_tile_count(size));
 

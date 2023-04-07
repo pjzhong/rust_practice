@@ -48,7 +48,8 @@ fn draw(mut q_term: Query<&mut Terminal>, mut config: ResMut<WavesConfig>) {
         let t = idx as f32 / (size.x - 2) as f32;
         let col = color_lerp(START_COLOR, END_COLOR, t);
         let fmt = CharFormat::new(col, Color::BLACK);
-        let y = size.y as f64 * wave_height * ((half as f64 + x as f64) * wave_width + x_offset).sin();
+        let y =
+            size.y as f64 * wave_height * ((half as f64 + x as f64) * wave_width + x_offset).sin();
         let pos = world_to_map(size, IVec2::new(x, y as i32));
         term.put_char_formatted(pos.to_array(), '█', fmt);
     }
@@ -57,7 +58,8 @@ fn draw(mut q_term: Query<&mut Terminal>, mut config: ResMut<WavesConfig>) {
         let t = idx as f32 / (size.x - 2) as f32;
         let col = color_lerp(START_COLOR_1, END_COLOR_1, t);
         let fmt = CharFormat::new(col, Color::BLACK);
-        let y = size.y as f64 * wave_height * ((half as f64 + x as f64) * wave_width + x_offset).cos();
+        let y =
+            size.y as f64 * wave_height * ((half as f64 + x as f64) * wave_width + x_offset).cos();
         let pos = world_to_map(size, IVec2::new(x, y as i32));
         term.put_char_formatted(pos.to_array(), '█', fmt);
     }
