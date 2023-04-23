@@ -53,7 +53,7 @@ impl Display for Function {
 #[derive(Clone, Default, Debug)]
 pub struct Closure {
     pub function: Rc<Function>,
-    pub upvalues: Vec<UpValue>,
+    pub upvalues: Vec<Rc<UpValue>>,
 }
 
 impl PartialEq for Closure {
@@ -101,7 +101,7 @@ impl Display for Object {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct UpValue {
     pub(crate) location: usize,
 }

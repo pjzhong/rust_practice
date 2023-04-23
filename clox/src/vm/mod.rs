@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque, LinkedList};
 use std::ops::{Div, Mul, Sub};
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -60,6 +60,7 @@ pub struct Vm {
     frames: VecDeque<CallFrame>,
     cur_frame: CallFrame,
     globals: HashMap<Rc<String>, Value>,
+    upvalus: LinkedList<Rc<UpValue>>
 }
 
 impl Vm {
@@ -69,6 +70,7 @@ impl Vm {
             frames: VecDeque::new(),
             globals: HashMap::new(),
             cur_frame: CallFrame::default(),
+            upvalus: LinkedList::new(),
         }
     }
 
@@ -312,11 +314,11 @@ impl Vm {
                             if is_local {
                                 closure
                                     .upvalues
-                                    .push(Vm::capture_upvalue(self.cur_frame.slot_idx + index));
+                                    .push(self.capture_upvalue(self.cur_frame.slot_idx + index));
                             } else {
                                 closure
                                     .upvalues
-                                    .push(self.cur_frame.closure.upvalues[index]);
+                                    .push(self.cur_frame.closure.upvalues[index].clone());
                             }
                         }
                         self.push(closure);
@@ -348,8 +350,24 @@ impl Vm {
         }
     }
 
-    fn capture_upvalue(location: usize) -> UpValue {
-        UpValue { location }
+    fn capture_upvalue(&mut self, location: usize) -> Rc<UpValue> {
+        let mut upvalue = None;
+
+        for (idx, val) in self.upvalus.iter().enumerate() {
+            if val.location <= location {
+                upvalue = Some(val.clone());
+                break;
+            }
+        }
+
+        if let Some(upvalue) = upvalue {
+            if upvalue.location == location {
+                return upvalue;
+            }
+        }
+        
+        let val = Rc::new(UpValue { location });
+        
     }
 
     fn reset_stack(&mut self) {

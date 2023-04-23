@@ -8,6 +8,7 @@ use super::{scanner::Scanner, token::Token, TokenType};
 struct Local {
     name: Token,
     depth: i32,
+    captured: bool,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -71,6 +72,7 @@ impl Compiler {
                 str: Rc::new(String::new()),
                 line: 0,
             },
+            captured: false,
         })
     }
 
@@ -378,8 +380,15 @@ impl Compiler {
             .filter(|local| local.depth > self.scope_depth)
             .count();
         for _ in 0..count {
-            self.locals.pop();
-            self.emit_byte(OpCode::Pop);
+            if let Some(local) = self.locals.pop() {
+                if local.captured {
+                    self.emit_byte(OpCode::CloseUpvalue)
+                } else {
+                    self.emit_byte(OpCode::Pop)
+                }
+            } else {
+               self.error("wrong stack length, end scope error")
+            }
         }
     }
 
@@ -620,6 +629,7 @@ impl Compiler {
         if let Some(enclsoing) = self.enclosing.as_mut() {
             let local = enclsoing.resolve_local(name);
             if local != -1 {
+                self.locals[local as usize].captured = true;
                 return self.add_upvalue(local as u8, true);
             }
 
@@ -731,6 +741,7 @@ impl Compiler {
         let local = Local {
             name,
             depth: self.scope_depth,
+            captured: false,
         };
         self.locals.push(local);
     }

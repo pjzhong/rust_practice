@@ -29,6 +29,7 @@ pub enum OpCode {
     Closure,
     GetUpValue,
     SetUpValue,
+    CloseUpvalue,
     Unknown(u8),
 }
 
@@ -64,6 +65,7 @@ impl From<u8> for OpCode {
             26 => Self::Closure,
             27 => Self::GetUpValue,
             28 => Self::SetUpValue,
+            29 => Self::CloseUpvalue,
             _ => Self::Unknown(byte),
         }
     }
@@ -101,6 +103,7 @@ impl From<OpCode> for u8 {
             OpCode::Closure => 26,
             OpCode::GetUpValue => 27,
             OpCode::SetUpValue => 28,
+            OpCode::CloseUpvalue => 29,
             OpCode::Unknown(a) => a,
         }
     }

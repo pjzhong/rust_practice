@@ -126,6 +126,7 @@ impl Chunk {
             | OpCode::Greater
             | OpCode::Less
             | OpCode::Print
+            | OpCode::CloseUpvalue
             | OpCode::Pop => self.simple_instruction(&instruction, offset),
         }
     }
