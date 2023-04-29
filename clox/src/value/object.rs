@@ -1,4 +1,5 @@
 use crate::{chunk::Chunk, InterpretResult};
+use std::cell::{BorrowMutError, RefCell};
 use std::fmt::{Debug, Display};
 use std::rc::Rc;
 
@@ -103,5 +104,39 @@ impl Display for Object {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UpValue {
-    pub(crate) location: usize,
+    innner: RefCell<UpValueInner>,
+}
+
+impl UpValue {
+    pub fn new(location: usize) -> Self {
+        Self {
+            innner: RefCell::new(UpValueInner { location }),
+        }
+    }
+
+    pub fn location(&self) -> usize {
+        match self.innner.try_borrow() {
+            Ok(loc) => loc.location,
+            Err(_) => {
+                //TODO Is ok to return max???
+                usize::MAX
+            }
+        }
+    }
+
+    pub fn set_location(&self, location: usize) -> Result<(), BorrowMutError> {
+        match self.innner.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.location = location;
+
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct UpValueInner {
+    location: usize,
 }

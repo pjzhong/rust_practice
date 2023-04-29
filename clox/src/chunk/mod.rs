@@ -106,7 +106,7 @@ impl Chunk {
                         );
                     }
                 }
-                return offset;
+                 offset
             }
             OpCode::Unknown(inst) => {
                 eprintln!("Unknow opcde {}", inst);
