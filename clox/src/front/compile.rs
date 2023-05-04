@@ -546,7 +546,7 @@ impl Compiler {
             return 0;
         }
 
-        let mut count = 0;
+        let mut count: usize = 0;
         loop {
             self.expression();
             if count >= 255 {
@@ -561,7 +561,7 @@ impl Compiler {
 
         self.consume(TokenType::RightParen, "Expect ')' after arguments");
 
-        count
+        count as u8
     }
 
     pub fn literal(&mut self, _: bool) {
@@ -637,9 +637,9 @@ impl Compiler {
             if upvalue != -1 {
                 return self.add_upvalue(upvalue as u8, false);
             }
-            return -1;
+            -1
         } else {
-            return -1;
+            -1
         }
     }
 
