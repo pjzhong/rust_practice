@@ -387,7 +387,7 @@ impl Compiler {
                     self.emit_byte(OpCode::Pop)
                 }
             } else {
-               self.error("wrong stack length, end scope error")
+                self.error("wrong stack length, end scope error")
             }
         }
     }

@@ -1,4 +1,6 @@
 use crate::{chunk::Chunk, InterpretResult};
+use std::borrow::BorrowMut;
+use std::cell::{BorrowError, BorrowMutError, RefCell};
 use std::fmt::{Debug, Display};
 use std::rc::Rc;
 
@@ -103,5 +105,32 @@ impl Display for Object {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UpValue {
-    pub(crate) location: usize,
+    location: RefCell<UpValueInner>,
+}
+
+impl UpValue {
+    pub fn new(location: usize) -> Self {
+        Self {
+            location: RefCell::new(UpValueInner { location: location }),
+        }
+    }
+
+    pub fn location(&self) -> usize {
+        self.location.borrow().location
+    }
+
+    pub fn set_location(&self, loc: usize) -> Result<(), BorrowMutError> {
+        match self.location.try_borrow_mut() {
+            Ok(mut inner) => {
+                inner.location = loc;
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct UpValueInner {
+    location: usize,
 }
