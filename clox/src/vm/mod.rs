@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque, LinkedList};
+use std::collections::{HashMap, LinkedList, VecDeque};
 use std::ops::{Div, Mul, Sub};
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -60,7 +60,7 @@ pub struct Vm {
     frames: VecDeque<CallFrame>,
     cur_frame: CallFrame,
     globals: HashMap<Rc<String>, Value>,
-    upvalus: LinkedList<Rc<UpValue>>
+    upvalus: LinkedList<Rc<UpValue>>,
 }
 
 impl Vm {
@@ -329,7 +329,7 @@ impl Vm {
                 }
                 OpCode::GetUpValue => {
                     let slot = self.read_byte() as usize;
-                    let slot = self.cur_frame.closure.upvalues[slot].location()();
+                    let slot = self.cur_frame.closure.upvalues[slot].location();
                     if let Some(val) = self.stack.get(slot) {
                         self.push(val.clone())
                     } else {
@@ -368,7 +368,7 @@ impl Vm {
         }
 
         if let Some(upvalue) = upvalue {
-            if upvalue.location()() == location {
+            if upvalue.location() == location {
                 return upvalue;
             }
         }
