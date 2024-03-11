@@ -6,9 +6,12 @@ impl Solution {
     /// [`here`]: https://leetcode.cn/problems/reverse-integer/description/
     #[allow(unused)]
     pub fn reverse(x: i32) -> i32 {
-        let sign = if x < 0 { -1 } else { 1 };
+        let sign = match x < 0 {
+            true => -1,
+            false => 1,
+        };
 
-        let mut res: i32 = 0;
+        let mut res = 0i32;
         let mut x = match x.checked_abs() {
             Some(x) => x,
             None => return 0,
