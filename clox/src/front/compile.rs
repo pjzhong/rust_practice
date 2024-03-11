@@ -444,9 +444,11 @@ impl Compiler {
     }
 
     fn enclosing(&mut self, enclosing: &mut Compiler, fn_type: FunctionType) {
-        let mut enclosing_copy = Compiler::default();
-        enclosing_copy.fn_type = enclosing.fn_type;
-        enclosing_copy.enclosing = enclosing.enclosing.take();
+        let mut enclosing_copy = Compiler {
+            fn_type: enclosing.fn_type,
+            enclosing: enclosing.enclosing.take(),
+            ..Default::default()
+        };
         std::mem::swap(&mut enclosing_copy.locals, &mut enclosing.locals);
         std::mem::swap(&mut enclosing_copy.upvalues, &mut enclosing.upvalues);
 

@@ -340,10 +340,10 @@ impl Vm {
                 OpCode::SetUpValue => {
                     let idx = self.stack.len() - 1;
                     let slot = self.read_byte() as usize;
-                    if let Err(e) = self.cur_frame.closure.upvalues[slot].set_location(idx) {
+                    if let Err(err) = self.cur_frame.closure.upvalues[slot].set_location(idx) {
                         self.runtime_error(&format!(
-                            "SetUpValue operand error, slot:{}, err:{}",
-                            slot, e
+                            "SetUpValue operand error, slot:{}, data race:{}",
+                            slot, err
                         ));
                         return InterpretResult::RuntimeError;
                     }
@@ -372,7 +372,6 @@ impl Vm {
                 return upvalue;
             }
         }
-
         Rc::new(UpValue::new(location))
     }
 
