@@ -1,8 +1,8 @@
 use core::ptr;
 use std::mem::forget;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicIsize, AtomicPtr, fence};
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::{fence, AtomicIsize, AtomicPtr};
+use std::sync::Arc;
 
 use crate::deque::Stolen::{Abort, Data, Empty};
 

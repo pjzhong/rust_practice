@@ -1,6 +1,6 @@
 mod algorithms;
-pub mod pretree;
 pub mod deque;
+pub mod pretree;
 
 #[cfg(test)]
 mod tests {

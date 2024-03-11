@@ -2,7 +2,6 @@ use crate::algorithms::Solution;
 
 #[allow(dead_code)]
 impl Solution {
-
     /// click [`here`] to leetcode。
     /// leetcode上面有更简洁的，完美的呈现如何运用【大小】规律
     ///

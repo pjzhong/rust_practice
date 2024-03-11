@@ -7,9 +7,7 @@ use std::{
 
 pub fn main() {
     let current_dir = env::current_dir().unwrap();
-    let algorithms_dir = current_dir
-        .join("src")
-        .join("algorithms");
+    let algorithms_dir = current_dir.join("src").join("algorithms");
 
     let path_prefix = current_dir
         .to_owned()
