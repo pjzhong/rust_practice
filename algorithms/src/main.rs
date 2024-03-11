@@ -56,7 +56,7 @@ pub fn main() {
     let mut read_me_file = File::create(current_dir.join("README.md")).unwrap();
     let all = format!(
         "{}\n\n# Questions-{}\n\n",
-        "[LeetCode:pj_zhong](https://leetcode.com/pj_zhong/)",
+        "[LeetCode:zanchen](https://leetcode.cn/u/zanchen/)",
         questions.len()
     );
     read_me_file
