@@ -1,61 +1,64 @@
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     iter::FromIterator,
 };
 
 use super::Solution;
 
+#[derive(Default, Debug)]
+struct Node {
+    word: Option<usize>,
+    child: HashMap<char, Node>,
+}
+
 impl Solution {
     const DIRS: [(isize, isize); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
 
+    /// click [`here`] to leetcode
+    ///
+    /// [`here`]: https://leetcode.cn/problems/word-search-ii/description/
     #[allow(unused)]
     pub fn find_words(board: Vec<Vec<char>>, words: Vec<String>) -> Vec<String> {
-        //1.收集全部单词首字母，记录字母的开始坐标
-        //2.从开始坐标开始上下左右搜索
+        //前缀树
+        //深度搜索(回溯法)
+        let mut tree = {
+            let mut parent = Node::default();
+            for (idx, word) in words.iter().enumerate() {
+                let mut node = &mut parent;
+                for c in word.chars() {
+                    let child = node.child.entry(c).or_default();
+                    node = child;
+                }
+                node.word = Some(idx);
+            }
+
+            parent
+        };
+
         let n = board[0].len();
         let mut res = vec![];
-
-        let mut starts: HashMap<&char, VecDeque<(usize, usize)>> = HashMap::new();
-
         for (x, row) in board.iter().enumerate() {
             for (y, col) in row.iter().enumerate() {
-                match starts.entry(col) {
-                    Entry::Occupied(mut e) => {
-                        e.get_mut().push_back((x, y));
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(VecDeque::from_iter([(x, y)]));
-                    }
+                let node = match tree.child.get_mut(col) {
+                    Some(node) => node,
+                    None => continue,
                 };
-            }
-        }
 
-        for word in words {
-            let chars = word.chars().collect::<Vec<_>>();
-            if chars.iter().any(|c| !starts.contains_key(c)) {
-                continue;
-            }
-
-            let start = match starts.get(&chars[0]) {
-                Some(start) => start,
-                None => continue,
-            };
-
-            for (x, y) in start {
-                if Solution::search(
-                    *x,
-                    *y,
-                    1,
+                Solution::search(
+                    x,
+                    y,
+                    node,
                     &board,
-                    &chars,
                     &mut HashSet::from_iter([x * n + y]),
-                ) {
-                    res.push(word);
-                    break;
-                }
+                    &mut res,
+                );
             }
         }
 
+        let mut res = res
+            .iter()
+            .map(|idx| words[*idx].clone())
+            .collect::<Vec<_>>();
         res.sort();
         res
     }
@@ -63,38 +66,38 @@ impl Solution {
     fn search(
         x: usize,
         y: usize,
-        cidx: usize,
+        tree: &mut Node,
         board: &[Vec<char>],
-        chars: &[char],
         moved: &mut HashSet<usize>,
-    ) -> bool {
-        if chars.len() <= cidx {
-            return true;
+        res: &mut Vec<usize>,
+    ) {
+        if let Some(word) = tree.word.take() {
+            res.push(word);
         }
 
         let (m, n) = (board.len(), board[0].len());
-
-        let c = chars[cidx];
         for (lhs, rhs) in Solution::DIRS {
-            let x = x.wrapping_add_signed(lhs);
-            let y = y.wrapping_add_signed(rhs);
-            if m <= x || n <= y || board[x][y] != c {
+            let nx = x.wrapping_add_signed(lhs);
+            let ny = y.wrapping_add_signed(rhs);
+            if m <= nx || n <= ny {
                 continue;
             }
 
-            let idx = x * n + y;
+            let idx = nx * n + ny;
             if moved.contains(&idx) {
                 continue;
             }
 
+            let c = board[nx][ny];
+            let child = match tree.child.get_mut(&c) {
+                Some(child) => child,
+                None => continue,
+            };
+
             moved.insert(idx);
-            if Solution::search(x, y, cidx + 1, board, chars, moved) {
-                return true;
-            }
+            Solution::search(nx, ny, child, board, moved, res);
             moved.remove(&idx);
         }
-
-        false
     }
 }
 
@@ -153,7 +156,7 @@ fn test4() {
     ];
     assert_eq!(
         vec!["abcdefg", "befa", "eaabcdgfa", "gfedcbaaa",],
-        dbg!(Solution::find_words(
+        Solution::find_words(
             w,
             vec![
                 "abcdefg".to_string(),
@@ -163,7 +166,7 @@ fn test4() {
                 "dgc".to_string(),
                 "ade".to_string()
             ],
-        ))
+        )
     );
 }
 

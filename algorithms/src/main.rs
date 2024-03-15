@@ -19,8 +19,8 @@ pub fn main() {
     let mut questions = Vec::new();
     let mut dirs = vec![fs::read_dir(algorithms_dir)];
 
-    while !dirs.is_empty() {
-        let item = dirs.pop().unwrap();
+    while let Some(item) = dirs.pop() {
+        //let item = dirs.pop().unwrap();
         if let Ok(entry) = item {
             for path in entry {
                 let path = path.unwrap().path();

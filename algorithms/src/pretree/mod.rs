@@ -232,7 +232,7 @@ fn parse_path(path: &str) -> Vec<String> {
     paths
 }
 fn format_rule(rule: &str) -> String {
-    rule.replace("{", ":").replace("}", "")
+    rule.replace('{', ":").replace('}', "")
 }
 
 fn is_variable(s: &str) -> bool {
