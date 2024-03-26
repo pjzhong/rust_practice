@@ -4,6 +4,7 @@ mod last_stone_weight;
 mod majority_element;
 mod maximum_units_on_a_truck;
 mod number_of_good_pairs;
+mod palindrome_number;
 mod product_of_array_except_self;
 mod remove_all_adjacent_duplicates_in_string;
 mod remove_duplicates_from_sorted_array_ii;
