@@ -7,6 +7,7 @@ impl Solution {
     /// click [`here`] to leetcode
     ///
     /// [`here`]: https://leetcode.cn/problems/palindrome-number/description/
+    #[allow(unused)]
     pub fn is_palindrome(x: i32) -> bool {
         if x.is_negative() {
             return false;
