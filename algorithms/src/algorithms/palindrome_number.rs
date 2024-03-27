@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 use super::Solution;
 
 impl Solution {
-
     /// click [`here`] to leetcode
     ///
     /// [`here`]: https://leetcode.cn/problems/palindrome-number/description/
