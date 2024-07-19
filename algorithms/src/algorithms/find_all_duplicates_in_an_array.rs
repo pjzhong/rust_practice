@@ -11,8 +11,8 @@ impl Solution {
         let len = nums.len();
         let mut idx = 0;
         while idx < len {
-            let i = nums[idx];
-            let target_idx = (i as usize) - 1;
+            let i = nums[idx].abs();
+            let target_idx = (i as usize).saturating_sub(1);
             let target = nums[target_idx];
             if idx == target_idx || i == 0 {
                 idx += 1;
