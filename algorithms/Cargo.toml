@@ -9,4 +9,4 @@ edition = "2018"
 [dependencies]
 
 [dev-dependencies]
-rand = "0.3.*"
+rand = "0.8.*"
