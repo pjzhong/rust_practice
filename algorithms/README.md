@@ -1,10 +1,11 @@
 [LeetCode:zanchen](https://leetcode.cn/u/zanchen/)
 
-# Questions-18
+# Questions-19
 
 - [backspace_string_compare](src/algorithms/backspace_string_compare.rs)
 - [circular_queue](src/algorithms/circular_queue.rs)
 - [find_all_duplicates_in_an_array](src/algorithms/find_all_duplicates_in_an_array.rs)
+- [hanota](src/algorithms/hanota.rs)
 - [last_stone_weight](src/algorithms/last_stone_weight.rs)
 - [majority_element](src/algorithms/majority_element.rs)
 - [maximum_units_on_a_truck](src/algorithms/maximum_units_on_a_truck.rs)

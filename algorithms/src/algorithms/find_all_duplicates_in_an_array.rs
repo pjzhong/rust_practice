@@ -1,5 +1,6 @@
 use super::Solution;
 
+#[allow(dead_code)]
 impl Solution {
     pub fn find_duplicates(mut nums: Vec<i32>) -> Vec<i32> {
         // n == nums.length

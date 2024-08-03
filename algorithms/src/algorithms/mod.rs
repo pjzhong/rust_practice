@@ -1,6 +1,7 @@
 mod backspace_string_compare;
 mod circular_queue;
 mod find_all_duplicates_in_an_array;
+mod hanota;
 mod last_stone_weight;
 mod majority_element;
 mod maximum_units_on_a_truck;
